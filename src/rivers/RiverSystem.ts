@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
 import type { Terrain } from '../terrain/Terrain.ts';
+import { createRiverBankMeshes } from './RiverBankMesh.ts';
 import { RiverField } from './RiverField.ts';
 import { createRiverShoreStones } from './RiverShoreStones.ts';
 import { createRiverWaterMesh, disposeSharedRiverWaterMaterial } from './RiverWaterMesh.ts';
@@ -16,6 +18,7 @@ export function createRiverSystem(
   terrain: Terrain,
   riverField: RiverField,
   maxAnisotropy: number,
+  riverBankMaterial: MeshStandardNodeMaterial,
 ): RiverSystem {
   const group = new THREE.Group();
   group.name = 'River system';
@@ -23,6 +26,7 @@ export function createRiverSystem(
   const rockMaterial = createRiverRockMaterial(maxAnisotropy);
   const rng = mulberry32(0x71ee1212);
   const waterController = createRiverWaterMesh(group, terrain, riverField);
+  group.add(createRiverBankMeshes(terrain, riverField.layout, riverBankMaterial));
   group.add(createRiverShoreStones(terrain, riverField, rockMaterial, rng));
 
   const dispose = () => {

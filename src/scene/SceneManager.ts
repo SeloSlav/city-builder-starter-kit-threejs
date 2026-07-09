@@ -81,9 +81,10 @@ export class SceneManager {
       heightSegments: 28,
       rendererBackend: backend.kind,
     });
-    this.riverSystem = createRiverSystem(this.terrain, riverField, backend.maxAnisotropy);
+    this.riverSystem = createRiverSystem(this.terrain, riverField, backend.maxAnisotropy, materials.riverBank);
     this.forestManager = createForestProps(this.terrain, backend.maxAnisotropy, {
       isBlockedAt: (x, z) => this.riverSystem.isBlockedAt(x, z),
+      rendererBackend: backend.kind,
     });
 
     this.roadGroup.name = 'Road network visuals';

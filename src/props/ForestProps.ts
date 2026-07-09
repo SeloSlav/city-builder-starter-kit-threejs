@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { Terrain } from '../terrain/Terrain.ts';
 import { ForestManager, type ConiferForestInstances } from './ForestManager.ts';
+import { applyTreeShadowReceiveFilter, setTreeShadowInstanceAttributes } from './treeShadowReceiveFilter.ts';
+import type { RendererBackendKind } from '../scene/RendererBackend.ts';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const TAU = Math.PI * 2;
@@ -61,6 +63,7 @@ type RockOutcrop = {
 
 export type ForestPropsOptions = {
   isBlockedAt?: (x: number, z: number) => boolean;
+  rendererBackend?: RendererBackendKind;
 };
 
 export function createForestProps(
@@ -71,7 +74,8 @@ export function createForestProps(
   const rng = mulberry32(0x5eedf0a5);
   const spawnConfig = createPropSpawnConfig(terrain);
   const isBlockedAt = options?.isBlockedAt;
-  const materials = createForestMaterials(maxAnisotropy);
+  const enableTreeShadowFilter = options?.rendererBackend !== 'webgpu';
+  const materials = createForestMaterials(maxAnisotropy, enableTreeShadowFilter);
   const forest = new THREE.Group();
   forest.name = 'Road-scale forest props';
   const forestCores = createForestCores(rng, spawnConfig);
@@ -104,7 +108,7 @@ function createPropSpawnConfig(terrain: Terrain): PropSpawnConfig {
   };
 }
 
-function createForestMaterials(maxAnisotropy: number): ForestMaterialSet {
+function createForestMaterials(maxAnisotropy: number, enableTreeShadowFilter: boolean): ForestMaterialSet {
   const loader = new THREE.TextureLoader();
   const textures: THREE.Texture[] = [];
   const loadMap = (url: string, srgb = false, anisotropyLimit = 16): THREE.Texture => {
@@ -153,6 +157,8 @@ function createForestMaterials(maxAnisotropy: number): ForestMaterialSet {
       side: THREE.DoubleSide,
     }),
   ];
+  if (enableTreeShadowFilter) applyTreeShadowReceiveFilter(needles[0]);
+  if (enableTreeShadowFilter) applyTreeShadowReceiveFilter(bark);
 
   return {
     bark,
@@ -515,6 +521,14 @@ function createConiferForest(
   const foliageStartIndex: number[] = [];
   const trunkMatrices = placements.map(() => new THREE.Matrix4());
   const foliageMatrices = Array.from({ length: totalLayers }, () => new THREE.Matrix4());
+  const foliageTreeRoots = new Float32Array(totalLayers * 2);
+  const foliageTreeBaseYs = new Float32Array(totalLayers);
+  const foliageTreeHeights = new Float32Array(totalLayers);
+  const foliageCanopyRadii = new Float32Array(totalLayers);
+  const trunkTreeRoots = new Float32Array(placements.length * 2);
+  const trunkTreeBaseYs = new Float32Array(placements.length);
+  const trunkTreeHeights = new Float32Array(placements.length);
+  const trunkCanopyRadii = new Float32Array(placements.length);
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
   const scaleVector = new THREE.Vector3();
@@ -524,7 +538,7 @@ function createConiferForest(
 
   trunkMesh.name = 'Instanced pine trunks';
   trunkMesh.castShadow = true;
-  trunkMesh.receiveShadow = false;
+  trunkMesh.receiveShadow = true;
   shadowTierMesh.name = 'Instanced pine shadow tiers';
   shadowTierMesh.layers.set(TREE_SHADOW_CAST_LAYER);
   shadowTierMesh.castShadow = true;
@@ -532,7 +546,7 @@ function createConiferForest(
   shadowTierMesh.customDepthMaterial = materials.shadowDepth;
   foliageMesh.name = 'Instanced pine needle tiers';
   foliageMesh.castShadow = false;
-  foliageMesh.receiveShadow = false;
+  foliageMesh.receiveShadow = true;
 
   placements.forEach((placement, treeIndex) => {
     const rootY = terrain.getHeightAt(placement.x, placement.z);
@@ -552,8 +566,10 @@ function createConiferForest(
     const layers = layerCounts[treeIndex];
     foliageStartIndex[treeIndex] = layerIndex;
     const yawOffset = rng() * TAU;
+    let maxTierRadius = 0;
+
     for (let i = 0; i < layers; i++) {
-      const t = i / (layers - 1);
+      const t = layers > 1 ? i / (layers - 1) : 0;
       const whorl = (isBroad ? 0.14 : 0.17) + t * (isYoung ? 0.72 : 0.76);
       const tierRadius =
         (3.35 * Math.pow(1 - t, isBroad ? 0.98 : 1.16) + (isYoung ? 0.36 : 0.5)) *
@@ -569,6 +585,7 @@ function createConiferForest(
       );
       quaternion.setFromEuler(new THREE.Euler((rng() - 0.5) * 0.075, yawOffset + i * 0.83, (rng() - 0.5) * 0.075));
       scaleVector.set(tierRadius, tierHeight, tierRadius * (0.9 + rng() * 0.16));
+      maxTierRadius = Math.max(maxTierRadius, tierRadius);
       matrix.compose(position, quaternion, scaleVector);
       foliageMesh.setMatrixAt(layerIndex, matrix);
       shadowTierMesh.setMatrixAt(layerIndex, matrix);
@@ -577,9 +594,26 @@ function createConiferForest(
         .set(t < 0.42 ? 0xd1dcc4 : t < 0.76 ? 0xe1e8d0 : 0xc5cfb7)
         .offsetHSL((rng() - 0.5) * 0.014, (rng() - 0.5) * 0.035, (rng() - 0.5) * 0.045);
       foliageMesh.setColorAt(layerIndex, color);
+      foliageTreeRoots[layerIndex * 2] = placement.x;
+      foliageTreeRoots[layerIndex * 2 + 1] = placement.z;
+      foliageTreeBaseYs[layerIndex] = rootY;
+      foliageTreeHeights[layerIndex] = height;
       layerIndex++;
     }
+
+    const treeCanopyRadius = maxTierRadius * 1.06;
+    trunkTreeRoots[treeIndex * 2] = placement.x;
+    trunkTreeRoots[treeIndex * 2 + 1] = placement.z;
+    trunkTreeBaseYs[treeIndex] = rootY;
+    trunkTreeHeights[treeIndex] = height;
+    trunkCanopyRadii[treeIndex] = treeCanopyRadius;
+    for (let i = 0; i < layers; i++) {
+      foliageCanopyRadii[foliageStartIndex[treeIndex] + i] = treeCanopyRadius;
+    }
   });
+
+  setTreeShadowInstanceAttributes(trunkGeometry, trunkTreeRoots, trunkTreeBaseYs, trunkTreeHeights, trunkCanopyRadii);
+  setTreeShadowInstanceAttributes(tierGeometry, foliageTreeRoots, foliageTreeBaseYs, foliageTreeHeights, foliageCanopyRadii);
 
   trunkMesh.instanceMatrix.needsUpdate = true;
   shadowTierMesh.instanceMatrix.needsUpdate = true;

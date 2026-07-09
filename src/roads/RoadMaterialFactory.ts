@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { createTerrainGrassMaterial } from '../terrain/TerrainGrassMaterial.ts';
-import { createRoadCoreMaterial, createRoadEdgeMaterial } from './RoadSurfaceMaterial.ts';
+import { createRoadCoreMaterial, createRoadEdgeMaterial, createRiverBankMaterial } from './RoadSurfaceMaterial.ts';
 import { RoadTextureLoader, type TerrainBlendTextureSet, type TextureSet } from './RoadTextureLoader.ts';
 import type { MeshStandardNodeMaterial } from 'three/webgpu';
 
 export class RoadMaterialFactory {
   readonly road!: MeshStandardNodeMaterial;
   readonly roadEdge!: MeshStandardNodeMaterial;
+  readonly riverBank!: MeshStandardNodeMaterial;
   readonly terrain!: MeshStandardNodeMaterial;
   readonly previewValid: THREE.MeshStandardMaterial;
   readonly previewInvalid: THREE.MeshStandardMaterial;
@@ -58,7 +59,7 @@ export class RoadMaterialFactory {
   }
 
   dispose(): void {
-    const materials = [this.road, this.roadEdge, this.terrain, this.previewValid, this.previewInvalid, this.selection, this.snap];
+    const materials = [this.road, this.roadEdge, this.riverBank, this.terrain, this.previewValid, this.previewInvalid, this.selection, this.snap];
     materials.forEach((material) => material.dispose());
     if (this.roadTextures) this.disposeTextureSet(this.roadTextures);
     if (this.terrainBlendTextures) {
@@ -68,12 +69,18 @@ export class RoadMaterialFactory {
     }
   }
 
-  private createMaterials(): { road: MeshStandardNodeMaterial; roadEdge: MeshStandardNodeMaterial; terrain: MeshStandardNodeMaterial } {
+  private createMaterials(): {
+    road: MeshStandardNodeMaterial;
+    roadEdge: MeshStandardNodeMaterial;
+    riverBank: MeshStandardNodeMaterial;
+    terrain: MeshStandardNodeMaterial;
+  } {
     if (!this.roadTextures || !this.terrainBlendTextures) throw new Error('Textures are not loaded.');
     const road = createRoadCoreMaterial(this.roadTextures);
     const roadEdge = createRoadEdgeMaterial(this.roadTextures);
+    const riverBank = createRiverBankMaterial(this.roadTextures);
     const terrain = createTerrainGrassMaterial(this.terrainBlendTextures);
-    return { road, roadEdge, terrain };
+    return { road, roadEdge, riverBank, terrain };
   }
 
   private disposeTextureSet(set: TextureSet): void {

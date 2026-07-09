@@ -21,8 +21,10 @@ export class RoadMeshBuilder {
     const ribbonPath = sampled.map((point) => point.clone());
     const startNode = network.nodes.get(edge.startNodeId);
     const endNode = network.nodes.get(edge.endNodeId);
-    if (startNode && startNode.edgeIds.size === 1) trimPathAtEndpoint(ribbonPath, edge.startNodeId, edge, edge.width);
-    if (endNode && endNode.edgeIds.size === 1) trimPathAtEndpoint(ribbonPath, edge.endNodeId, edge, edge.width);
+    const startIsEndpoint = startNode?.edgeIds.size === 1;
+    const endIsEndpoint = endNode?.edgeIds.size === 1;
+    if (startNode && startIsEndpoint) trimPathAtEndpoint(ribbonPath, edge.startNodeId, edge, edge.width);
+    if (endNode && endIsEndpoint) trimPathAtEndpoint(ribbonPath, edge.endNodeId, edge, edge.width);
 
     const group = new THREE.Group();
     group.name = `Road edge ${edge.id}`;
@@ -36,7 +38,10 @@ export class RoadMeshBuilder {
     core.renderOrder = 11;
     group.add(core);
 
-    const edgeBlend = this.buildEdgeBlend(ribbonPath, edge.width, edge.id);
+    const edgeBlend = this.buildEdgeBlend(ribbonPath, edge.width, edge.id, {
+      fadeStart: startIsEndpoint,
+      fadeEnd: endIsEndpoint,
+    });
     edgeBlend.name = `Road edge blend ${edge.id}`;
     edgeBlend.userData.edgeId = edge.id;
     edgeBlend.renderOrder = 10;
@@ -118,14 +123,21 @@ export class RoadMeshBuilder {
     return new THREE.Mesh(geometry, material);
   }
 
-  private buildEdgeBlend(path: THREE.Vector3[], width: number, seed: string): THREE.Mesh {
+  private buildEdgeBlend(
+    path: THREE.Vector3[],
+    width: number,
+    seed: string,
+    endpointFade: { fadeStart: boolean; fadeEnd: boolean } = { fadeStart: false, fadeEnd: false },
+  ): THREE.Mesh {
     const positions: number[] = [];
     const uvs: number[] = [];
     const indices: number[] = [];
     const distances = cumulativeDistances(path);
+    const pathLen = distances[distances.length - 1] ?? 0;
     const half = width * 0.5;
     const shoulderMid = width * 0.48;
     const shoulderOuter = width * 0.92;
+    const fadeSpan = width * 0.55;
 
     for (let i = 0; i < path.length; i++) {
       const tangent = tangentAt(path, i);
@@ -143,7 +155,10 @@ export class RoadMeshBuilder {
         positions.push(p.x, p.y, p.z);
       }
       const v = distances[i] / 5.8;
-      uvs.push(0, v, 0.42, v, 1, v, 1, v, 0.42, v, 0, v);
+      let mouthFade = 1;
+      if (endpointFade.fadeStart) mouthFade = Math.min(mouthFade, smoothFade(distances[i], fadeSpan));
+      if (endpointFade.fadeEnd) mouthFade = Math.min(mouthFade, smoothFade(pathLen - distances[i], fadeSpan));
+      uvs.push(0, v, 0.42 * mouthFade, v, 1 * mouthFade, v, 1 * mouthFade, v, 0.42 * mouthFade, v, 0, v);
     }
 
     for (let i = 0; i < path.length - 1; i++) {
@@ -198,5 +213,10 @@ function estimateCurvature(points: THREE.Vector3[]): number {
 function edgeJitter(seed: string, index: number, side: number): number {
   const seedValue = [...seed].reduce((sum, char) => sum + char.charCodeAt(0), 0);
   return Math.sin(index * 1.734 + side * 11.91 + seedValue * 0.137) * 0.65 + Math.sin(index * 0.431 + seedValue) * 0.35;
+}
+
+function smoothFade(distance: number, span: number): number {
+  const t = THREE.MathUtils.clamp(distance / Math.max(0.001, span), 0, 1);
+  return t * t * (3 - 2 * t);
 }
 
