@@ -84,4 +84,5 @@ declare module 'three/tsl' {
   export const positionWorld: TslNode;
   export const distance: (a: TslNode, b: TslNode) => TslNode;
   export const sub: (a: TslNode, b: TslNode) => TslNode;
+  export function uniform<T>(value: T): { value: T };
 }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { cameraPosition, distance, float, positionWorld, smoothstep, sub, vertexColor } from 'three/tsl';
+import { float, smoothstep, sub, vertexColor } from 'three/tsl';
 import type { Terrain } from '../terrain/Terrain.ts';
 import type { RoadEdge } from '../roads/RoadEdge.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
@@ -13,7 +13,7 @@ import {
   isInsidePlayableExtent,
   mulberry32,
 } from '../props/forestField.ts';
-import { GRASS_LOD } from './GrassLodConfig.ts';
+import { GRASS_LOD, grassCameraDistance } from './GrassLodConfig.ts';
 
 type TslNode = {
   add(value: TslNode): TslNode;
@@ -128,10 +128,9 @@ function createGrassBladeMaterial(): MeshStandardNodeMaterial {
   material.metalness = 0;
   material.color.set(0xffffff);
 
-  const dist = distance(positionWorld as TslNode, cameraPosition as TslNode) as TslNode;
   const fade = sub(
     float(1) as TslNode,
-    smoothstep(float(GRASS_LOD.near) as TslNode, float(GRASS_LOD.far) as TslNode, dist) as TslNode,
+    smoothstep(float(GRASS_LOD.near) as TslNode, float(GRASS_LOD.far) as TslNode, grassCameraDistance as unknown as TslNode) as TslNode,
   ) as TslNode;
   material.opacityNode = fade;
   material.colorNode = (vertexColor() as TslNode).rgb;

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createForestProps, TREE_SHADOW_CAST_LAYER } from '../props/ForestProps.ts';
 import type { ForestManager } from '../props/ForestManager.ts';
 import { createGrassBladeField, type GrassBladeField } from '../grass/GrassBladeField.ts';
+import { updateGrassCameraDistance } from '../grass/GrassLodConfig.ts';
 import { createRiverSystem, type RiverSystem } from '../rivers/RiverSystem.ts';
 import { updateTerrainRoadWear } from '../terrain/TerrainRoadWear.ts';
 import { RiverField } from '../rivers/RiverField.ts';
@@ -131,6 +132,7 @@ export class SceneManager {
 
   render(dt: number): void {
     const elapsed = performance.now() * 0.001;
+    updateGrassCameraDistance(this.camera.position.distanceTo(this.cameraTarget));
     this.sky.updateCamera(this.camera);
     this.sky.updateSun(this.sunDirection);
     this.sky.updateTime(elapsed);

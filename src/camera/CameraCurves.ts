@@ -5,21 +5,21 @@ import * as THREE from 'three';
  * Tune these constants to adjust camera feel without touching controller logic.
  */
 
-/** Zoom level that maps to 100% in the zoom HUD. */
-export const DEFAULT_ZOOM01 = 0.35;
+/** Zoom level that maps to 100% in the zoom HUD — near the far/top-down end. */
+export const DEFAULT_ZOOM01 = 0.1;
 
 /** Close-ground rig blend begins here; below feels like a normal strategy camera. */
 export const CLOSE_ZOOM_BLEND_START = 0.65;
 
 // ── Far (zoom01 = 0) ──────────────────────────────────────────────────────────
-export const FAR_ORBIT_DISTANCE = 110;
-export const FAR_ORBIT_PITCH = THREE.MathUtils.degToRad(62);
+export const FAR_ORBIT_DISTANCE = 210;
+export const FAR_ORBIT_PITCH = THREE.MathUtils.degToRad(78);
 export const FAR_PAN_SPEED = 1.0;
 export const FAR_FOV = 54;
 
 // ── Mid (zoom01 ≈ 0.5) ────────────────────────────────────────────────────────
-export const MID_ORBIT_DISTANCE = 52;
-export const MID_ORBIT_PITCH = THREE.MathUtils.degToRad(42);
+export const MID_ORBIT_DISTANCE = 68;
+export const MID_ORBIT_PITCH = THREE.MathUtils.degToRad(50);
 export const MID_PAN_SPEED = 0.45;
 
 // ── Close (zoom01 = 1) ────────────────────────────────────────────────────────
