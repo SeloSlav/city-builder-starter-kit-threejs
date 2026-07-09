@@ -46,17 +46,15 @@ export class RiverLayout {
     const bounds = options.bounds;
     const riverCount = options.riverCount ?? 4;
     const tributaryCount = options.tributaryCount ?? 1;
-    const halfExtent = (bounds.maxX - bounds.minX) * 0.5;
     const drain = { x: 0, z: -88 };
 
     const corridors: RiverCorridor[] = [];
     for (let i = 0; i < riverCount; i++) {
-      const jitter = hashF64(seed ^ 0x5151, i, 0) * 0.28 - 0.14;
-      const angle = (i / riverCount) * TAU + jitter;
-      const start = {
-        x: Math.cos(angle) * halfExtent * 0.9,
-        z: Math.sin(angle) * halfExtent * 0.9,
-      };
+      const jitter = hashF64(seed ^ 0x5151, i, 0) * 0.22 - 0.11;
+      const edgeAngle = (i / riverCount) * TAU + jitter;
+      const mountainAngle = -Math.PI * 0.5 + (hashF64(seed ^ 0x7171, i, 2) - 0.5) * Math.PI * 0.95;
+      const angle = mountainAngle * 0.58 + edgeAngle * 0.42;
+      const start = pointOnBoundsEdge(angle, bounds);
       corridors.push(buildCorridor(start, drain, seed ^ (i + 1) * 0x1337, i));
     }
 
@@ -160,20 +158,25 @@ function buildCorridor(
   scale = 1,
 ): RiverCorridor {
   const controlCount = 11;
-  const controls: Array<{ x: number; z: number }> = [start];
   const dx = drain.x - start.x;
   const dz = drain.z - start.z;
   const length = Math.max(1, Math.hypot(dx, dz));
   const perpX = -dz / length;
   const perpZ = dx / length;
+  const upstream = {
+    x: start.x - (dx / length) * Math.min(96, length * 0.14),
+    z: start.z - (dz / length) * Math.min(96, length * 0.14),
+  };
+  const controls: Array<{ x: number; z: number }> = [upstream, start];
 
   for (let i = 1; i < controlCount; i++) {
     const t = i / controlCount;
     const baseX = start.x + dx * t;
     const baseZ = start.z + dz * t;
     const convergence = smoothstep(0.68, 1, t);
+    const upstreamDamp = 1 - smoothstep(0, 0.24, t) * 0.82;
     const meanderEnvelope =
-      Math.sin(t * Math.PI) * (72 + hashF64(seed ^ 0x6161, i, riverIndex) * 48) * scale * (1 - convergence * 0.88);
+      Math.sin(t * Math.PI) * (72 + hashF64(seed ^ 0x6161, i, riverIndex) * 48) * scale * (1 - convergence * 0.88) * upstreamDamp;
     const waveA = Math.sin(t * (7.4 + riverIndex * 0.31) + seed * 0.002) * 0.58;
     const waveB = Math.sin(t * (12.8 + riverIndex * 0.17) - seed * 0.003) * 0.42;
     const offset = meanderEnvelope * (waveA + waveB);
@@ -188,8 +191,8 @@ function buildCorridor(
   const resampled = resampleByDistance(dense, 2.6);
   const points: RiverPoint[] = resampled.map((point, index) => {
     const progress = index / Math.max(1, resampled.length - 1);
-    let halfWidth = lerp(4, 12, Math.pow(progress, 0.78)) * scale;
-    let channelDepth = lerp(0.95, 2.2, Math.pow(progress, 0.85)) * scale;
+    let halfWidth = lerp(2.4, 12, Math.pow(progress, 0.68)) * scale;
+    let channelDepth = lerp(0.7, 2.2, Math.pow(progress, 0.82)) * scale;
     const distToDrain = Math.hypot(point.x - drain.x, point.z - drain.z);
     const mouthBlend = 1 - smoothstep(0, 130, distToDrain);
     halfWidth = lerp(halfWidth, 26, mouthBlend * 0.82);
@@ -198,6 +201,19 @@ function buildCorridor(
   });
 
   return { points };
+}
+
+function pointOnBoundsEdge(angle: number, bounds: TerrainBounds): { x: number; z: number } {
+  const cx = (bounds.minX + bounds.maxX) * 0.5;
+  const cz = (bounds.minZ + bounds.maxZ) * 0.5;
+  const halfX = (bounds.maxX - bounds.minX) * 0.5;
+  const halfZ = (bounds.maxZ - bounds.minZ) * 0.5;
+  const dx = Math.cos(angle);
+  const dz = Math.sin(angle);
+  let t = Number.POSITIVE_INFINITY;
+  if (Math.abs(dx) > 1e-6) t = Math.min(t, halfX / Math.abs(dx));
+  if (Math.abs(dz) > 1e-6) t = Math.min(t, halfZ / Math.abs(dz));
+  return { x: cx + dx * t, z: cz + dz * t };
 }
 
 function resampleByDistance(

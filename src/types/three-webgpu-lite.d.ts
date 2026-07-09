@@ -72,5 +72,6 @@ declare module 'three/tsl' {
   export const vec3: (...values: Array<number | TslNode>) => TslNode;
   export const normalMap: (sample: TslNode) => TslNode;
   export const vertexColor: () => TslNode;
+  export const attribute: (name: string, type: string) => TslNode;
   export const max: (a: TslNode, b: TslNode) => TslNode;
 }

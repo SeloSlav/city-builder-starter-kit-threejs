@@ -11,6 +11,7 @@ export type RiverFieldOptions = {
 const DEFAULT_RESOLUTION = 225;
 const WATER_THRESHOLD = 0.48;
 const MASK_DILATE_THRESHOLD = 0.38;
+const RENDER_WATER_MASK_THRESHOLD = MASK_DILATE_THRESHOLD;
 const MASK_DILATE_RADIUS = 1.75;
 const SHORE_BAND_MAX = 5.2;
 
@@ -63,7 +64,7 @@ export class RiverField {
     const stepZ = spanZ / (resolution - 1);
     const riverMask = layout.buildRiverMaskGrid(resolution);
     const connectedMask = dilateRiverMask(riverMask, resolution, MASK_DILATE_THRESHOLD, MASK_DILATE_RADIUS);
-    const shoreSigned = computeShoreSignedDistance(connectedMask, resolution, WATER_THRESHOLD);
+    const shoreSigned = computeShoreSignedDistance(connectedMask, resolution, RENDER_WATER_MASK_THRESHOLD);
     const organicSignedDistance = buildOrganicShoreSignedDistance({
       shoreSignedDistance: shoreSigned,
       resolution,
@@ -127,9 +128,7 @@ export class RiverField {
   isRenderedWetAtGrid(ix: number, iz: number): boolean {
     if (ix < 0 || iz < 0 || ix >= this.resolution || iz >= this.resolution) return false;
     const i = iz * this.resolution + ix;
-    const coreWet = this.riverMask[i] >= 0.38;
-    const organicWet = this.organicSignedDistance[i] >= -0.15;
-    return coreWet && organicWet;
+    return this.riverMask[i] >= RENDER_WATER_MASK_THRESHOLD;
   }
 
   sampleOrganicSignedDistance(x: number, z: number): number {

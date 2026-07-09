@@ -42,7 +42,12 @@ export class Terrain {
 
   dispose(): void {
     this.mesh.geometry.dispose();
-    this.mesh.material.dispose();
+    const { material } = this.mesh;
+    if (Array.isArray(material)) {
+      for (const entry of material) entry.dispose();
+    } else {
+      material.dispose();
+    }
   }
 
   private createGeometry(riverField?: RiverField): THREE.BufferGeometry {
