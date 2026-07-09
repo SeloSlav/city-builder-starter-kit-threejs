@@ -138,6 +138,7 @@ export class App {
     this.lastTime = time;
     this.cameraController?.update(dt);
     this.roadTool?.update(dt);
+    this.updateBuildButtonPosition();
     this.sceneManager?.render(dt);
     this.updateFps(time, dt);
     this.animationId = requestAnimationFrame(this.tick);
@@ -155,6 +156,16 @@ export class App {
       mode: this.roadTool.isEnabled() ? 'road' : 'idle',
     };
     this.toolbar.setStats(stats);
+    this.updateBuildButtonPosition();
+  }
+
+  private updateBuildButtonPosition(): void {
+    const roadTool = this.roadTool;
+    if (!this.toolbar || !roadTool) return;
+    this.toolbar.setBuildButtonPosition(
+      roadTool.getBuildButtonPosition(),
+      roadTool.isDraftBuildable(),
+    );
   }
 
   private updateFps(time: number, dt: number): void {

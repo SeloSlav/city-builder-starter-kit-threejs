@@ -2,6 +2,8 @@
 import { Terrain } from '../terrain/Terrain.ts';
 import type { RoadEdge } from './RoadEdge.ts';
 import { RoadMaterialFactory } from './RoadMaterialFactory.ts';
+import type { RoadNetwork } from './RoadNetwork.ts';
+import { trimPathAtEndpoint } from './roadEndpoint.ts';
 
 export class RoadMeshBuilder {
   private readonly terrain: Terrain;
@@ -11,16 +13,22 @@ export class RoadMeshBuilder {
     this.materials = materials;
   }
 
-  buildEdge(edge: RoadEdge): THREE.Group {
+  buildEdge(edge: RoadEdge, network: RoadNetwork): THREE.Group {
     const sampled = this.sampleEdge(edge);
     edge.sampledPath = sampled;
     edge.length = pathLength(sampled);
+
+    const ribbonPath = sampled.map((point) => point.clone());
+    const startNode = network.nodes.get(edge.startNodeId);
+    const endNode = network.nodes.get(edge.endNodeId);
+    if (startNode && startNode.edgeIds.size === 1) trimPathAtEndpoint(ribbonPath, edge.startNodeId, edge, edge.width);
+    if (endNode && endNode.edgeIds.size === 1) trimPathAtEndpoint(ribbonPath, edge.endNodeId, edge, edge.width);
 
     const group = new THREE.Group();
     group.name = `Road edge ${edge.id}`;
     group.userData.edgeId = edge.id;
 
-    const core = this.buildRibbon(sampled, edge.width, this.materials.road, 0.055, edge.id, true);
+    const core = this.buildRibbon(ribbonPath, edge.width, this.materials.road, 0.055, edge.id, true);
     core.name = `Road core ${edge.id}`;
     core.userData.edgeId = edge.id;
     core.castShadow = false;
@@ -28,7 +36,7 @@ export class RoadMeshBuilder {
     core.renderOrder = 11;
     group.add(core);
 
-    const edgeBlend = this.buildEdgeBlend(sampled, edge.width, edge.id);
+    const edgeBlend = this.buildEdgeBlend(ribbonPath, edge.width, edge.id);
     edgeBlend.name = `Road edge blend ${edge.id}`;
     edgeBlend.userData.edgeId = edge.id;
     edgeBlend.renderOrder = 10;
@@ -116,29 +124,34 @@ export class RoadMeshBuilder {
     const indices: number[] = [];
     const distances = cumulativeDistances(path);
     const half = width * 0.5;
-    const shoulder = width * 0.38;
+    const shoulderMid = width * 0.48;
+    const shoulderOuter = width * 0.92;
 
     for (let i = 0; i < path.length; i++) {
       const tangent = tangentAt(path, i);
       const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-      const leftJitter = edgeJitter(seed, i, 2) * 0.42;
-      const rightJitter = edgeJitter(seed, i, 3) * 0.42;
-      const leftOuter = path[i].clone().addScaledVector(normal, half + shoulder + leftJitter);
-      const leftInner = path[i].clone().addScaledVector(normal, half - 0.08 + leftJitter * 0.35);
-      const rightInner = path[i].clone().addScaledVector(normal, -half + 0.08 + rightJitter * 0.35);
-      const rightOuter = path[i].clone().addScaledVector(normal, -half - shoulder + rightJitter);
-      for (const p of [leftOuter, leftInner, rightInner, rightOuter]) {
-        p.y = this.terrain.getHeightAt(p.x, p.z) + 0.036;
+      const leftJitter = edgeJitter(seed, i, 2) * 0.52;
+      const rightJitter = edgeJitter(seed, i, 3) * 0.52;
+      const leftFar = path[i].clone().addScaledVector(normal, half + shoulderOuter + leftJitter);
+      const leftMid = path[i].clone().addScaledVector(normal, half + shoulderMid + leftJitter * 0.62);
+      const leftInner = path[i].clone().addScaledVector(normal, half - 0.04 + leftJitter * 0.28);
+      const rightInner = path[i].clone().addScaledVector(normal, -half + 0.04 + rightJitter * 0.28);
+      const rightMid = path[i].clone().addScaledVector(normal, -half - shoulderMid + rightJitter * 0.62);
+      const rightFar = path[i].clone().addScaledVector(normal, -half - shoulderOuter + rightJitter);
+      for (const p of [leftFar, leftMid, leftInner, rightInner, rightMid, rightFar]) {
+        p.y = this.terrain.getHeightAt(p.x, p.z) + 0.034;
         positions.push(p.x, p.y, p.z);
       }
       const v = distances[i] / 5.8;
-      uvs.push(0, v, 1, v, 1, v, 0, v);
+      uvs.push(0, v, 0.42, v, 1, v, 1, v, 0.42, v, 0, v);
     }
 
     for (let i = 0; i < path.length - 1; i++) {
-      const a = i * 4;
-      indices.push(a, a + 4, a + 1, a + 1, a + 4, a + 5);
-      indices.push(a + 2, a + 6, a + 3, a + 3, a + 6, a + 7);
+      const a = i * 6;
+      indices.push(a, a + 6, a + 1, a + 1, a + 6, a + 7);
+      indices.push(a + 1, a + 7, a + 2, a + 2, a + 7, a + 8);
+      indices.push(a + 3, a + 9, a + 4, a + 4, a + 9, a + 10);
+      indices.push(a + 4, a + 10, a + 5, a + 5, a + 10, a + 11);
     }
 
     const geometry = new THREE.BufferGeometry();

@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { createForestProps } from '../props/ForestProps.ts';
+import { createForestProps, TREE_SHADOW_CAST_LAYER } from '../props/ForestProps.ts';
+import type { ForestManager } from '../props/ForestManager.ts';
+import { createRiverSystem, type RiverSystem } from '../rivers/RiverSystem.ts';
+import { RiverField } from '../rivers/RiverField.ts';
+import { RiverLayout } from '../rivers/RiverLayout.ts';
+import { setActiveRiverLayout } from '../terrain/TerrainHeight.ts';
 import type { RoadEdge } from '../roads/RoadEdge.ts';
 import { RoadJunctionBuilder } from '../roads/RoadJunctionBuilder.ts';
 import { RoadMaterialFactory } from '../roads/RoadMaterialFactory.ts';
@@ -10,6 +15,7 @@ import { Terrain } from '../terrain/Terrain.ts';
 import { TerrainProjector } from '../terrain/TerrainProjector.ts';
 import { disposeObject3D } from '../utils/dispose.ts';
 import { createPostProcessor, type ScenePostProcessor } from './PostProcessing.ts';
+import { fitDirectionalLightShadow } from './fitDirectionalShadow.ts';
 import { createPreferredRenderer, type RendererBackend, type RendererBackendKind, type SupportedRenderer } from './RendererBackend.ts';
 
 export class SceneManager {
@@ -28,7 +34,9 @@ export class SceneManager {
   readonly selectionGroup = new THREE.Group();
   private readonly sky: SkyCloudMesh;
   private readonly sunDirection = new THREE.Vector3();
-  private readonly forestGroup: THREE.Group;
+  private sunLight!: THREE.DirectionalLight;
+  private readonly forestManager: ForestManager;
+  private readonly riverSystem: RiverSystem;
   private readonly roadGroup = new THREE.Group();
   private readonly junctionGroup = new THREE.Group();
   private readonly edgeVisuals = new Map<string, { revision: number; group: THREE.Group }>();
@@ -43,6 +51,16 @@ export class SceneManager {
     this.scene.fog = new THREE.FogExp2(0xc8def1, 0.00082);
     this.camera = new THREE.PerspectiveCamera(54, 1, 0.1, 2600);
     this.sunDirection.setFromSphericalCoords(1, THREE.MathUtils.degToRad(43), THREE.MathUtils.degToRad(225));
+    const playableHalf = 820 * 0.5;
+    const bounds = {
+      minX: -playableHalf,
+      maxX: playableHalf,
+      minZ: -playableHalf,
+      maxZ: playableHalf,
+    };
+    const riverLayout = RiverLayout.create({ bounds });
+    setActiveRiverLayout(riverLayout);
+    const riverField = RiverField.fromLayout({ bounds, layout: riverLayout });
     this.terrain = new Terrain(materials.terrain);
     this.terrainProjector = new TerrainProjector(this.terrain, this.camera, this.renderer.domElement);
     this.roadMeshBuilder = new RoadMeshBuilder(this.terrain, materials);
@@ -63,14 +81,26 @@ export class SceneManager {
       heightSegments: 28,
       rendererBackend: backend.kind,
     });
-    this.forestGroup = createForestProps(this.terrain, backend.maxAnisotropy);
+    this.riverSystem = createRiverSystem(this.terrain, riverField, backend.maxAnisotropy);
+    this.forestManager = createForestProps(this.terrain, backend.maxAnisotropy, {
+      isBlockedAt: (x, z) => this.riverSystem.isBlockedAt(x, z),
+    });
 
     this.roadGroup.name = 'Road network visuals';
     this.junctionGroup.name = 'Road junction visuals';
     this.previewGroup.name = 'Road preview root';
     this.selectionGroup.name = 'Road selection root';
 
-    this.scene.add(this.sky, this.terrain.mesh, this.forestGroup, this.roadGroup, this.junctionGroup, this.previewGroup, this.selectionGroup);
+    this.scene.add(
+      this.sky,
+      this.terrain.mesh,
+      this.riverSystem.group,
+      this.forestManager.group,
+      this.roadGroup,
+      this.junctionGroup,
+      this.previewGroup,
+      this.selectionGroup,
+    );
     this.addLighting();
     this.postProcessor = createPostProcessor(backend, this.scene, this.camera);
   }
@@ -101,6 +131,8 @@ export class SceneManager {
     this.sky.updateCamera(this.camera);
     this.sky.updateSun(this.sunDirection);
     this.sky.updateTime(elapsed);
+    this.riverSystem.tick(dt, elapsed);
+    fitDirectionalLightShadow(this.sunLight, { bounds: this.terrain.bounds, sunOffsetDir: this.sunDirection });
     this.postProcessor.render(dt);
   }
 
@@ -123,10 +155,17 @@ export class SceneManager {
     }
 
     for (const edge of network.edges.values()) {
-      this.upsertEdge(edge);
+      this.upsertEdge(edge, network);
     }
 
     this.rebuildJunctions(network);
+    this.forestManager.syncRoadClearance(network);
+    this.refreshShadowMap();
+  }
+
+  private refreshShadowMap(): void {
+    const shadowMap = this.renderer.shadowMap as { needsUpdate?: boolean };
+    if ('needsUpdate' in shadowMap) shadowMap.needsUpdate = true;
   }
 
   getRoadPickMeshes(): THREE.Object3D[] {
@@ -142,8 +181,10 @@ export class SceneManager {
   dispose(): void {
     for (const visual of this.edgeVisuals.values()) disposeObject3D(visual.group);
     this.edgeVisuals.clear();
-    disposeObject3D(this.forestGroup);
-    (this.forestGroup.userData.disposeResources as (() => void) | undefined)?.();
+    disposeObject3D(this.forestManager.group);
+    this.forestManager.dispose();
+    this.riverSystem.dispose();
+    disposeObject3D(this.riverSystem.group);
     this.sky.dispose();
     this.postProcessor.dispose();
     disposeObject3D(this.junctionGroup);
@@ -155,7 +196,7 @@ export class SceneManager {
     this.renderer.domElement.remove();
   }
 
-  private upsertEdge(edge: RoadEdge): void {
+  private upsertEdge(edge: RoadEdge, network: RoadNetwork): void {
     const existing = this.edgeVisuals.get(edge.id);
     if (existing && existing.revision === edge.revision) return;
     if (existing) {
@@ -163,7 +204,7 @@ export class SceneManager {
       disposeObject3D(existing.group);
       this.edgeVisuals.delete(edge.id);
     }
-    const group = this.roadMeshBuilder.buildEdge(edge);
+    const group = this.roadMeshBuilder.buildEdge(edge, network);
     this.roadGroup.add(group);
     this.edgeVisuals.set(edge.id, { revision: edge.revision, group });
   }
@@ -187,16 +228,16 @@ export class SceneManager {
     sun.name = 'Sun';
     sun.position.copy(this.sunDirection).multiplyScalar(180);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.near = 15;
-    sun.shadow.camera.far = 260;
-    sun.shadow.camera.left = -120;
-    sun.shadow.camera.right = 120;
-    sun.shadow.camera.top = 120;
-    sun.shadow.camera.bottom = -120;
-    sun.shadow.bias = -0.00008;
-    sun.shadow.normalBias = 0.025;
+    sun.shadow.mapSize.set(4096, 4096);
+    sun.shadow.bias = -0.00015;
+    sun.shadow.normalBias = 0.012;
+    sun.shadow.radius = 2.8;
+    sun.shadow.camera.layers.enable(TREE_SHADOW_CAST_LAYER);
     this.scene.add(sun);
+    this.scene.add(sun.target);
+    this.sunLight = sun;
+    fitDirectionalLightShadow(sun, { bounds: this.terrain.bounds, sunOffsetDir: this.sunDirection });
+    this.refreshShadowMap();
 
     const blueFill = new THREE.DirectionalLight(0x9fc8ff, 0.45);
     blueFill.name = 'Sky fill';

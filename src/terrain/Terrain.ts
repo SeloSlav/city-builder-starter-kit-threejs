@@ -1,4 +1,5 @@
 ﻿import * as THREE from 'three';
+import { sampleBaseTerrainHeight } from './TerrainHeight.ts';
 
 export type TerrainBounds = {
   minX: number;
@@ -24,11 +25,7 @@ export class Terrain {
   }
 
   getHeightAt(x: number, z: number): number {
-    const n1 = this.fbm(x * 0.014, z * 0.014, 4) * 5.6;
-    const n2 = this.fbm(x * 0.04 + 18.4, z * 0.04 - 9.2, 3) * 1.2;
-    const broad = Math.sin(x * 0.012 + z * 0.005) * 1.35 + Math.cos(z * 0.011) * 1.0;
-    const basin = -Math.exp(-(x * x + z * z) / 52000) * 1.4;
-    return n1 + n2 + broad + basin + this.getEdgeHillHeight(x, z);
+    return sampleBaseTerrainHeight(x, z);
   }
 
   getPointAt(x: number, z: number, offset = 0): THREE.Vector3 {
@@ -61,7 +58,7 @@ export class Terrain {
         positions.push(x, this.getHeightAt(x, z), z);
         const uv = this.getTerrainUv(x, z);
         uvs.push(uv.x, uv.y);
-        colors.push(...this.getTerrainBlendTint(x, z));
+        colors.push(...this.getTerrainBlendWeights(x, z));
       }
     }
 
@@ -86,59 +83,30 @@ export class Terrain {
     return geometry;
   }
 
-  private getTerrainBlendTint(x: number, z: number): [number, number, number] {
+  private getTerrainBlendWeights(x: number, z: number): [number, number, number] {
+    // Vertex color channels are blend weights, not tints: R=meadow, G=dense, B=dry.
     const warpX = this.fbm(x * 0.006 + 41.1, z * 0.006 - 17.8, 4) * 22;
     const warpZ = this.fbm(x * 0.006 - 12.5, z * 0.006 + 73.2, 4) * 22;
     const wx = x + warpX;
     const wz = z + warpZ;
-    const dirtNoise = this.fbm(wx * 0.019, wz * 0.019, 4) + 0.5;
-    const liveNoise = this.fbm(wx * 0.0135 + 101.3, wz * 0.0135 - 55.8, 4) + 0.5;
-    const deadNoise = this.fbm(wx * 0.0095 + 31.7, wz * 0.0095 - 19.4, 4) + 0.5;
-    const gravelNoise = this.fbm(wx * 0.031 - 47.2, wz * 0.031 + 22.1, 4) + 0.5;
+    const meadowNoise = this.fbm(wx * 0.011 + 101.3, wz * 0.011 - 55.8, 4) + 0.5;
+    const denseNoise = this.fbm(wx * 0.015, wz * 0.015, 4) + 0.5;
+    const dryNoise = this.fbm(wx * 0.0075 + 31.7, wz * 0.0075 - 19.4, 4) + 0.5;
     const hillT = this.getEdgeHillFactor(x, z);
-    const rawDirt = this.smoothstep(0.6, 0.84, dirtNoise) + 0.024 + hillT * 0.1;
-    const rawDead = this.smoothstep(0.56, 0.82, deadNoise) + 0.03 + hillT * 0.18;
-    const rawLive = this.smoothstep(0.14, 0.58, liveNoise) + 0.34 - hillT * 0.14;
-    const primarySum = Math.max(rawDirt + rawDead + rawLive, 0.0001);
-    const dirtWeight = rawDirt / primarySum;
-    const deadWeight = rawDead / primarySum;
-    const liveWeight = rawLive / primarySum;
-    const gravelOfDirt = this.smoothstep(0.64, 0.86, gravelNoise) * 0.28;
-    const gravelWeight = dirtWeight * gravelOfDirt;
-    const visibleDirtWeight = dirtWeight * (1 - gravelOfDirt);
-    const macro = this.fbm(wx * 0.007 + 8, wz * 0.007 + 29, 4) + 0.5;
-    const mottled = this.fbm(wx * 0.034 - 9.5, wz * 0.034 + 4.8, 3) + 0.5;
-    const macroMul = 0.88 + macro * 0.18 + mottled * 0.08 - hillT * 0.06;
-
-    const live: [number, number, number] = [0.94, 1.05, 0.87];
-    const dead: [number, number, number] = [1.06, 1.0, 0.82];
-    const dirt: [number, number, number] = [1.05, 0.91, 0.74];
-    const gravel: [number, number, number] = [0.96, 0.96, 0.91];
-    return [
-      (live[0] * liveWeight + dead[0] * deadWeight + dirt[0] * visibleDirtWeight + gravel[0] * gravelWeight) * macroMul,
-      (live[1] * liveWeight + dead[1] * deadWeight + dirt[1] * visibleDirtWeight + gravel[1] * gravelWeight) * macroMul,
-      (live[2] * liveWeight + dead[2] * deadWeight + dirt[2] * visibleDirtWeight + gravel[2] * gravelWeight) * macroMul,
-    ];
+    const rawMeadow = this.smoothstep(0.08, 0.54, meadowNoise) + 0.52 - hillT * 0.14;
+    const rawDense = this.smoothstep(0.72, 0.94, denseNoise) * 0.38 + 0.1 + hillT * 0.26;
+    const rawDry = this.smoothstep(0.72, 0.94, dryNoise) * 0.3 + 0.14 + hillT * 0.12;
+    const sum = Math.max(rawMeadow + rawDense + rawDry, 0.0001);
+    return [rawMeadow / sum, rawDense / sum, rawDry / sum];
   }
 
   private getTerrainUv(x: number, z: number): THREE.Vector2 {
-    const scale = 88;
+    const scale = 48;
     const rotatedX = x * 0.67 - z * 0.74;
     const rotatedZ = x * 0.74 + z * 0.67;
     const warpX = this.fbm(x * 0.0048 + 13.2, z * 0.0048 - 7.4, 4) * 0.38 + this.fbm(x * 0.018 - 71.5, z * 0.018 + 19.8, 3) * 0.055;
     const warpZ = this.fbm(x * 0.0053 - 28.6, z * 0.0053 + 44.1, 4) * 0.38 + this.fbm(x * 0.016 + 53.7, z * 0.016 - 38.2, 3) * 0.055;
     return new THREE.Vector2(rotatedX / scale + warpX, rotatedZ / (scale * 1.17) + warpZ);
-  }
-
-  private getEdgeHillHeight(x: number, z: number): number {
-    const t = this.getEdgeHillFactor(x, z);
-    if (t <= 0) return 0;
-
-    const ridge = this.fbm(x * 0.0085 + 37.5, z * 0.0085 - 22.4, 5) + 0.5;
-    const detail = this.fbm(x * 0.026 - 6.2, z * 0.026 + 9.7, 3) + 0.5;
-    const shoulder = t * t * (14 + ridge * 26);
-    const crest = t * t * t * t * (14 + detail * 18);
-    return shoulder + crest;
   }
 
   private getEdgeHillFactor(x: number, z: number): number {
@@ -186,5 +154,3 @@ export class Terrain {
     return n - Math.floor(n);
   }
 }
-
-

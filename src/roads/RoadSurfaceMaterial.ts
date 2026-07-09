@@ -1,0 +1,56 @@
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { float, mix, texture, uv, vec3 } from 'three/tsl';
+import type { TextureSet } from './RoadTextureLoader.ts';
+
+type TslNode = {
+  add(value: TslNode): TslNode;
+  mul(value: TslNode): TslNode;
+  r: TslNode;
+  g: TslNode;
+  b: TslNode;
+  rgb: TslNode;
+};
+
+function greyCoolRoadColor(map: TslNode, desaturate: number, tint: [number, number, number]): TslNode {
+  const luminance = map.r
+    .mul(float(0.299) as TslNode)
+    .add(map.g.mul(float(0.587) as TslNode))
+    .add(map.b.mul(float(0.114) as TslNode));
+  const desaturated = mix(map.rgb, vec3(luminance, luminance, luminance) as TslNode, float(desaturate) as TslNode) as TslNode;
+  return desaturated.mul(vec3(tint[0], tint[1], tint[2]) as TslNode);
+}
+
+function buildRoadColorNode(textures: TextureSet, desaturate: number, tint: [number, number, number]): TslNode {
+  const sample = texture(textures.albedo, uv() as TslNode) as TslNode;
+  return greyCoolRoadColor(sample, desaturate, tint);
+}
+
+export function createRoadCoreMaterial(textures: TextureSet): MeshStandardNodeMaterial {
+  const material = new MeshStandardNodeMaterial();
+  material.name = 'Road core';
+  material.color.set(0xffffff);
+  material.roughness = 0.99;
+  material.metalness = 0;
+  material.colorNode = buildRoadColorNode(textures, 0.72, [0.9, 0.9, 0.88]);
+  material.normalNode = texture(textures.normal, uv());
+  material.roughnessNode = (texture(textures.roughness, uv() as TslNode) as TslNode).r;
+  if (textures.ao) material.aoNode = (texture(textures.ao, uv() as TslNode) as TslNode).r;
+  return material;
+}
+
+export function createRoadEdgeMaterial(textures: TextureSet): MeshStandardNodeMaterial {
+  const material = new MeshStandardNodeMaterial();
+  material.name = 'Road edge blend';
+  material.color.set(0xffffff);
+  material.roughness = 1;
+  material.metalness = 0;
+  material.transparent = true;
+  material.opacity = 0.9;
+  material.depthWrite = false;
+  if (textures.edgeMask) material.alphaMap = textures.edgeMask;
+  material.colorNode = buildRoadColorNode(textures, 0.78, [0.92, 0.91, 0.89]);
+  material.normalNode = texture(textures.normal, uv());
+  material.roughnessNode = (texture(textures.roughness, uv() as TslNode) as TslNode).r;
+  if (textures.ao) material.aoNode = (texture(textures.ao, uv() as TslNode) as TslNode).r;
+  return material;
+}

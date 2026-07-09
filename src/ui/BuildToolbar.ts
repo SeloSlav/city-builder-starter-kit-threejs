@@ -14,6 +14,7 @@ type DeletePopupOptions = {
 export class BuildToolbar {
   private readonly roadButton: HTMLButtonElement;
   private readonly buildButton: HTMLButtonElement;
+  private readonly statusLabel: HTMLElement;
   private readonly deletePopup: HTMLElement;
   private readonly removeButton: HTMLButtonElement;
   private readonly cancelDeleteButton: HTMLButtonElement;
@@ -27,23 +28,50 @@ export class BuildToolbar {
     handlers: {
       onOpenRoads: () => void;
       onBuildRoad: () => void;
-    }
+    },
   ) {
     root.innerHTML = `
+      <aside class="road-controls-panel" aria-label="Road placement instructions">
+        <header class="road-controls-header">
+          <div>
+            <p class="road-controls-eyebrow">Builder</p>
+            <h2 class="road-controls-title">Roads</h2>
+            <p class="road-controls-status" data-road-status>Road tool off</p>
+          </div>
+        </header>
+
+        <section class="road-controls-help" aria-label="Road placement shortcuts">
+          <h3 class="road-controls-help-title">Controls</h3>
+          <ul class="road-controls-list">
+            <li><span>Toggle road tool</span><span class="road-controls-key">R</span></li>
+            <li><span>Place point</span><span class="road-controls-key">L-click</span></li>
+            <li><span>Undo last point</span><span class="road-controls-key">R-click</span></li>
+            <li><span>Curve segment</span><span class="road-controls-key">Ctrl + scroll</span></li>
+            <li><span>Build road</span><span class="road-controls-key">Hammer or Enter</span></li>
+            <li><span>Delete segment</span><span class="road-controls-key">Alt + L-click</span></li>
+            <li><span>Undo change</span><span class="road-controls-key">Ctrl + Z</span></li>
+            <li><span>Cancel / exit</span><span class="road-controls-key">Esc</span></li>
+          </ul>
+        </section>
+      </aside>
+
       <div class="road-tools" aria-label="Road tools">
         <button type="button" class="road-tool-button" data-action="road" title="Roads (R)">Roads</button>
-        <button type="button" class="road-tool-button icon-button" data-action="build" title="Build road" aria-label="Build road" disabled>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M14.5 5.5l4 4" />
-            <path d="M12.3 7.7l4-4 3.9 3.9-4 4" />
-            <path d="M14.8 10.8L6.4 19.2a2.1 2.1 0 0 1-3-3l8.4-8.4" />
-          </svg>
-        </button>
       </div>
+
+      <button type="button" class="road-tool-button icon-button floating-build-button" data-action="build" title="Build road (Enter)" aria-label="Build road" disabled hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M14.5 5.5l4 4" />
+          <path d="M12.3 7.7l4-4 3.9 3.9-4 4" />
+          <path d="M14.8 10.8L6.4 19.2a2.1 2.1 0 0 1-3-3l8.4-8.4" />
+        </svg>
+      </button>
+
       <div class="delete-popup" data-delete-popup hidden>
         <button type="button" data-action="confirm-delete">Remove</button>
         <button type="button" class="ghost-button" data-action="cancel-delete">Cancel</button>
       </div>
+
       <div class="fps-panel" data-fps-panel aria-live="polite">
         <strong data-stat="fps">--</strong>
         <span>FPS</span>
@@ -52,6 +80,7 @@ export class BuildToolbar {
 
     this.roadButton = this.mustButton(root, '[data-action="road"]');
     this.buildButton = this.mustButton(root, '[data-action="build"]');
+    this.statusLabel = this.mustElement(root, '[data-road-status]');
     this.deletePopup = this.mustElement(root, '[data-delete-popup]');
     this.removeButton = this.mustButton(root, '[data-action="confirm-delete"]');
     this.cancelDeleteButton = this.mustButton(root, '[data-action="cancel-delete"]');
@@ -71,11 +100,30 @@ export class BuildToolbar {
   }
 
   setStats(stats: ToolbarStats): void {
-    this.roadButton.classList.toggle('is-active', stats.mode === 'road');
-    this.roadButton.setAttribute('aria-pressed', String(stats.mode === 'road'));
+    const roadMode = stats.mode === 'road';
+    this.roadButton.classList.toggle('is-active', roadMode);
+    this.roadButton.setAttribute('aria-pressed', String(roadMode));
     this.buildButton.disabled = !stats.canBuild;
     this.buildButton.classList.toggle('is-ready', stats.canBuild);
     this.buildButton.classList.toggle('has-draft', stats.hasDraft);
+    this.statusLabel.textContent = this.describeStatus(stats);
+    this.statusLabel.dataset.state = stats.canBuild ? 'ready' : roadMode ? (stats.hasDraft ? 'draft' : 'active') : 'idle';
+  }
+
+  setBuildButtonPosition(position: { clientX: number; clientY: number } | null, visible: boolean): void {
+    if (!visible || !position) {
+      this.buildButton.hidden = true;
+      return;
+    }
+
+    const size = 44;
+    const margin = 10;
+    const gap = 12;
+    const left = Math.max(margin, Math.min(window.innerWidth - size - margin, position.clientX + gap));
+    const top = Math.max(margin, Math.min(window.innerHeight - size - margin, position.clientY - size - gap));
+    this.buildButton.hidden = false;
+    this.buildButton.style.left = `${left}px`;
+    this.buildButton.style.top = `${top}px`;
   }
 
   setFps(fps: number): void {
@@ -106,6 +154,13 @@ export class BuildToolbar {
     this.deleteCancel = null;
     this.deleteRemove = null;
     if (runCancel) cancel?.();
+  }
+
+  private describeStatus(stats: ToolbarStats): string {
+    if (stats.mode !== 'road') return 'Road tool off';
+    if (stats.canBuild) return 'Ready to build';
+    if (stats.hasDraft) return 'Add more points';
+    return 'Click terrain to start';
   }
 
   private mustButton(root: HTMLElement, selector: string): HTMLButtonElement {

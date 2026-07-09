@@ -36,6 +36,20 @@ declare module 'three/webgpu' {
 
   export class NodeMaterial extends THREE.Material {
     fragmentNode: unknown;
+    colorNode: unknown;
+    normalNode: unknown;
+    roughnessNode: unknown;
+    aoNode: unknown;
+  }
+
+  export class MeshStandardNodeMaterial extends NodeMaterial {
+    color: THREE.Color;
+    metalness: number;
+    roughness: number;
+    transparent: boolean;
+    opacity: number;
+    depthWrite: boolean;
+    alphaMap: THREE.Texture | null;
   }
 
   export class RenderPipeline {

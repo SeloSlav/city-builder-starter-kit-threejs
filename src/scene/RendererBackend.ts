@@ -75,12 +75,11 @@ function configureRenderer(renderer: SupportedRenderer): void {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.12;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setClearColor(0x86bdf1, 1);
 
   const shadowMap = renderer.shadowMap as ShadowMapWithManualRefresh;
-  if ('autoUpdate' in shadowMap) shadowMap.autoUpdate = false;
-  if ('needsUpdate' in shadowMap) shadowMap.needsUpdate = true;
+  if ('autoUpdate' in shadowMap) shadowMap.autoUpdate = true;
 }
 
 async function canUseWebGPU(): Promise<boolean> {

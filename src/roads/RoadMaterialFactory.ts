@@ -1,46 +1,49 @@
 import * as THREE from 'three';
-import { RoadTextureLoader, type TextureSet } from './RoadTextureLoader.ts';
+import { createTerrainGrassMaterial } from '../terrain/TerrainGrassMaterial.ts';
+import { createRoadCoreMaterial, createRoadEdgeMaterial } from './RoadSurfaceMaterial.ts';
+import { RoadTextureLoader, type TerrainBlendTextureSet, type TextureSet } from './RoadTextureLoader.ts';
+import type { MeshStandardNodeMaterial } from 'three/webgpu';
 
 export class RoadMaterialFactory {
-  readonly road!: THREE.MeshStandardMaterial;
-  readonly roadEdge!: THREE.MeshStandardMaterial;
-  readonly terrain!: THREE.MeshLambertMaterial;
+  readonly road!: MeshStandardNodeMaterial;
+  readonly roadEdge!: MeshStandardNodeMaterial;
+  readonly terrain!: MeshStandardNodeMaterial;
   readonly previewValid: THREE.MeshStandardMaterial;
   readonly previewInvalid: THREE.MeshStandardMaterial;
   readonly selection: THREE.MeshBasicMaterial;
   readonly snap: THREE.MeshBasicMaterial;
   private roadTextures: TextureSet | null = null;
-  private terrainTextures: TextureSet | null = null;
+  private terrainBlendTextures: TerrainBlendTextureSet | null = null;
 
   private constructor() {
     this.previewValid = new THREE.MeshStandardMaterial({
-      color: 0xd8b25d,
-      emissive: 0x3a270b,
-      roughness: 0.9,
+      color: 0xc8c5be,
+      emissive: 0x181715,
+      roughness: 0.96,
       metalness: 0,
       transparent: true,
-      opacity: 0.48,
+      opacity: 0.52,
       depthWrite: false,
     });
     this.previewInvalid = new THREE.MeshStandardMaterial({
-      color: 0xc97055,
-      emissive: 0x3c0f09,
-      roughness: 0.9,
+      color: 0x968880,
+      emissive: 0x1a1210,
+      roughness: 0.96,
       metalness: 0,
       transparent: true,
-      opacity: 0.48,
+      opacity: 0.52,
       depthWrite: false,
     });
     this.selection = new THREE.MeshBasicMaterial({
-      color: 0xf6cf70,
+      color: 0xc8c2b8,
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.16,
       depthWrite: false,
     });
     this.snap = new THREE.MeshBasicMaterial({
-      color: 0xf2d889,
+      color: 0xb8b0a4,
       transparent: true,
-      opacity: 0.78,
+      opacity: 0.72,
       depthWrite: false,
     });
   }
@@ -49,7 +52,7 @@ export class RoadMaterialFactory {
     const factory = new RoadMaterialFactory();
     const textureLoader = new RoadTextureLoader(Math.min(maxAnisotropy, 8));
     factory.roadTextures = await textureLoader.loadRoadTextures();
-    factory.terrainTextures = await textureLoader.loadTerrainTextures();
+    factory.terrainBlendTextures = await textureLoader.loadTerrainBlendTextures();
     Object.assign(factory, factory.createMaterials());
     return factory;
   }
@@ -57,46 +60,19 @@ export class RoadMaterialFactory {
   dispose(): void {
     const materials = [this.road, this.roadEdge, this.terrain, this.previewValid, this.previewInvalid, this.selection, this.snap];
     materials.forEach((material) => material.dispose());
-    for (const set of [this.roadTextures, this.terrainTextures]) {
-      if (!set) continue;
-      this.disposeTextureSet(set);
+    if (this.roadTextures) this.disposeTextureSet(this.roadTextures);
+    if (this.terrainBlendTextures) {
+      this.disposeTextureSet(this.terrainBlendTextures.meadow);
+      this.disposeTextureSet(this.terrainBlendTextures.dense);
+      this.disposeTextureSet(this.terrainBlendTextures.dry);
     }
   }
 
-  private createMaterials(): { road: THREE.MeshStandardMaterial; roadEdge: THREE.MeshStandardMaterial; terrain: THREE.MeshLambertMaterial } {
-    if (!this.roadTextures || !this.terrainTextures) throw new Error('Textures are not loaded.');
-    const road = new THREE.MeshStandardMaterial({
-      map: this.roadTextures.albedo,
-      normalMap: this.roadTextures.normal,
-      roughnessMap: this.roadTextures.roughness,
-      aoMap: this.roadTextures.ao,
-      displacementMap: this.roadTextures.height,
-      displacementScale: 0.035,
-      roughness: 0.95,
-      metalness: 0,
-    });
-    road.normalScale.set(0.85, 0.85);
-
-    const roadEdge = new THREE.MeshStandardMaterial({
-      map: this.roadTextures.albedo,
-      normalMap: this.roadTextures.normal,
-      roughnessMap: this.roadTextures.roughness,
-      aoMap: this.roadTextures.ao,
-      alphaMap: this.roadTextures.edgeMask,
-      transparent: true,
-      opacity: 0.72,
-      depthWrite: false,
-      roughness: 1,
-      metalness: 0,
-    });
-    roadEdge.normalScale.set(0.55, 0.55);
-
-    const terrain = new THREE.MeshLambertMaterial({
-      map: this.terrainTextures.albedo,
-      vertexColors: true,
-    });
-    terrain.name = 'Tinted terrain';
-
+  private createMaterials(): { road: MeshStandardNodeMaterial; roadEdge: MeshStandardNodeMaterial; terrain: MeshStandardNodeMaterial } {
+    if (!this.roadTextures || !this.terrainBlendTextures) throw new Error('Textures are not loaded.');
+    const road = createRoadCoreMaterial(this.roadTextures);
+    const roadEdge = createRoadEdgeMaterial(this.roadTextures);
+    const terrain = createTerrainGrassMaterial(this.terrainBlendTextures);
     return { road, roadEdge, terrain };
   }
 

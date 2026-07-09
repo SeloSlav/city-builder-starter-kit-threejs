@@ -53,6 +53,101 @@ button {
   outline: none;
 }
 
+.road-controls-panel {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 4;
+  width: min(280px, calc(100vw - 28px));
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 14px 34px var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.road-controls-header {
+  display: block;
+}
+
+.road-controls-eyebrow {
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.road-controls-title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.road-controls-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.road-controls-status[data-state='active'] {
+  color: #b8c99a;
+}
+
+.road-controls-status[data-state='draft'] {
+  color: #d7b463;
+}
+
+.road-controls-status[data-state='ready'] {
+  color: var(--accent);
+}
+
+.road-controls-help {
+  padding-top: 2px;
+  border-top: 1px solid rgba(238, 232, 220, 0.1);
+}
+
+.road-controls-help-title {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.road-controls-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.road-controls-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.road-controls-key {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: right;
+}
+
 .road-tools {
   position: absolute;
   left: 50%;
@@ -92,6 +187,21 @@ button {
   padding: 0;
   display: grid;
   place-items: center;
+}
+
+.road-tool-button.icon-button[hidden] {
+  display: none;
+}
+
+.floating-build-button {
+  position: absolute;
+  z-index: 6;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(12px);
 }
 
 .road-tool-button.icon-button svg {
@@ -205,15 +315,27 @@ button {
 }
 
 @media (max-width: 720px) {
+  .road-controls-panel {
+    top: 10px;
+    left: 10px;
+    width: min(260px, calc(100vw - 20px));
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .road-controls-title {
+    font-size: 16px;
+  }
+
+  .road-controls-list li {
+    font-size: 11px;
+  }
+
   .road-tools {
     right: 10px;
     left: 10px;
     bottom: 10px;
     transform: none;
     justify-content: center;
-  }
-
-  .road-tool-button {
-    flex: 0 0 auto;
   }
 }

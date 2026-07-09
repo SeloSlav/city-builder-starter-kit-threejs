@@ -84,6 +84,23 @@ export class RoadTool {
     return this.hasDraft() ? 'crosshair' : 'copy';
   }
 
+  getBuildButtonPosition(): { clientX: number; clientY: number } | null {
+    if (!this.enabled || !this.isDraftBuildable()) return null;
+    const lastPoint = this.points[this.points.length - 1];
+    const rect = this.options.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+
+    const projected = lastPoint.clone();
+    projected.y += 1.2;
+    projected.project(this.options.sceneManager.camera);
+    if (projected.z < -1 || projected.z > 1) return null;
+
+    return {
+      clientX: rect.left + (projected.x * 0.5 + 0.5) * rect.width,
+      clientY: rect.top + (-projected.y * 0.5 + 0.5) * rect.height,
+    };
+  }
+
   update(_dt: number): void {}
 
   commitDraft(): void {
@@ -94,7 +111,7 @@ export class RoadTool {
     if (added.length === 0) return;
     this.undoStack.push(snapshot);
     this.cancelDraft(false);
-    this.options.selection.setSelected(added[added.length - 1]);
+    this.options.selection.setSelected(null);
     this.options.onNetworkChanged();
     this.options.onStateChanged();
   }

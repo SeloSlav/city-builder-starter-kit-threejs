@@ -10,8 +10,8 @@ export class RoadPreview {
   private readonly marker: THREE.Mesh;
   private readonly anchors = new THREE.Group();
   private readonly anchorGeometry = new THREE.SphereGeometry(0.45, 12, 8);
-  private readonly anchorMaterialValid = new THREE.MeshBasicMaterial({ color: 0xf2d889, depthWrite: false });
-  private readonly anchorMaterialInvalid = new THREE.MeshBasicMaterial({ color: 0xc97055, depthWrite: false });
+  private readonly anchorMaterialValid = new THREE.MeshBasicMaterial({ color: 0xb0a89e, depthWrite: false });
+  private readonly anchorMaterialInvalid = new THREE.MeshBasicMaterial({ color: 0x958880, depthWrite: false });
 
   constructor(meshBuilder: RoadMeshBuilder, materials: RoadMaterialFactory) {
     this.meshBuilder = meshBuilder;
