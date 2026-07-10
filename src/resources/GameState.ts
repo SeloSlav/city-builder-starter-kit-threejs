@@ -1,18 +1,26 @@
 import type { RoadNetworkSnapshot } from '../roads/RoadNetwork.ts';
 import {
   createEmptyStockpile,
+  isBuildingKind,
+  isTreePhase,
   RESOURCE_KINDS,
+  type BuildingState,
   type GameState,
   type GameStateSnapshot,
-  type ResourceNodeState,
+  type GameStateSnapshotV1,
+  type QuarryNodeState,
   type ResourceStockpile,
+  type TreeEntityState,
 } from './types.ts';
 import type { WorldLayoutRegistry } from './WorldLayoutRegistry.ts';
+import type { TreeRegistry } from './TreeRegistry.ts';
+import { getBuildingDefinition } from './buildings.ts';
+import type { BuildingKind } from './types.ts';
 
 export function createInitialGameState(registry: WorldLayoutRegistry, seed: number): GameState {
-  const nodes = new Map<string, ResourceNodeState>();
+  const quarries = new Map<string, QuarryNodeState>();
   for (const definition of registry.definitionList) {
-    nodes.set(definition.id, {
+    quarries.set(definition.id, {
       nodeId: definition.id,
       kind: definition.kind,
       resource: definition.resource,
@@ -25,55 +33,63 @@ export function createInitialGameState(registry: WorldLayoutRegistry, seed: numb
     seed,
     tick: 0,
     stockpile: createEmptyStockpile(),
-    nodes,
+    quarries,
+    trees: new Map(),
+    buildings: new Map(),
+    nextBuildingId: 1,
   };
+}
+
+export function initTreeEntities(state: GameState, treeRegistry: TreeRegistry): GameState {
+  const trees = new Map<string, TreeEntityState>();
+  for (const entry of treeRegistry.entries) {
+    trees.set(entry.id, {
+      treeId: entry.id,
+      layoutIndex: entry.layoutIndex,
+      phase: 'standing',
+      regrowProgress: 0,
+    });
+  }
+  return { ...state, trees };
 }
 
 export function gameStateToSnapshot(state: GameState, roads: RoadNetworkSnapshot): GameStateSnapshot {
   return {
-    version: 1,
+    version: 2,
     seed: state.seed,
     tick: state.tick,
     stockpile: { ...state.stockpile },
-    nodes: [...state.nodes.values()],
+    quarries: [...state.quarries.values()],
+    trees: [...state.trees.values()],
+    buildings: [...state.buildings.values()],
     roads,
   };
 }
 
-export function restoreGameState(snapshot: GameStateSnapshot, registry: WorldLayoutRegistry): GameState {
-  if (snapshot.version !== 1) {
-    throw new Error(`Unsupported game state version: ${String(snapshot.version)}`);
+export function restoreGameState(
+  snapshot: GameStateSnapshot | GameStateSnapshotV1,
+  registry: WorldLayoutRegistry,
+  treeRegistry?: TreeRegistry | null,
+): GameState {
+  if (snapshot.version === 1) {
+    return restoreFromV1(snapshot, registry, treeRegistry);
+  }
+  if (snapshot.version !== 2) {
+    throw new Error(`Unsupported game state version: ${String((snapshot as GameStateSnapshot).version)}`);
   }
 
-  const nodes = new Map<string, ResourceNodeState>();
-  for (const node of snapshot.nodes) {
-    const definition = registry.getDefinition(node.nodeId);
-    if (!definition) continue;
-    nodes.set(node.nodeId, {
-      nodeId: node.nodeId,
-      kind: definition.kind,
-      resource: definition.resource,
-      remaining: clamp(node.remaining, 0, definition.maxYield),
-      maxYield: definition.maxYield,
-    });
-  }
-
-  for (const definition of registry.definitionList) {
-    if (nodes.has(definition.id)) continue;
-    nodes.set(definition.id, {
-      nodeId: definition.id,
-      kind: definition.kind,
-      resource: definition.resource,
-      remaining: definition.maxYield,
-      maxYield: definition.maxYield,
-    });
-  }
+  const quarries = restoreQuarries(snapshot.quarries, registry);
+  const trees = restoreTrees(snapshot.trees, treeRegistry);
+  const buildings = restoreBuildings(snapshot.buildings);
 
   return {
     seed: snapshot.seed,
     tick: Math.max(0, snapshot.tick),
     stockpile: normalizeStockpile(snapshot.stockpile),
-    nodes,
+    quarries,
+    trees,
+    buildings,
+    nextBuildingId: inferNextBuildingId(buildings),
   };
 }
 
@@ -81,23 +97,57 @@ export function serializeGameState(snapshot: GameStateSnapshot): string {
   return JSON.stringify(snapshot, null, 2);
 }
 
-export function deserializeGameState(raw: string): GameStateSnapshot {
+export function deserializeGameState(raw: string): GameStateSnapshot | GameStateSnapshotV1 {
   const parsed = JSON.parse(raw) as unknown;
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('Game state must be a JSON object.');
   }
-  return validateGameStateSnapshot(parsed as Partial<GameStateSnapshot>);
+  return validateSnapshot(parsed as Partial<GameStateSnapshot | GameStateSnapshotV1>);
 }
 
-export type ExtractFromNodeResult =
+export type PlaceBuildingResult =
+  | { ok: true; state: GameState; building: BuildingState }
+  | { ok: false; state: GameState; error: string };
+
+export function placeBuilding(state: GameState, kind: BuildingKind, x: number, z: number): PlaceBuildingResult {
+  if (!isBuildingKind(kind)) {
+    return { ok: false, state, error: 'Unknown building kind.' };
+  }
+
+  const definition = getBuildingDefinition(kind);
+  const id = `building-${state.nextBuildingId}`;
+  const building: BuildingState = {
+    id,
+    kind,
+    x,
+    z,
+    workRadius: definition.workRadius,
+    actionCooldown: 0,
+  };
+
+  const buildings = new Map(state.buildings);
+  buildings.set(id, building);
+
+  return {
+    ok: true,
+    building,
+    state: {
+      ...state,
+      tick: state.tick + 1,
+      nextBuildingId: state.nextBuildingId + 1,
+      buildings,
+    },
+  };
+}
+
+export type ExtractFromQuarryResult =
   | { ok: true; state: GameState; extracted: number }
   | { ok: false; state: GameState; error: string };
 
-/** Reducer-shaped extraction — ready for a future SpacetimeDB reducer. */
-export function extractFromNode(state: GameState, nodeId: string, amount: number): ExtractFromNodeResult {
-  const node = state.nodes.get(nodeId);
+export function extractFromQuarry(state: GameState, nodeId: string, amount: number): ExtractFromQuarryResult {
+  const node = state.quarries.get(nodeId);
   if (!node) {
-    return { ok: false, state, error: 'Unknown resource node.' };
+    return { ok: false, state, error: 'Unknown quarry.' };
   }
   if (amount <= 0) {
     return { ok: false, state, error: 'Amount must be positive.' };
@@ -108,11 +158,11 @@ export function extractFromNode(state: GameState, nodeId: string, amount: number
     return { ok: false, state, error: 'Nothing left to extract.' };
   }
 
-  const nextNodes = new Map(state.nodes);
-  nextNodes.set(nodeId, { ...node, remaining: node.remaining - extracted });
+  const quarries = new Map(state.quarries);
+  quarries.set(nodeId, { ...node, remaining: node.remaining - extracted });
 
-  const nextStockpile = { ...state.stockpile };
-  nextStockpile[node.resource] += extracted;
+  const stockpile = { ...state.stockpile };
+  stockpile[node.resource] += extracted;
 
   return {
     ok: true,
@@ -120,26 +170,154 @@ export function extractFromNode(state: GameState, nodeId: string, amount: number
     state: {
       ...state,
       tick: state.tick + 1,
-      stockpile: nextStockpile,
-      nodes: nextNodes,
+      stockpile,
+      quarries,
     },
   };
 }
 
-function validateGameStateSnapshot(value: Partial<GameStateSnapshot>): GameStateSnapshot {
-  if (value.version !== 1) throw new Error('Unsupported game state version.');
-  if (typeof value.seed !== 'number') throw new Error('Missing seed.');
-  if (typeof value.tick !== 'number') throw new Error('Missing tick.');
-  if (!value.stockpile || typeof value.stockpile !== 'object') throw new Error('Missing stockpile.');
-  if (!Array.isArray(value.nodes)) throw new Error('Missing nodes.');
-  if (!value.roads || typeof value.roads !== 'object') throw new Error('Missing roads.');
+function restoreFromV1(
+  snapshot: GameStateSnapshotV1,
+  registry: WorldLayoutRegistry,
+  treeRegistry?: TreeRegistry | null,
+): GameState {
+  const quarries = restoreQuarries(snapshot.nodes, registry);
+  const trees = treeRegistry ? restoreTrees([], treeRegistry, true) : new Map<string, TreeEntityState>();
 
   return {
-    version: 1,
+    seed: snapshot.seed,
+    tick: Math.max(0, snapshot.tick),
+    stockpile: normalizeStockpile(snapshot.stockpile),
+    quarries,
+    trees,
+    buildings: new Map(),
+    nextBuildingId: 1,
+  };
+}
+
+function restoreQuarries(nodes: QuarryNodeState[], registry: WorldLayoutRegistry): Map<string, QuarryNodeState> {
+  const quarries = new Map<string, QuarryNodeState>();
+  for (const node of nodes) {
+    const definition = registry.getDefinition(node.nodeId);
+    if (!definition) continue;
+    quarries.set(node.nodeId, {
+      nodeId: node.nodeId,
+      kind: definition.kind,
+      resource: definition.resource,
+      remaining: clamp(node.remaining, 0, definition.maxYield),
+      maxYield: definition.maxYield,
+    });
+  }
+
+  for (const definition of registry.definitionList) {
+    if (quarries.has(definition.id)) continue;
+    quarries.set(definition.id, {
+      nodeId: definition.id,
+      kind: definition.kind,
+      resource: definition.resource,
+      remaining: definition.maxYield,
+      maxYield: definition.maxYield,
+    });
+  }
+
+  return quarries;
+}
+
+function restoreTrees(
+  nodes: TreeEntityState[],
+  treeRegistry?: TreeRegistry | null,
+  fillMissing = false,
+): Map<string, TreeEntityState> {
+  const trees = new Map<string, TreeEntityState>();
+  if (!treeRegistry) return trees;
+
+  for (const node of nodes) {
+    const entry = treeRegistry.getEntry(node.treeId);
+    if (!entry) continue;
+    trees.set(node.treeId, {
+      treeId: node.treeId,
+      layoutIndex: entry.layoutIndex,
+      phase: isTreePhase(node.phase) ? node.phase : 'standing',
+      regrowProgress: clamp01(node.regrowProgress),
+    });
+  }
+
+  if (fillMissing || nodes.length === 0) {
+    for (const entry of treeRegistry.entries) {
+      if (trees.has(entry.id)) continue;
+      trees.set(entry.id, {
+        treeId: entry.id,
+        layoutIndex: entry.layoutIndex,
+        phase: 'standing',
+        regrowProgress: 0,
+      });
+    }
+  }
+
+  return trees;
+}
+
+function restoreBuildings(buildings: BuildingState[]): Map<string, BuildingState> {
+  const map = new Map<string, BuildingState>();
+  for (const building of buildings) {
+    if (!isBuildingKind(building.kind)) continue;
+    const definition = getBuildingDefinition(building.kind);
+    map.set(building.id, {
+      id: building.id,
+      kind: building.kind,
+      x: building.x,
+      z: building.z,
+      workRadius: definition.workRadius,
+      actionCooldown: Math.max(0, building.actionCooldown),
+    });
+  }
+  return map;
+}
+
+function inferNextBuildingId(buildings: Map<string, BuildingState>): number {
+  let maxId = 0;
+  for (const building of buildings.values()) {
+    const match = /^building-(\d+)$/.exec(building.id);
+    if (!match) continue;
+    maxId = Math.max(maxId, Number.parseInt(match[1], 10));
+  }
+  return maxId + 1;
+}
+
+function validateSnapshot(value: Partial<GameStateSnapshot | GameStateSnapshotV1>): GameStateSnapshot | GameStateSnapshotV1 {
+  if (value.version === 1) {
+    if (typeof value.seed !== 'number') throw new Error('Missing seed.');
+    if (typeof value.tick !== 'number') throw new Error('Missing tick.');
+    if (!value.stockpile) throw new Error('Missing stockpile.');
+    if (!Array.isArray(value.nodes)) throw new Error('Missing nodes.');
+    if (!value.roads) throw new Error('Missing roads.');
+    return {
+      version: 1,
+      seed: value.seed,
+      tick: value.tick,
+      stockpile: normalizeStockpile(value.stockpile as Partial<ResourceStockpile>),
+      nodes: value.nodes as QuarryNodeState[],
+      roads: value.roads as RoadNetworkSnapshot,
+    };
+  }
+
+  if (value.version !== 2) throw new Error('Unsupported game state version.');
+  if (typeof value.seed !== 'number') throw new Error('Missing seed.');
+  if (typeof value.tick !== 'number') throw new Error('Missing tick.');
+  if (!value.stockpile) throw new Error('Missing stockpile.');
+  if (!Array.isArray(value.quarries)) throw new Error('Missing quarries.');
+  if (!Array.isArray(value.trees)) throw new Error('Missing trees.');
+  if (!Array.isArray(value.buildings)) throw new Error('Missing buildings.');
+  if (!value.roads) throw new Error('Missing roads.');
+
+  return {
+    version: 2,
     seed: value.seed,
     tick: value.tick,
     stockpile: normalizeStockpile(value.stockpile as Partial<ResourceStockpile>),
-    nodes: value.nodes as ResourceNodeState[],
+    quarries: value.quarries as QuarryNodeState[],
+    trees: value.trees as TreeEntityState[],
+    buildings: value.buildings as BuildingState[],
     roads: value.roads as RoadNetworkSnapshot,
   };
 }
@@ -155,4 +333,8 @@ function normalizeStockpile(value: Partial<ResourceStockpile>): ResourceStockpil
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function clamp01(value: number): number {
+  return clamp(value, 0, 1);
 }

@@ -252,6 +252,10 @@ export class SceneManager {
     };
   }
 
+  getForestManager(): ForestManager | null {
+    return this.forestManager;
+  }
+
   getBridgeSamplingContext(): BridgeSamplingContext {
     const { terrain, riverSystem } = this;
     const riverField = riverSystem.field;

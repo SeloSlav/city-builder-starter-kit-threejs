@@ -22,17 +22,47 @@ export type RoadStumpInstances = {
 const STUMP_MAX_COUNT = 512;
 
 export function createRoadStumpMesh(): THREE.InstancedMesh {
+  return createStumpInstancedMesh('Road edge stumps', STUMP_MAX_COUNT);
+}
+
+export function createHarvestStumpMesh(capacity: number): THREE.InstancedMesh {
+  return createStumpInstancedMesh('Harvest stumps', Math.max(1, capacity));
+}
+
+export function updateHarvestStumpInstance(
+  mesh: THREE.InstancedMesh,
+  index: number,
+  x: number,
+  z: number,
+  y: number,
+  treeScale: number,
+): void {
+  if (index >= mesh.count) return;
+
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const position = new THREE.Vector3(x, y, z);
+  const stumpScale = 0.48 + treeScale * 0.12;
+  const scaleVector = new THREE.Vector3(stumpScale, stumpScale * 0.55, stumpScale);
+  const yaw = stumpHash(x, z) * 0.01;
+  quaternion.setFromEuler(new THREE.Euler(0, yaw, 0));
+  matrix.compose(position, quaternion, scaleVector);
+  mesh.setMatrixAt(index, matrix);
+  mesh.instanceMatrix.needsUpdate = true;
+}
+
+function createStumpInstancedMesh(name: string, capacity: number): THREE.InstancedMesh {
   const geometry = createStumpGeometry();
   const material = new THREE.MeshStandardMaterial({
     color: 0x6a5644,
     roughness: 0.96,
     metalness: 0,
   });
-  const mesh = new THREE.InstancedMesh(geometry, material, STUMP_MAX_COUNT);
-  mesh.name = 'Road edge stumps';
+  const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+  mesh.name = name;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
-  mesh.count = 0;
+  mesh.count = capacity;
   return mesh;
 }
 

@@ -3,6 +3,9 @@ import type { RiverField } from '../rivers/RiverField.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
 import type { GameState, InspectableTarget } from './types.ts';
 import type { WorldLayoutRegistry } from './WorldLayoutRegistry.ts';
+import { buildingKindLabel, findNearestBuilding as findBuilding } from './WorldLayoutRegistry.ts';
+import { countTreesNearBuilding } from './ForestVisualSync.ts';
+import type { TreeRegistry } from './TreeRegistry.ts';
 
 const RIVER_INSPECT_MAX_SHORE = 8;
 const NEAREST_ROAD_MAX_DISTANCE = 18;
@@ -13,6 +16,7 @@ export class WorldQueries {
   private readonly registry: WorldLayoutRegistry;
   private readonly getGameState: () => GameState;
   private readonly getRoadNetwork: () => RoadNetwork;
+  private readonly getTreeRegistry: () => TreeRegistry | null;
 
   constructor(options: {
     terrain: Terrain;
@@ -20,21 +24,18 @@ export class WorldQueries {
     registry: WorldLayoutRegistry;
     getGameState: () => GameState;
     getRoadNetwork: () => RoadNetwork;
+    getTreeRegistry: () => TreeRegistry | null;
   }) {
     this.terrain = options.terrain;
     this.riverField = options.riverField;
     this.registry = options.registry;
     this.getGameState = options.getGameState;
     this.getRoadNetwork = options.getRoadNetwork;
+    this.getTreeRegistry = options.getTreeRegistry;
   }
 
   getHeightAt(x: number, z: number): number {
     return this.terrain.getHeightAt(x, z);
-  }
-
-  isNearRiver(x: number, z: number): boolean {
-    if (this.riverField.isRenderedWetAt(x, z)) return true;
-    return this.riverField.sampleShoreDistance(x, z) <= RIVER_INSPECT_MAX_SHORE;
   }
 
   getRiverAccessInfo(x: number, z: number): { shoreDistance: number; onWater: boolean } {
@@ -45,11 +46,27 @@ export class WorldQueries {
   }
 
   findInspectableTarget(x: number, z: number): InspectableTarget | null {
-    const nodeDefinition = this.registry.findNearestDefinition(x, z);
-    if (nodeDefinition) {
-      const state = this.getGameState().nodes.get(nodeDefinition.id);
-      if (state) {
-        return { kind: 'node', definition: nodeDefinition, state };
+    const state = this.getGameState();
+    const building = findBuilding(state.buildings.values(), x, z);
+    if (building) {
+      const treeRegistry = this.getTreeRegistry();
+      const counts = treeRegistry
+        ? countTreesNearBuilding(state, treeRegistry, building.x, building.z, building.workRadius)
+        : { standing: 0, felled: 0, regrowing: 0 };
+      return {
+        kind: 'building',
+        building,
+        standingTrees: counts.standing,
+        felledTrees: counts.felled,
+        regrowingTrees: counts.regrowing,
+      };
+    }
+
+    const quarryDefinition = this.registry.findNearestQuarry(x, z);
+    if (quarryDefinition) {
+      const quarryState = state.quarries.get(quarryDefinition.id);
+      if (quarryState) {
+        return { kind: 'quarry', definition: quarryDefinition, state: quarryState };
       }
     }
 
@@ -72,5 +89,9 @@ export class WorldQueries {
     }
 
     return best;
+  }
+
+  getBuildingLabel(kind: Parameters<typeof buildingKindLabel>[0]): string {
+    return buildingKindLabel(kind);
   }
 }

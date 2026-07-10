@@ -1,15 +1,21 @@
 ﻿import { CameraController } from '../camera/CameraController.ts';
 import { FirstPersonController } from '../camera/FirstPersonController.ts';
+import { BuildingMarkers } from '../buildings/BuildingMarkers.ts';
+import { BuildingTool } from '../buildings/BuildingTool.ts';
 import { InputManager } from '../input/InputManager.ts';
 import {
   createInitialGameState,
   deserializeGameState,
   gameStateToSnapshot,
+  initTreeEntities,
   restoreGameState,
   serializeGameState,
 } from '../resources/GameState.ts';
 import type { GameState } from '../resources/types.ts';
+import { ForestVisualSync } from '../resources/ForestVisualSync.ts';
 import { ResourceInspector } from '../resources/ResourceInspector.ts';
+import { Simulation } from '../resources/Simulation.ts';
+import { TreeRegistry } from '../resources/TreeRegistry.ts';
 import { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
 import { WorldQueries } from '../resources/WorldQueries.ts';
 import { RoadMaterialFactory } from '../roads/RoadMaterialFactory.ts';
@@ -35,11 +41,16 @@ export class App {
   private roadNetwork: RoadNetwork | null = null;
   private roadTool: RoadTool | null = null;
   private roadSelection: RoadSelection | null = null;
+  private buildingTool: BuildingTool | null = null;
+  private buildingMarkers: BuildingMarkers | null = null;
   private toolbar: BuildToolbar | null = null;
   private toastManager: ToastManager | null = null;
   private resourceInspector: ResourceInspector | null = null;
   private gameState: GameState | null = null;
   private layoutRegistry: WorldLayoutRegistry | null = null;
+  private treeRegistry: TreeRegistry | null = null;
+  private forestVisualSync: ForestVisualSync | null = null;
+  private simulation: Simulation | null = null;
   private animationId = 0;
   private lastTime = 0;
   private frameBudgetTime = 0;
@@ -81,6 +92,11 @@ export class App {
       registry: layoutRegistry,
       getGameState: () => this.gameState ?? gameState,
       getRoadNetwork: () => this.roadNetwork ?? roadNetwork,
+      getTreeRegistry: () => this.treeRegistry,
+    });
+    const buildingMarkers = new BuildingMarkers({
+      terrain: sceneManager.terrain,
+      parent: sceneManager.selectionGroup,
     });
     const cameraController = new CameraController({
       camera: sceneManager.camera,
@@ -133,9 +149,39 @@ export class App {
 
     let firstPersonController: FirstPersonController;
 
+    const buildingTool = new BuildingTool({
+      domElement: sceneManager.renderer.domElement,
+      terrainProjector: sceneManager.terrainProjector,
+      markers: buildingMarkers,
+      getState: () => this.gameState ?? gameState,
+      onPlaced: (state) => {
+        this.gameState = state;
+        this.syncResourceUi();
+        this.syncToolbar();
+      },
+      isBlocked: () =>
+        roadTool.isEnabled()
+        || firstPersonController.isActive()
+        || toolbar.isGameMenuOpen(),
+    });
+
     const toolbar = new BuildToolbar(uiRoot, {
-      onOpenRoads: () => roadTool.setEnabled(!roadTool.isEnabled()),
+      onOpenRoads: () => {
+        roadTool.setEnabled(!roadTool.isEnabled());
+        if (roadTool.isEnabled()) buildingTool.setMode('off');
+        this.syncToolbar();
+      },
       onBuildRoad: () => roadTool.commitDraft(),
+      onToggleLumberMill: () => {
+        buildingTool.toggleMode('lumber_mill');
+        if (buildingTool.isEnabled()) roadTool.setEnabled(false);
+        this.syncToolbar();
+      },
+      onToggleReforester: () => {
+        buildingTool.toggleMode('reforester');
+        if (buildingTool.isEnabled()) roadTool.setEnabled(false);
+        this.syncToolbar();
+      },
       onMenuOpenChange: (open) => {
         cameraController.setInputEnabled(!open && !firstPersonController.isActive());
       },
@@ -150,7 +196,11 @@ export class App {
       sceneManager,
       terrainProjector: sceneManager.terrainProjector,
       worldQueries,
-      isBlocked: () => roadTool.isEnabled() || firstPersonController.isActive() || toolbar.isGameMenuOpen(),
+      isBlocked: () =>
+        roadTool.isEnabled()
+        || buildingTool.isEnabled()
+        || firstPersonController.isActive()
+        || toolbar.isGameMenuOpen(),
     });
     resourceInspector.setStockpile(gameState.stockpile);
 
@@ -170,6 +220,7 @@ export class App {
         toolbar.setFirstPersonMode(active);
         if (active) {
           if (roadTool.isEnabled()) roadTool.setEnabled(false);
+          if (buildingTool.isEnabled()) buildingTool.setMode('off');
           return;
         }
         const pos = firstPersonController.getPosition();
@@ -184,6 +235,8 @@ export class App {
     this.firstPersonController = firstPersonController;
     this.roadTool = roadTool;
     this.roadSelection = roadSelection;
+    this.buildingTool = buildingTool;
+    this.buildingMarkers = buildingMarkers;
     this.toolbar = toolbar;
     this.toastManager = toastManager;
     this.resourceInspector = resourceInspector;
@@ -211,6 +264,7 @@ export class App {
         try {
           await sceneManager.finishVegetation();
           if (this.roadNetwork) sceneManager.syncRoadNetwork(this.roadNetwork);
+          this.onForestReady();
         } catch (error) {
           console.error('Vegetation build failed:', error);
         }
@@ -225,6 +279,8 @@ export class App {
     window.removeEventListener('resize', this.onResize);
     this.roadTool?.dispose();
     this.roadSelection?.dispose();
+    this.buildingTool?.dispose();
+    this.buildingMarkers?.dispose();
     this.resourceInspector?.dispose();
     this.toastManager?.dispose();
     this.firstPersonController?.dispose();
@@ -246,6 +302,9 @@ export class App {
     if (rawDt > 0.25) this.resetFpsSample(time);
     const dt = Math.min(0.05, Math.max(0.001, rawDt));
     this.lastTime = time;
+
+    this.stepSimulation(dt);
+
     const firstPersonActive = this.firstPersonController?.isActive() ?? false;
     if (firstPersonActive) {
       this.firstPersonController?.update(dt);
@@ -265,16 +324,51 @@ export class App {
     this.animationId = requestAnimationFrame(this.tick);
   };
 
+  private stepSimulation(dt: number): void {
+    if (!this.simulation || !this.gameState || !this.forestVisualSync) return;
+
+    const previousWood = this.gameState.stockpile.wood;
+    const result = this.simulation.step(this.gameState, dt);
+    this.gameState = result.state;
+
+    if (result.changedTreeIds.length > 0) {
+      this.forestVisualSync.syncTrees(this.gameState.trees, result.changedTreeIds);
+    }
+
+    if (result.changedTreeIds.length > 0 || this.gameState.stockpile.wood !== previousWood) {
+      this.syncResourceUi();
+    }
+  }
+
+  private onForestReady(): void {
+    const forestManager = this.sceneManager?.getForestManager();
+    if (!forestManager || !this.gameState) return;
+
+    this.treeRegistry = TreeRegistry.fromForestManager(forestManager);
+    this.gameState = initTreeEntities(this.gameState, this.treeRegistry);
+    this.forestVisualSync = new ForestVisualSync(forestManager);
+    this.forestVisualSync.syncAll(this.gameState.trees);
+    this.simulation = new Simulation(this.treeRegistry);
+    this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
+    this.syncResourceUi();
+    this.exposeDevHandles();
+  }
+
   private readonly onResize = (): void => {
     this.sceneManager?.resize();
   };
 
   private syncToolbar(): void {
-    if (!this.toolbar || !this.roadNetwork || !this.roadTool || !this.roadSelection) return;
+    if (!this.toolbar || !this.roadNetwork || !this.roadTool || !this.roadSelection || !this.buildingTool) return;
+    const buildingMode = this.buildingTool.getMode();
     const stats: ToolbarStats = {
       canBuild: this.roadTool.isDraftBuildable(),
       hasDraft: this.roadTool.hasDraft(),
-      mode: this.roadTool.isEnabled() ? 'road' : 'idle',
+      mode: this.roadTool.isEnabled()
+        ? 'road'
+        : buildingMode === 'off'
+          ? 'idle'
+          : buildingMode,
     };
     this.toolbar.setStats(stats);
     this.updateBuildButtonPosition();
@@ -340,9 +434,11 @@ export class App {
           if (snapshot.seed !== this.gameState!.seed) {
             console.warn('Imported state seed differs from current world layout.');
           }
-          this.gameState = restoreGameState(snapshot, this.layoutRegistry!);
+          this.gameState = restoreGameState(snapshot, this.layoutRegistry!, this.treeRegistry);
           this.roadNetwork!.restore(snapshot.roads);
           this.sceneManager!.syncRoadNetwork(this.roadNetwork!);
+          this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
+          this.forestVisualSync?.syncAll(this.gameState.trees);
           this.roadSelection?.refresh();
           this.syncResourceUi();
           this.syncToolbar();
@@ -364,20 +460,24 @@ export class App {
         export: () => string;
         import: (raw: string) => void;
         registry: WorldLayoutRegistry;
+        treeRegistry: TreeRegistry | null;
       };
     }).__medievalGameState = {
       getState: () => this.gameState!,
       export: () => serializeGameState(gameStateToSnapshot(this.gameState!, this.roadNetwork!.snapshot())),
       import: (raw: string) => {
         const snapshot = deserializeGameState(raw);
-        this.gameState = restoreGameState(snapshot, this.layoutRegistry!);
+        this.gameState = restoreGameState(snapshot, this.layoutRegistry!, this.treeRegistry);
         this.roadNetwork!.restore(snapshot.roads);
         this.sceneManager?.syncRoadNetwork(this.roadNetwork!);
+        this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
+        this.forestVisualSync?.syncAll(this.gameState.trees);
         this.roadSelection?.refresh();
         this.syncResourceUi();
         this.syncToolbar();
       },
       registry: this.layoutRegistry,
+      treeRegistry: this.treeRegistry,
     };
   }
 
@@ -387,4 +487,3 @@ export class App {
     return element;
   }
 }
-

@@ -1,5 +1,4 @@
 import type { QuarryKind } from '../quarries/QuarryLayout.ts';
-import type { ForestCore } from '../props/forestField.ts';
 import type { ResourceKind } from './types.ts';
 
 const LARGE_QUARRY_YIELD = 800;
@@ -20,16 +19,6 @@ export function quarryMaxYield(kind: QuarryKind): number {
 
 export function quarryPickRadius(radiusX: number, radiusZ: number): number {
   return Math.max(radiusX, radiusZ) * 0.88;
-}
-
-export function forestMaxYield(core: ForestCore): number {
-  const area = Math.PI * core.radiusX * core.radiusZ;
-  const estimate = area * core.strength * 0.14;
-  return Math.round(Math.min(280, Math.max(40, estimate)));
-}
-
-export function forestPickRadius(radiusX: number, radiusZ: number): number {
-  return Math.max(radiusX, radiusZ) * 0.72;
 }
 
 export function formatResourceAmount(kind: ResourceKind, amount: number): string {

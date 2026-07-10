@@ -3,6 +3,7 @@ import type { TerrainProjector } from '../terrain/TerrainProjector.ts';
 import type { SceneManager } from '../scene/SceneManager.ts';
 import { disposeObject3D } from '../utils/dispose.ts';
 import { formatResourceAmount } from './yields.ts';
+import { getBuildingDefinition } from './buildings.ts';
 import type { InspectableTarget, ResourceStockpile } from './types.ts';
 import type { WorldQueries } from './WorldQueries.ts';
 
@@ -13,7 +14,6 @@ type ResourceInspectorOptions = {
   terrainProjector: TerrainProjector;
   worldQueries: WorldQueries;
   isBlocked: () => boolean;
-  onStockpileChange?: () => void;
 };
 
 export class ResourceInspector {
@@ -27,6 +27,9 @@ export class ResourceInspector {
   private readonly stockpileValues: Record<keyof ResourceStockpile, HTMLElement>;
   private readonly marker: THREE.Mesh;
   private selectedTarget: InspectableTarget | null = null;
+  private selectedX = 0;
+  private selectedZ = 0;
+  private selectedRadius = 6;
 
   constructor(options: ResourceInspectorOptions) {
     this.options = options;
@@ -54,7 +57,7 @@ export class ResourceInspector {
           <div>
             <p class="road-controls-eyebrow" data-inspector-eyebrow>Resources</p>
             <h2 class="road-controls-title" data-inspector-title>Select a site</h2>
-            <p class="road-controls-status" data-inspector-status>Click terrain to inspect quarries, forests, or river access.</p>
+            <p class="road-controls-status" data-inspector-status>Click terrain to inspect quarries, buildings, or river access.</p>
           </div>
         </header>
         <section class="resource-inspector-details" aria-label="Resource details">
@@ -91,16 +94,25 @@ export class ResourceInspector {
 
   refreshSelection(): void {
     if (!this.selectedTarget) return;
-    if (this.selectedTarget.kind === 'node') {
-      const latest = this.options.worldQueries.findInspectableTarget(
-        this.selectedTarget.definition.x,
-        this.selectedTarget.definition.z,
-      );
-      if (latest?.kind === 'node' && latest.definition.id === this.selectedTarget.definition.id) {
-        this.selectedTarget = latest;
-        this.renderTarget(latest);
-        return;
-      }
+    const latest = this.options.worldQueries.findInspectableTarget(this.selectedX, this.selectedZ);
+    if (!latest) {
+      this.clearSelection(false);
+      return;
+    }
+    if (this.selectedTarget.kind === 'building' && latest.kind === 'building' && latest.building.id === this.selectedTarget.building.id) {
+      this.selectedTarget = latest;
+      this.renderTarget(latest);
+      return;
+    }
+    if (this.selectedTarget.kind === 'quarry' && latest.kind === 'quarry' && latest.definition.id === this.selectedTarget.definition.id) {
+      this.selectedTarget = latest;
+      this.renderTarget(latest);
+      return;
+    }
+    if (this.selectedTarget.kind === 'river' && latest.kind === 'river') {
+      this.selectedTarget = latest;
+      this.renderTarget(latest);
+      return;
     }
     this.clearSelection(false);
   }
@@ -134,8 +146,21 @@ export class ResourceInspector {
 
   private selectTarget(target: InspectableTarget): void {
     this.selectedTarget = target;
+    if (target.kind === 'quarry') {
+      this.selectedX = target.definition.x;
+      this.selectedZ = target.definition.z;
+      this.selectedRadius = target.definition.pickRadius * 0.42;
+    } else if (target.kind === 'building') {
+      this.selectedX = target.building.x;
+      this.selectedZ = target.building.z;
+      this.selectedRadius = target.building.workRadius * 0.42;
+    } else {
+      this.selectedX = target.x;
+      this.selectedZ = target.z;
+      this.selectedRadius = 6;
+    }
     this.renderTarget(target);
-    this.updateMarker(target);
+    this.updateMarker();
     this.panel.hidden = false;
   }
 
@@ -146,20 +171,48 @@ export class ResourceInspector {
   }
 
   private renderTarget(target: InspectableTarget): void {
-    if (target.kind === 'node') {
+    if (target.kind === 'quarry') {
       const { definition, state } = target;
-      this.eyebrow.textContent = definition.resource === 'stone' ? 'Quarry' : 'Forest';
+      this.eyebrow.textContent = 'Quarry';
       this.title.textContent = definition.label;
-      this.status.textContent = `${Math.round(state.remaining)} / ${Math.round(state.maxYield)} ${definition.resource} remaining`;
+      this.status.textContent = `${Math.round(state.remaining)} / ${Math.round(state.maxYield)} stone remaining`;
       this.status.dataset.state = state.remaining > 0 ? 'active' : 'idle';
 
       const nearestRoad = this.options.worldQueries.getNearestRoadNodeDistance(definition.x, definition.z);
       this.detailList.innerHTML = `
-        <li><span>Resource</span><span>${definition.resource}</span></li>
+        <li><span>Resource</span><span>stone</span></li>
         <li><span>Site ID</span><span>${definition.id}</span></li>
         <li><span>Yield left</span><span>${Math.round(state.remaining)}</span></li>
-        <li><span>Max yield</span><span>${Math.round(state.maxYield)}</span></li>
         <li><span>Nearest road</span><span>${nearestRoad == null ? 'None nearby' : `${nearestRoad.toFixed(1)} m`}</span></li>
+      `;
+      return;
+    }
+
+    if (target.kind === 'building') {
+      const { building, standingTrees, felledTrees, regrowingTrees } = target;
+      const label = this.options.worldQueries.getBuildingLabel(building.kind);
+      this.eyebrow.textContent = 'Building';
+      this.title.textContent = label;
+      const definition = getBuildingDefinition(building.kind);
+
+      if (building.kind === 'lumber_mill') {
+        this.status.textContent = standingTrees > 0
+          ? `Harvesting — ${standingTrees} trees in range`
+          : 'Idle — no standing trees in range';
+        this.status.dataset.state = standingTrees > 0 ? 'active' : 'idle';
+      } else {
+        this.status.textContent = felledTrees + regrowingTrees > 0
+          ? `Reforesting — ${felledTrees} stumps, ${regrowingTrees} regrowing`
+          : 'Idle — no stumps in range';
+        this.status.dataset.state = felledTrees + regrowingTrees > 0 ? 'active' : 'draft';
+      }
+
+      this.detailList.innerHTML = `
+        <li><span>Kind</span><span>${building.kind}</span></li>
+        <li><span>Work radius</span><span>${definition.workRadius} m</span></li>
+        <li><span>Standing trees</span><span>${standingTrees}</span></li>
+        <li><span>Felled stumps</span><span>${felledTrees}</span></li>
+        <li><span>Regrowing</span><span>${regrowingTrees}</span></li>
       `;
       return;
     }
@@ -178,13 +231,10 @@ export class ResourceInspector {
     `;
   }
 
-  private updateMarker(target: InspectableTarget): void {
-    const x = target.kind === 'node' ? target.definition.x : target.x;
-    const z = target.kind === 'node' ? target.definition.z : target.z;
-    const y = this.options.sceneManager.terrain.getHeightAt(x, z) + 0.35;
-    const radius = target.kind === 'node' ? target.definition.pickRadius * 0.42 : 6;
-    this.marker.scale.set(radius, 1, radius);
-    this.marker.position.set(x, y, z);
+  private updateMarker(): void {
+    const y = this.options.sceneManager.terrain.getHeightAt(this.selectedX, this.selectedZ) + 0.35;
+    this.marker.scale.set(this.selectedRadius, 1, this.selectedRadius);
+    this.marker.position.set(this.selectedX, y, this.selectedZ);
     this.marker.visible = true;
   }
 

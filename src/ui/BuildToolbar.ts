@@ -6,7 +6,7 @@ import { subscribeTipCardsPreference } from './tipCardsPreference.ts';
 export type ToolbarStats = {
   canBuild: boolean;
   hasDraft: boolean;
-  mode: 'road' | 'idle';
+  mode: 'road' | 'lumber_mill' | 'reforester' | 'idle';
 };
 
 type DeletePopupOptions = {
@@ -18,6 +18,8 @@ type DeletePopupOptions = {
 
 export class BuildToolbar {
   private readonly roadButton: HTMLButtonElement;
+  private readonly lumberMillButton: HTMLButtonElement;
+  private readonly reforesterButton: HTMLButtonElement;
   private readonly buildButton: HTMLButtonElement;
   private readonly statusLabel: HTMLElement;
   private readonly deletePopup: HTMLElement;
@@ -43,6 +45,8 @@ export class BuildToolbar {
     handlers: {
       onOpenRoads: () => void;
       onBuildRoad: () => void;
+      onToggleLumberMill: () => void;
+      onToggleReforester: () => void;
       onMenuOpenChange?: (open: boolean) => void;
       canOpenMenuFromKeyboard?: () => boolean;
       onExportGameState?: () => void;
@@ -131,9 +135,15 @@ export class BuildToolbar {
         </aside>
       </div>
 
-      <div class="road-tools" aria-label="Road tools">
+      <div class="road-tools" aria-label="Build tools">
         <button type="button" class="road-tool-button" data-action="road" title="Roads (R)">
           Roads <span class="road-tool-button-key">(R)</span>
+        </button>
+        <button type="button" class="road-tool-button" data-action="lumber-mill" title="Place lumber mill">
+          Lumber mill
+        </button>
+        <button type="button" class="road-tool-button" data-action="reforester" title="Place reforester">
+          Reforester
         </button>
       </div>
 
@@ -172,6 +182,8 @@ export class BuildToolbar {
     this.unsubscribeTipsPreference = subscribeTipCardsPreference(() => this.syncContextPanels());
 
     this.roadButton = this.mustButton(root, '[data-action="road"]');
+    this.lumberMillButton = this.mustButton(root, '[data-action="lumber-mill"]');
+    this.reforesterButton = this.mustButton(root, '[data-action="reforester"]');
     this.buildButton = this.mustButton(root, '[data-action="build"]');
     this.statusLabel = this.mustElement(root, '[data-road-status]');
     this.deletePopup = this.mustElement(root, '[data-delete-popup]');
@@ -187,6 +199,8 @@ export class BuildToolbar {
 
     this.syncContextPanels();
     this.roadButton.addEventListener('click', handlers.onOpenRoads);
+    this.lumberMillButton.addEventListener('click', handlers.onToggleLumberMill);
+    this.reforesterButton.addEventListener('click', handlers.onToggleReforester);
     this.buildButton.addEventListener('click', handlers.onBuildRoad);
     this.deletePopup.addEventListener('mousedown', (event) => event.stopPropagation());
     this.deletePopup.addEventListener('click', (event) => event.stopPropagation());
@@ -201,8 +215,14 @@ export class BuildToolbar {
   setStats(stats: ToolbarStats): void {
     this.hudMode = stats.mode;
     const roadMode = stats.mode === 'road';
+    const lumberMode = stats.mode === 'lumber_mill';
+    const reforesterMode = stats.mode === 'reforester';
     this.roadButton.classList.toggle('is-active', roadMode);
     this.roadButton.setAttribute('aria-pressed', String(roadMode));
+    this.lumberMillButton.classList.toggle('is-active', lumberMode);
+    this.lumberMillButton.setAttribute('aria-pressed', String(lumberMode));
+    this.reforesterButton.classList.toggle('is-active', reforesterMode);
+    this.reforesterButton.setAttribute('aria-pressed', String(reforesterMode));
     this.buildButton.disabled = !stats.canBuild;
     this.buildButton.classList.toggle('is-ready', stats.canBuild);
     this.buildButton.classList.toggle('has-draft', stats.hasDraft);
@@ -253,9 +273,10 @@ export class BuildToolbar {
   }
 
   private syncContextPanels(): void {
+    const tipHudMode = this.hudMode === 'road' ? 'road' : 'idle';
     syncTipCardVisibility(this.root, {
       firstPersonActive: this.firstPersonActive,
-      hudMode: this.hudMode,
+      hudMode: tipHudMode,
     });
   }
 
@@ -289,6 +310,8 @@ export class BuildToolbar {
   }
 
   private describeStatus(stats: ToolbarStats): string {
+    if (stats.mode === 'lumber_mill') return 'Click terrain to place a lumber mill';
+    if (stats.mode === 'reforester') return 'Click terrain to place a reforester';
     if (stats.mode !== 'road') return 'Road tool off';
     if (stats.canBuild) return 'Ready to build';
     if (stats.hasDraft) return 'Add more points';

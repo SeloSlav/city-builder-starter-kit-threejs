@@ -1,13 +1,9 @@
 import type { QuarrySite } from '../quarries/QuarryLayout.ts';
-import type { ForestCore } from '../props/forestField.ts';
-import type { ResourceNodeDefinition } from './types.ts';
-import {
-  forestMaxYield,
-  forestPickRadius,
-  quarryMaxYield,
-  quarryPickRadius,
-} from './yields.ts';
+import type { BuildingKind, ResourceNodeDefinition } from './types.ts';
+import { quarryMaxYield, quarryPickRadius } from './yields.ts';
 import type { WorldLayout } from './WorldLayout.ts';
+import { getBuildingDefinition } from './buildings.ts';
+import type { BuildingState } from './types.ts';
 
 const REGISTRY_CELL_SIZE = 120;
 
@@ -45,20 +41,6 @@ export class WorldLayoutRegistry {
       });
     }
 
-    layout.forestCores.forEach((core, index) => {
-      definitions.push({
-        id: `forest-core-${index}`,
-        kind: 'forest',
-        resource: 'wood',
-        x: core.x,
-        z: core.z,
-        label: forestCoreLabel(core),
-        maxYield: forestMaxYield(core),
-        pickRadius: forestPickRadius(core.radiusX, core.radiusZ),
-        forestStrength: core.strength,
-      });
-    });
-
     return new WorldLayoutRegistry(definitions);
   }
 
@@ -66,14 +48,13 @@ export class WorldLayoutRegistry {
     return this.definitions.get(nodeId);
   }
 
-  findNearestDefinition(x: number, z: number, maxDistance?: number): ResourceNodeDefinition | null {
+  findNearestQuarry(x: number, z: number): ResourceNodeDefinition | null {
     let best: ResourceNodeDefinition | null = null;
     let bestScore = Infinity;
 
     for (const definition of this.candidateDefinitions(x, z)) {
       const distance = Math.hypot(x - definition.x, z - definition.z);
       if (distance > definition.pickRadius) continue;
-      if (maxDistance != null && distance > maxDistance) continue;
       if (distance < bestScore) {
         bestScore = distance;
         best = definition;
@@ -99,15 +80,34 @@ export class WorldLayoutRegistry {
   }
 }
 
+export function findNearestBuilding(
+  buildings: Iterable<BuildingState>,
+  x: number,
+  z: number,
+): BuildingState | null {
+  let best: BuildingState | null = null;
+  let bestScore = Infinity;
+
+  for (const building of buildings) {
+    const definition = getBuildingDefinition(building.kind);
+    const distance = Math.hypot(x - building.x, z - building.z);
+    if (distance > definition.pickRadius) continue;
+    if (distance < bestScore) {
+      bestScore = distance;
+      best = building;
+    }
+  }
+
+  return best;
+}
+
+export function buildingKindLabel(kind: BuildingKind): string {
+  return getBuildingDefinition(kind).label;
+}
+
 function quarryNodeId(site: QuarrySite, largeIndex: number, smallIndex: number): string {
   if (site.kind === 'large') return `quarry-large-${largeIndex}`;
   return `quarry-small-${smallIndex}`;
-}
-
-function forestCoreLabel(core: ForestCore): string {
-  if (core.strength >= 0.82) return 'Dense woodland';
-  if (core.strength >= 0.62) return 'Woodland pocket';
-  return 'Sparse grove';
 }
 
 function spatialKey(cellX: number, cellZ: number): string {
