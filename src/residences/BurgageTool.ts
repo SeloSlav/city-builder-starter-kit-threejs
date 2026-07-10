@@ -14,6 +14,7 @@ import {
 
 const MIN_POINT_DISTANCE = 1.2;
 const SNAP_DISTANCE = 6;
+const HOVER_PREVIEW_MOVE_THRESHOLD = 0.35;
 
 export type BurgageZoneCommit = {
   corners: THREE.Vector3[];
@@ -47,6 +48,8 @@ export class BurgageTool {
   private plotCount = 1;
   private plotCountTouched = false;
   private hoverPoint: THREE.Vector3 | null = null;
+  private lastHoverPreviewX = Number.NaN;
+  private lastHoverPreviewZ = Number.NaN;
 
   constructor(options: BurgageToolOptions) {
     this.options = options;
@@ -135,17 +138,23 @@ export class BurgageTool {
   update(): void {
     if (!this.enabled || this.options.isBlocked()) {
       this.preview.clear();
-      return;
     }
-    this.refreshPreview();
   }
 
   private readonly onPointerMove = (event: MouseEvent): void => {
     if (!this.enabled || this.options.isBlocked()) return;
     const point = this.pickPoint(event.clientX, event.clientY);
+    if (point && this.shouldSkipHoverPreview(point)) return;
     this.hoverPoint = point;
     this.refreshPreview();
   };
+
+  private shouldSkipHoverPreview(point: THREE.Vector3): boolean {
+    const dx = point.x - this.lastHoverPreviewX;
+    const dz = point.z - this.lastHoverPreviewZ;
+    if (!Number.isFinite(this.lastHoverPreviewX)) return false;
+    return Math.hypot(dx, dz) < HOVER_PREVIEW_MOVE_THRESHOLD;
+  }
 
   private readonly onPointerDown = (event: MouseEvent): void => {
     if (!this.enabled || event.button !== 0 || this.options.isBlocked()) return;
@@ -245,6 +254,8 @@ export class BurgageTool {
   private cancelDraft(notify: boolean): void {
     this.points = [];
     this.hoverPoint = null;
+    this.lastHoverPreviewX = Number.NaN;
+    this.lastHoverPreviewZ = Number.NaN;
     this.frontageEdge = 0;
     this.plotCount = 1;
     this.plotCountTouched = false;
@@ -280,6 +291,10 @@ export class BurgageTool {
     }
 
     const validation = this.points.length === 4 ? this.getValidation() : { ok: false as const, reason: 'invalid_shape' as const };
+    if (this.hoverPoint) {
+      this.lastHoverPreviewX = this.hoverPoint.x;
+      this.lastHoverPreviewZ = this.hoverPoint.z;
+    }
     this.preview.update(
       corners,
       layout,

@@ -546,13 +546,18 @@ export class App {
     const roadTool = this.roadTool;
     const burgageTool = this.burgageTool;
     if (!this.toolbar || !roadTool || !burgageTool) return;
-    const position = burgageTool.isEnabled()
-      ? burgageTool.getBuildButtonPosition()
-      : roadTool.getBuildButtonPosition();
-    const visible = burgageTool.isEnabled()
+    const burgageEnabled = burgageTool.isEnabled();
+    const visible = burgageEnabled
       ? burgageTool.isDraftBuildable()
       : roadTool.isDraftBuildable();
-    this.toolbar.setBuildButtonPosition(position, visible);
+    if (!visible) {
+      this.toolbar.setBuildButtonPosition(null, false);
+      return;
+    }
+    const position = burgageEnabled
+      ? burgageTool.getBuildButtonPosition()
+      : roadTool.getBuildButtonPosition();
+    this.toolbar.setBuildButtonPosition(position, true);
   }
 
   private updateFps(time: number, dt: number): void {
