@@ -412,6 +412,11 @@ export class App {
           this.toastManager?.show(message, { variant: 'error' });
         }
       },
+      onSelectionChange: (target) => {
+        buildingMarkers.setSelectedWorkExtent(
+          target?.kind === 'building' ? target.building : null,
+        );
+      },
       isBlocked: () => isWorldInspectionBlocked(placementGate),
     });
     resourceInspector.setHud(

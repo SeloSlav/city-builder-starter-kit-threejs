@@ -26,7 +26,7 @@ import { computePathBoundsXZ } from '../utils/pathGeometry.ts';
 import { RockSpatialIndex } from '../utils/rockSpatialIndex.ts';
 import { yieldToMain } from '../utils/yieldToMain.ts';
 import { createPostProcessor, type ScenePostProcessor } from './PostProcessing.ts';
-import { fitDirectionalLightShadow } from './fitDirectionalShadow.ts';
+import { fitDirectionalLightShadow, computeViewShadowBounds, intersectTerrainBounds } from './fitDirectionalShadow.ts';
 import { createPreferredRenderer, type RendererBackend, type RendererBackendKind, type SupportedRenderer } from './RendererBackend.ts';
 import { TREE_SHADOW_CAST_LAYER } from './SceneLayers.ts';
 import { applyMaxAnisotropy, beginStartupTextureLoad, type SceneStartupTextures } from './startupTextures.ts';
@@ -68,6 +68,9 @@ export class SceneManager {
   private rockSpatialIndex: RockSpatialIndex | null = null;
   private buildInteractionActive = false;
   private renderFrame = 0;
+  private lastShadowTargetX = Number.NaN;
+  private lastShadowTargetZ = Number.NaN;
+  private lastShadowDistance = Number.NaN;
 
   private constructor(
     container: HTMLElement,
@@ -277,11 +280,29 @@ export class SceneManager {
     this.sky.updateTime(elapsed);
     this.riverSystem.tick(dt, elapsed);
     this.renderFrame++;
-    const shadowInterval = this.buildInteractionActive ? 3 : 1;
-    if (this.renderFrame % shadowInterval === 0) {
-      fitDirectionalLightShadow(this.sunLight, { bounds: this.terrain.bounds, sunOffsetDir: this.sunDirection });
+    if (this.shouldRefreshShadowMap(cameraDistance)) {
+      const viewBounds = computeViewShadowBounds(this.camera, this.cameraTarget, cameraDistance);
+      const shadowBounds = intersectTerrainBounds(viewBounds, this.terrain.bounds);
+      fitDirectionalLightShadow(this.sunLight, {
+        bounds: shadowBounds,
+        sunOffsetDir: this.sunDirection,
+      });
+      this.lastShadowTargetX = this.cameraTarget.x;
+      this.lastShadowTargetZ = this.cameraTarget.z;
+      this.lastShadowDistance = cameraDistance;
+      this.refreshShadowMap();
     }
     this.postProcessor.render(dt);
+  }
+
+  private shouldRefreshShadowMap(cameraDistance: number): boolean {
+    if (!Number.isFinite(this.lastShadowTargetX)) return true;
+    const interval = this.buildInteractionActive ? 3 : 2;
+    if (this.renderFrame % interval !== 0) return false;
+    const dx = this.cameraTarget.x - this.lastShadowTargetX;
+    const dz = this.cameraTarget.z - this.lastShadowTargetZ;
+    if (Math.hypot(dx, dz) > 10) return true;
+    return Math.abs(cameraDistance - this.lastShadowDistance) > 8;
   }
 
   getPerformanceStats(): { backend: RendererBackendKind; calls: number; triangles: number; pixelRatio: number } {
@@ -459,10 +480,11 @@ export class SceneManager {
     sun.name = 'Sun';
     sun.position.copy(this.sunDirection).multiplyScalar(180);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(4096, 4096);
+    sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.bias = -0.00015;
     sun.shadow.normalBias = 0.012;
     sun.shadow.radius = 2.8;
+    sun.shadow.autoUpdate = false;
     sun.shadow.camera.layers.enable(TREE_SHADOW_CAST_LAYER);
     this.scene.add(sun);
     this.scene.add(sun.target);

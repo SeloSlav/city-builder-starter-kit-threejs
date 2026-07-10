@@ -155,7 +155,13 @@ export function createGrassBladeField(
   };
 
   const refreshMeshCount = (): void => {
-    mesh.count = MAX_STREAM_INSTANCES;
+    let maxExclusive = 0;
+    for (let gridIdx = 0; gridIdx < slotRecords.length; gridIdx++) {
+      const record = slotRecords[gridIdx]!;
+      if (record.count <= 0) continue;
+      maxExclusive = Math.max(maxExclusive, gridIdx * SLOT_CAPACITY + record.count);
+    }
+    mesh.count = maxExclusive;
   };
 
   const regenerateSlot = (

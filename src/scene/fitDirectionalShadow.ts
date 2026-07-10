@@ -13,6 +13,7 @@ const MAX_TREE_HEIGHT = 48;
 const MAX_CANOPY_RADIUS = 12;
 const LIGHT_DISTANCE = 180;
 const DEPTH_PAD = 30;
+const MIN_VIEW_SHADOW_EXTENT = 72;
 
 type FitDirectionalShadowOptions = {
   bounds: TerrainBounds;
@@ -21,6 +22,34 @@ type FitDirectionalShadowOptions = {
   horizontalMargin?: number;
   padding?: number;
 };
+
+export function computeViewShadowBounds(
+  camera: THREE.PerspectiveCamera,
+  target: THREE.Vector3,
+  viewDistance: number,
+  padding = 1.3,
+): TerrainBounds {
+  const fovRad = THREE.MathUtils.degToRad(camera.fov);
+  const halfHeight = Math.tan(fovRad * 0.5) * viewDistance;
+  const halfWidth = halfHeight * camera.aspect;
+  const extentX = Math.max(MIN_VIEW_SHADOW_EXTENT, halfWidth * padding);
+  const extentZ = Math.max(MIN_VIEW_SHADOW_EXTENT, halfHeight * padding);
+  return {
+    minX: target.x - extentX,
+    maxX: target.x + extentX,
+    minZ: target.z - extentZ,
+    maxZ: target.z + extentZ,
+  };
+}
+
+export function intersectTerrainBounds(a: TerrainBounds, b: TerrainBounds): TerrainBounds {
+  return {
+    minX: Math.max(a.minX, b.minX),
+    maxX: Math.min(a.maxX, b.maxX),
+    minZ: Math.max(a.minZ, b.minZ),
+    maxZ: Math.min(a.maxZ, b.maxZ),
+  };
+}
 
 type ViewBounds = {
   minCamX: number;

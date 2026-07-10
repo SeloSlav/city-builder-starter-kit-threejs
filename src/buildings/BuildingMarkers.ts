@@ -19,7 +19,8 @@ export class BuildingMarkers {
   private readonly terrain: Terrain;
   private readonly group = new THREE.Group();
   private readonly buildingMeshes = new Map<string, THREE.Group>();
-  private readonly radiusMeshes = new Map<string, THREE.Mesh>();
+  private selectedWorkExtentMesh: THREE.Mesh | null = null;
+  private selectedWorkExtentKind: BuildingKind | null = null;
   private previewMesh: THREE.Mesh | null = null;
   private previewBuilding: THREE.Group | null = null;
   private previewKind: BuildingKind | null = null;
@@ -30,6 +31,33 @@ export class BuildingMarkers {
     this.terrain = options.terrain;
     this.group.name = 'Building markers';
     options.parent.add(this.group);
+  }
+
+  setSelectedWorkExtent(building: BuildingState | null): void {
+    if (
+      !building
+      || building.workRadius <= 0
+      || (building.kind !== 'lumber_mill' && building.kind !== 'stone_quarry')
+    ) {
+      if (this.selectedWorkExtentMesh) this.selectedWorkExtentMesh.visible = false;
+      return;
+    }
+
+    const color = workExtentColor(building.kind);
+    if (!this.selectedWorkExtentMesh || this.selectedWorkExtentKind !== building.kind) {
+      if (this.selectedWorkExtentMesh) {
+        disposeObject3D(this.selectedWorkExtentMesh);
+        this.selectedWorkExtentMesh.removeFromParent();
+      }
+      this.selectedWorkExtentMesh = createRadiusRing(color, 0.14);
+      this.selectedWorkExtentKind = building.kind;
+      this.group.add(this.selectedWorkExtentMesh);
+    }
+
+    const y = this.terrain.getHeightAt(building.x, building.z);
+    this.selectedWorkExtentMesh.visible = true;
+    this.selectedWorkExtentMesh.position.set(building.x, y + 0.15, building.z);
+    this.selectedWorkExtentMesh.scale.set(building.workRadius, 1, building.workRadius);
   }
 
   syncBuildings(buildings: Iterable<BuildingState>): void {
@@ -113,6 +141,11 @@ export class BuildingMarkers {
       this.previewBuilding = null;
       this.previewKind = null;
     }
+    if (this.selectedWorkExtentMesh) {
+      disposeObject3D(this.selectedWorkExtentMesh);
+      this.selectedWorkExtentMesh = null;
+      this.selectedWorkExtentKind = null;
+    }
     for (const id of [...this.buildingMeshes.keys()]) {
       this.removeBuilding(id);
     }
@@ -126,25 +159,10 @@ export class BuildingMarkers {
       marker.rotation.y = buildingPlacementYaw(building.x, building.z);
       this.buildingMeshes.set(building.id, marker);
       this.group.add(marker);
-
-      const radius = createRadiusRing(buildingRadiusColor(building.kind), 0.16);
-      this.radiusMeshes.set(building.id, radius);
-      this.group.add(radius);
     }
 
     const y = this.terrain.getHeightAt(building.x, building.z);
     marker.position.set(building.x, y, building.z);
-
-    const radiusMesh = this.radiusMeshes.get(building.id);
-    if (radiusMesh) {
-      radiusMesh.position.set(building.x, y + 0.15, building.z);
-      if (building.workRadius > 0) {
-        radiusMesh.visible = true;
-        radiusMesh.scale.set(building.workRadius, 1, building.workRadius);
-      } else {
-        radiusMesh.visible = false;
-      }
-    }
   }
 
   private removeBuilding(id: string): void {
@@ -153,22 +171,13 @@ export class BuildingMarkers {
       disposeObject3D(marker, true);
       this.buildingMeshes.delete(id);
     }
-    const radius = this.radiusMeshes.get(id);
-    if (radius) {
-      disposeObject3D(radius);
-      this.radiusMeshes.delete(id);
-    }
   }
 }
 
-function buildingRadiusColor(kind: BuildingState['kind']): number {
+function workExtentColor(kind: Extract<BuildingKind, 'lumber_mill' | 'stone_quarry'>): number {
   switch (kind) {
     case 'lumber_mill':
       return 0xd7b463;
-    case 'reforester':
-      return 0x84a66b;
-    case 'woodcutters_lodge':
-      return 0xc9a227;
     case 'stone_quarry':
       return 0xa8a29e;
     default: {

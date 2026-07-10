@@ -22,6 +22,7 @@ type ResourceInspectorOptions = {
   onDemolishResidence?: (residenceId: string) => void | Promise<void>;
   onDemolishBurgageZone?: (zoneId: string) => void | Promise<void>;
   onAssignBuildingLabor?: (buildingId: string, labor: number) => void | Promise<void>;
+  onSelectionChange?: (target: InspectableTarget | null) => void;
   isBlocked: () => boolean;
 };
 
@@ -264,7 +265,7 @@ export class ResourceInspector {
     } else if (target.kind === 'building') {
       this.selectedX = target.building.x;
       this.selectedZ = target.building.z;
-      this.selectedRadius = target.building.workRadius * 0.42;
+      this.selectedRadius = 0;
     } else if (target.kind === 'residence') {
       this.selectedX = target.residence.x;
       this.selectedZ = target.residence.z;
@@ -277,6 +278,7 @@ export class ResourceInspector {
     this.renderTarget(target);
     this.updateMarker();
     this.panel.hidden = false;
+    this.options.onSelectionChange?.(target);
   }
 
   private clearSelection(hidePanel: boolean): void {
@@ -285,6 +287,7 @@ export class ResourceInspector {
     this.demolishSection.hidden = true;
     this.laborSection.hidden = true;
     if (hidePanel) this.panel.hidden = true;
+    this.options.onSelectionChange?.(null);
   }
 
   private renderTarget(target: InspectableTarget): void {
@@ -324,6 +327,11 @@ export class ResourceInspector {
   }
 
   private updateMarker(): void {
+    if (!this.selectedTarget || this.selectedTarget.kind === 'building') {
+      this.marker.visible = false;
+      return;
+    }
+
     const y = this.options.sceneManager.terrain.getHeightAt(this.selectedX, this.selectedZ) + 0.35;
     this.marker.scale.set(this.selectedRadius, 1, this.selectedRadius);
     this.marker.position.set(this.selectedX, y, this.selectedZ);
