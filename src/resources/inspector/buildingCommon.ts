@@ -10,6 +10,7 @@ import { getBuildingDefinition } from '../buildings.ts';
 import type { BuildingKind, BuildingState } from '../types.ts';
 import {
   buildingAcceptsLabor,
+  buildingMaxLabor,
   buildingStorageCaps,
   maxAssignableLabor,
   type PopulationStats,
@@ -52,10 +53,11 @@ export function buildingLaborView(
   }
 
   const maxLabor = maxAssignableLabor(building, populationStats);
+  const buildingCap = buildingMaxLabor(building.kind);
   return {
     visible: true,
     count: building.assignedLabor,
-    hint: `${populationStats.available} workers available (${populationStats.total} population, ${populationStats.assigned} assigned).`,
+    hint: `${building.assignedLabor}/${buildingCap} workers here · ${populationStats.available} available (${populationStats.total} population, ${populationStats.assigned} assigned).`,
     decreaseDisabled: building.assignedLabor <= 0,
     increaseDisabled: building.assignedLabor >= maxLabor,
   };

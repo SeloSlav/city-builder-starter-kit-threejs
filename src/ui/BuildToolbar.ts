@@ -1,6 +1,7 @@
 import { CompassHud } from './CompassHud.ts';
 import { GameMenu } from './GameMenu.ts';
 import { formatBuildingCost, getBuildingCost } from '../resources/buildingEconomy.ts';
+import type { BurgageLayoutHudState } from '../residences/BurgageTool.ts';
 import { syncTipCardVisibility } from './tipCards.ts';
 import { subscribeTipCardsPreference } from './tipCardsPreference.ts';
 
@@ -26,6 +27,13 @@ export class BuildToolbar {
   private readonly stoneQuarryButton: HTMLButtonElement;
   private readonly residencesButton: HTMLButtonElement;
   private readonly buildButton: HTMLButtonElement;
+  private readonly burgageLayoutHud: HTMLElement;
+  private readonly burgagePlotDecreaseButton: HTMLButtonElement;
+  private readonly burgagePlotIncreaseButton: HTMLButtonElement;
+  private readonly burgagePlotCountLabel: HTMLElement;
+  private readonly burgagePlotMaxLabel: HTMLElement;
+  private readonly burgageRotateFrontageButton: HTMLButtonElement;
+  private readonly burgageFrontageLabel: HTMLElement;
   private readonly statusLabel: HTMLElement;
   private readonly deletePopup: HTMLElement;
   private readonly removeButton: HTMLButtonElement;
@@ -45,8 +53,11 @@ export class BuildToolbar {
   private readonly unsubscribeTipsPreference: () => void;
   private firstPersonActive = false;
   private buildButtonVisible = false;
+  private burgageLayoutHudVisible = false;
   private lastBuildLeft = Number.NaN;
   private lastBuildTop = Number.NaN;
+  private lastHudLeft = Number.NaN;
+  private lastHudTop = Number.NaN;
   private hudMode: ToolbarStats['mode'] = 'idle';
   private deleteCancel: (() => void) | null = null;
   private deleteRemove: (() => void) | null = null;
@@ -61,6 +72,9 @@ export class BuildToolbar {
       onToggleWoodcuttersLodge: () => void;
       onToggleStoneQuarry: () => void;
       onToggleResidences: () => void;
+      onBurgagePlotDecrease?: () => void;
+      onBurgagePlotIncrease?: () => void;
+      onBurgageRotateFrontage?: () => void;
       onMenuOpenChange?: (open: boolean) => void;
       canOpenMenuFromKeyboard?: () => boolean;
       onExportGameState?: () => void;
@@ -180,6 +194,19 @@ export class BuildToolbar {
         </svg>
       </button>
 
+      <div class="burgage-layout-hud" data-burgage-layout-hud hidden aria-label="Residence plot layout">
+        <button type="button" class="burgage-layout-hud-button" data-action="burgage-plot-decrease" title="Fewer plots (−)" aria-label="Fewer plots">−</button>
+        <div class="burgage-layout-hud-count">
+          <strong data-burgage-plot-count>1</strong>
+          <span data-burgage-plot-max>plot</span>
+        </div>
+        <button type="button" class="burgage-layout-hud-button" data-action="burgage-plot-increase" title="More plots (+)" aria-label="More plots">+</button>
+        <button type="button" class="burgage-layout-hud-frontage" data-action="burgage-rotate-frontage" title="Rotate frontage (F)" aria-label="Rotate frontage" hidden>
+          <span aria-hidden="true">↻</span>
+          <span class="burgage-layout-hud-frontage-label" data-burgage-frontage-label>A–B</span>
+        </button>
+      </div>
+
       <div class="delete-popup" data-delete-popup hidden>
         <button type="button" data-action="confirm-delete">Remove</button>
         <button type="button" class="ghost-button" data-action="cancel-delete">Cancel</button>
@@ -213,6 +240,13 @@ export class BuildToolbar {
     this.stoneQuarryButton = this.mustButton(root, '[data-action="stone-quarry"]');
     this.residencesButton = this.mustButton(root, '[data-action="residences"]');
     this.buildButton = this.mustButton(root, '[data-action="build"]');
+    this.burgageLayoutHud = this.mustElement(root, '[data-burgage-layout-hud]');
+    this.burgagePlotDecreaseButton = this.mustButton(root, '[data-action="burgage-plot-decrease"]');
+    this.burgagePlotIncreaseButton = this.mustButton(root, '[data-action="burgage-plot-increase"]');
+    this.burgagePlotCountLabel = this.mustElement(root, '[data-burgage-plot-count]');
+    this.burgagePlotMaxLabel = this.mustElement(root, '[data-burgage-plot-max]');
+    this.burgageRotateFrontageButton = this.mustButton(root, '[data-action="burgage-rotate-frontage"]');
+    this.burgageFrontageLabel = this.mustElement(root, '[data-burgage-frontage-label]');
     this.statusLabel = this.mustElement(root, '[data-road-status]');
     this.deletePopup = this.mustElement(root, '[data-delete-popup]');
     this.removeButton = this.mustButton(root, '[data-action="confirm-delete"]');
@@ -236,6 +270,11 @@ export class BuildToolbar {
     this.stoneQuarryButton.addEventListener('click', handlers.onToggleStoneQuarry);
     this.residencesButton.addEventListener('click', handlers.onToggleResidences);
     this.buildButton.addEventListener('click', handlers.onBuildRoad);
+    this.burgagePlotDecreaseButton.addEventListener('click', () => handlers.onBurgagePlotDecrease?.());
+    this.burgagePlotIncreaseButton.addEventListener('click', () => handlers.onBurgagePlotIncrease?.());
+    this.burgageRotateFrontageButton.addEventListener('click', () => handlers.onBurgageRotateFrontage?.());
+    this.burgageLayoutHud.addEventListener('mousedown', (event) => event.stopPropagation());
+    this.burgageLayoutHud.addEventListener('click', (event) => event.stopPropagation());
     this.deletePopup.addEventListener('mousedown', (event) => event.stopPropagation());
     this.deletePopup.addEventListener('click', (event) => event.stopPropagation());
     this.removeButton.addEventListener('click', () => {
@@ -309,6 +348,51 @@ export class BuildToolbar {
     this.lastBuildTop = top;
     this.buildButton.style.left = `${left}px`;
     this.buildButton.style.top = `${top}px`;
+  }
+
+  setBurgageLayoutHud(
+    position: { clientX: number; clientY: number } | null,
+    state: BurgageLayoutHudState | null,
+  ): void {
+    if (!position || !state) {
+      if (!this.burgageLayoutHudVisible) return;
+      this.burgageLayoutHud.hidden = true;
+      this.burgageLayoutHudVisible = false;
+      this.lastHudLeft = Number.NaN;
+      this.lastHudTop = Number.NaN;
+      return;
+    }
+
+    const plotLabel = state.plotCount === 1 ? 'plot' : 'plots';
+    const residenceHint = state.residenceCount != null && state.residenceCount !== state.plotCount
+      ? ` · ${state.residenceCount} fit`
+      : '';
+    this.burgagePlotCountLabel.textContent = state.plotCount.toString();
+    this.burgagePlotMaxLabel.textContent = `${plotLabel} / ${state.maxPlotCount} max${residenceHint}`;
+    this.burgagePlotDecreaseButton.disabled = !state.canDecrease;
+    this.burgagePlotIncreaseButton.disabled = !state.canIncrease;
+    this.burgageLayoutHud.dataset.state = state.valid ? 'ready' : 'warning';
+
+    const showFrontage = state.canRotateFrontage && state.frontageLabel != null;
+    this.burgageRotateFrontageButton.hidden = !showFrontage;
+    if (showFrontage) {
+      this.burgageFrontageLabel.textContent = state.frontageLabel;
+    }
+
+    this.burgageLayoutHud.hidden = false;
+    this.burgageLayoutHudVisible = true;
+
+    const width = this.burgageLayoutHud.offsetWidth || 168;
+    const height = this.burgageLayoutHud.offsetHeight || 44;
+    const margin = 10;
+    const left = Math.round(Math.max(margin, Math.min(window.innerWidth - width - margin, position.clientX - width * 0.5)));
+    const top = Math.round(Math.max(margin, Math.min(window.innerHeight - height - margin, position.clientY - height - 14)));
+    if (left === this.lastHudLeft && top === this.lastHudTop) return;
+
+    this.lastHudLeft = left;
+    this.lastHudTop = top;
+    this.burgageLayoutHud.style.left = `${left}px`;
+    this.burgageLayoutHud.style.top = `${top}px`;
   }
 
   setFps(fps: number): void {
@@ -423,8 +507,8 @@ export class BuildToolbar {
           <li><span>Frontage end</span><span class="road-controls-key">2nd click</span></li>
           <li><span>Set depth</span><span class="road-controls-key">3rd click</span></li>
           <li><span>Close rectangle</span><span class="road-controls-key">4th click</span></li>
-          <li><span>Change plot count</span><span class="road-controls-key">+ / −</span></li>
-          <li><span>Rotate frontage</span><span class="road-controls-key">F</span></li>
+          <li><span>Change plot count</span><span class="road-controls-key">+ / − or on-zone controls</span></li>
+          <li><span>Rotate frontage</span><span class="road-controls-key">F</span> <span class="road-controls-hint">(after depth is set)</span></li>
           <li><span>Place residences</span><span class="road-controls-key">Hammer or Enter</span></li>
           <li><span>Cancel / exit</span><span class="road-controls-key">Esc</span></li>
         `;

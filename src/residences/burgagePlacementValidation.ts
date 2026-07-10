@@ -138,7 +138,41 @@ export function validateBurgagePlacement(context: BurgagePlacementContext): Burg
 }
 
 export function detectFrontageEdge(corners: BurgageZoneCorners, roadNetwork: RoadNetwork): BurgageFrontageEdge {
-  return autoFrontageEdge(corners, (edge) => edgeDistanceToRoads(corners, edge, roadNetwork));
+  const valid = validFrontageEdges(corners, roadNetwork);
+  return valid[0] ?? autoFrontageEdge(corners, (edge) => edgeDistanceToRoads(corners, edge, roadNetwork));
+}
+
+export function validFrontageEdges(
+  corners: BurgageZoneCorners,
+  roadNetwork: RoadNetwork,
+): BurgageFrontageEdge[] {
+  const edges: BurgageFrontageEdge[] = [];
+  for (let edge = 0; edge < 4; edge++) {
+    const frontageEdge = edge as BurgageFrontageEdge;
+    if (edgeDistanceToRoads(corners, frontageEdge, roadNetwork) <= MAX_ROAD_FRONTAGE_DISTANCE) {
+      edges.push(frontageEdge);
+    }
+  }
+  return edges.sort(
+    (a, b) => edgeDistanceToRoads(corners, a, roadNetwork) - edgeDistanceToRoads(corners, b, roadNetwork),
+  );
+}
+
+export function cycleFrontageEdge(
+  corners: BurgageZoneCorners,
+  roadNetwork: RoadNetwork,
+  current: BurgageFrontageEdge,
+): BurgageFrontageEdge {
+  const valid = validFrontageEdges(corners, roadNetwork);
+  if (valid.length === 0) return current;
+  if (valid.length === 1) return valid[0];
+  const index = valid.indexOf(current);
+  const nextIndex = index < 0 ? 0 : (index + 1) % valid.length;
+  return valid[nextIndex];
+}
+
+export function frontageEdgeLabel(edge: BurgageFrontageEdge): string {
+  return ['A–B', 'B–C', 'C–D', 'D–A'][edge];
 }
 
 export function initialPlotCount(corners: BurgageZoneCorners, frontageEdge: BurgageFrontageEdge): number {

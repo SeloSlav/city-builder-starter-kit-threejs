@@ -78,11 +78,19 @@ export function sampleBuildingFootprintHeights(
   z: number,
   sampleNaturalHeight: (x: number, z: number) => number,
 ): number[] {
+  return sampleBuildingFootprintPoints(kind, x, z).map((point) => sampleNaturalHeight(point.x, point.z));
+}
+
+export function sampleBuildingFootprintPoints(
+  kind: BuildingKind,
+  x: number,
+  z: number,
+): Array<{ x: number; z: number }> {
   const params = PAD_PARAMS[kind];
   const rotation = buildingPlacementYaw(x, z);
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
-  const heights: number[] = [];
+  const points: Array<{ x: number; z: number }> = [];
 
   for (const fraction of FOOTPRINT_SAMPLE_FRACTIONS) {
     for (const sx of [-1, 0, 1] as const) {
@@ -90,14 +98,15 @@ export function sampleBuildingFootprintHeights(
         if (fraction === 0 && (sx !== 0 || sz !== 0)) continue;
         const localX = sx * params.radiusX * params.innerFade * fraction;
         const localZ = sz * params.radiusZ * params.innerFade * fraction;
-        const worldX = x + localX * cos - localZ * sin;
-        const worldZ = z + localX * sin + localZ * cos;
-        heights.push(sampleNaturalHeight(worldX, worldZ));
+        points.push({
+          x: x + localX * cos - localZ * sin,
+          z: z + localX * sin + localZ * cos,
+        });
       }
     }
   }
 
-  return heights;
+  return points;
 }
 
 function createPadSite(

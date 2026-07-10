@@ -408,6 +408,7 @@ export class SpacetimeGameStore {
           z: row.z,
           workRadius: row.workRadius,
           actionCooldown: row.actionCooldown,
+          deliveryCooldown: row.deliveryCooldown,
           timber: row.timber,
           firewood: row.firewood,
           stone: row.stone,

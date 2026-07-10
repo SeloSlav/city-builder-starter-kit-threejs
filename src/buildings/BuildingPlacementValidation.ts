@@ -3,9 +3,10 @@ import type { ResourceTotals } from '../resources/resourceTotals.ts';
 import { canAffordBuilding } from '../resources/buildingEconomy.ts';
 import { getBuildingDefinition } from '../resources/buildings.ts';
 import { sampleBuildingFootprintHeights } from './BuildingTerrainLayout.ts';
+import { sampleBuildingFootprintPoints } from './BuildingTerrainLayout.ts';
 import { buildingOverlapsResidenceZone } from '../placement/placementConflicts.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
-import { hasRoadAccess } from '../roads/roadConnectivity.ts';
+import { hasRoadAccess, isOnRoadSurface } from '../roads/roadConnectivity.ts';
 
 export type BuildingPlacementFailureReason =
   | 'water'
@@ -17,6 +18,7 @@ export type BuildingPlacementFailureReason =
   | 'no_quarry_in_range'
   | 'no_trees_in_range'
   | 'no_road_access'
+  | 'on_road'
   | 'insufficient_resources';
 
 export type BuildingPlacementResult =
@@ -49,6 +51,10 @@ export function validateBuildingPlacement(
 
   if (isFootprintTooUneven(kind, x, z, context.getNaturalHeightAt)) {
     return { ok: false, reason: 'too_steep' };
+  }
+
+  if (context.roadNetwork && buildingFootprintOverlapsRoadSurface(kind, x, z, context.roadNetwork)) {
+    return { ok: false, reason: 'on_road' };
   }
 
   if (kind !== 'stone_quarry' && context.isQuarryPitAt?.(x, z)) {
@@ -153,6 +159,18 @@ function hasQuarryStoneInRadius(
     if (Math.hypot(quarry.x - x, quarry.z - z) <= radius) {
       return true;
     }
+  }
+  return false;
+}
+
+function buildingFootprintOverlapsRoadSurface(
+  kind: BuildingKind,
+  x: number,
+  z: number,
+  roadNetwork: RoadNetwork,
+): boolean {
+  for (const point of sampleBuildingFootprintPoints(kind, x, z)) {
+    if (isOnRoadSurface(point.x, point.z, roadNetwork)) return true;
   }
   return false;
 }

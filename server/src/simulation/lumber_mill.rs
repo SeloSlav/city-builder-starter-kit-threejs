@@ -31,10 +31,12 @@ pub fn step_lumber_mill(ctx: &ReducerContext, building: Building) {
         return;
     }
 
+    let labor_interval = interval / building.assigned_labor as f64;
+
     let caps = building_storage_caps(&building.kind);
     if building.timber >= caps.timber - 1e-6 {
         ctx.db.building().id().update(Building {
-            action_cooldown: interval,
+            action_cooldown: labor_interval,
             ..building
         });
         return;
@@ -42,7 +44,7 @@ pub fn step_lumber_mill(ctx: &ReducerContext, building: Building) {
 
     let Some(target) = find_nearest_mature_tree(ctx, building.x, building.z, work_radius) else {
         ctx.db.building().id().update(Building {
-            action_cooldown: interval,
+            action_cooldown: labor_interval,
             ..building
         });
         return;
@@ -55,6 +57,6 @@ pub fn step_lumber_mill(ctx: &ReducerContext, building: Building) {
     });
 
     let (_, _, _, mut updated) = deposit_building(&building, caps, target.wood_yield, 0.0, 0.0);
-    updated.action_cooldown = interval;
+    updated.action_cooldown = labor_interval;
     ctx.db.building().id().update(updated);
 }

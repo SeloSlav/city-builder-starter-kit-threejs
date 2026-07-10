@@ -10,8 +10,12 @@ pub const TIMBER_SALVAGE_FRACTION: f64 = 0.7;
 pub const RESIDENCE_TIMBER_COST: f64 = 8.0;
 pub const RESIDENCE_STONE_COST: f64 = 12.0;
 
-pub const STARTING_POPULATION: u32 = 6;
-pub const POPULATION_PER_RESIDENCE: u32 = 4;
+pub const STARTING_POPULATION: u32 = 5;
+pub const POPULATION_PER_RESIDENCE: u32 = 3;
+pub const RESIDENCE_POPULATION_NARROW: u32 = 2;
+pub const RESIDENCE_POPULATION_WIDE: u32 = 4;
+pub const NARROW_PARCEL_FRONTAGE_MAX: f64 = 9.6;
+pub const WIDE_PARCEL_FRONTAGE_MIN: f64 = 14.0;
 pub const RESIDENCE_FIREWOOD_CAPACITY: f64 = 40.0;
 pub const RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC: f64 = 0.02;
 pub const ABANDON_AFTER_DEFICIT_TICKS: u32 = 3600;
@@ -20,6 +24,8 @@ pub const BUILDING_ROAD_ACCESS_DISTANCE: f64 = 20.0;
 
 pub const LODGE_TIMBER_PER_CYCLE: f64 = 3.0;
 pub const LODGE_FIREWOOD_PER_CYCLE: f64 = 3.0;
+pub const LODGE_DELIVERY_INTERVAL: f64 = 4.0;
+pub const LODGE_FIREWOOD_PER_DELIVERY: f64 = 2.0;
 pub const STONE_PER_HARVEST: f64 = 3.0;
 pub const REFORESTER_REGROW_PER_SEC: f64 = 0.014;
 
@@ -40,6 +46,7 @@ pub struct BuildingDef {
     pub storage_firewood: f64,
     pub storage_stone: f64,
     pub accepts_labor: bool,
+    pub max_labor: u32,
     pub work_radius: f64,
     pub action_interval: f64,
     pub pick_radius: f64,
@@ -57,6 +64,7 @@ const LUMBER_MILL: BuildingDef = BuildingDef {
     storage_firewood: 0.0,
     storage_stone: 0.0,
     accepts_labor: true,
+    max_labor: 3,
     work_radius: 210.0,
     action_interval: 9.0,
     pick_radius: 8.0,
@@ -73,7 +81,8 @@ const REFORESTER: BuildingDef = BuildingDef {
     storage_timber: 0.0,
     storage_firewood: 0.0,
     storage_stone: 0.0,
-    accepts_labor: false,
+    accepts_labor: true,
+    max_labor: 1,
     work_radius: 190.0,
     action_interval: 0.0,
     pick_radius: 8.0,
@@ -91,6 +100,7 @@ const WOODCUTTERS_LODGE: BuildingDef = BuildingDef {
     storage_firewood: 120.0,
     storage_stone: 0.0,
     accepts_labor: true,
+    max_labor: 2,
     work_radius: 0.0,
     action_interval: 5.0,
     pick_radius: 8.0,
@@ -108,6 +118,7 @@ const STONE_QUARRY: BuildingDef = BuildingDef {
     storage_firewood: 0.0,
     storage_stone: 180.0,
     accepts_labor: true,
+    max_labor: 4,
     work_radius: 55.0,
     action_interval: 9.0,
     pick_radius: 10.0,

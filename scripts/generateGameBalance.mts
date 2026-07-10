@@ -10,6 +10,7 @@ type BuildingBalance = {
   pickRadius: number;
   harvestInterval: number;
   regrowRatePerSecond: number;
+  maxLabor: number;
   acceptsLabor: boolean;
   requiresRoad: boolean;
   requiresMatureTrees: boolean;
@@ -29,6 +30,10 @@ type GameBalance = {
   population: {
     starting: number;
     perResidence: number;
+    residencePopulationNarrow: number;
+    residencePopulationWide: number;
+    narrowParcelFrontageMax: number;
+    wideParcelFrontageMin: number;
     residenceFirewoodCapacity: number;
     residenceFirewoodPerPersonPerSec: number;
     abandonAfterDeficitTicks: number;
@@ -40,6 +45,8 @@ type GameBalance = {
   production: {
     lodgeTimberPerCycle: number;
     lodgeFirewoodPerCycle: number;
+    lodgeDeliveryInterval: number;
+    lodgeFirewoodPerDelivery: number;
     stonePerHarvest: number;
     reforesterRegrowPerSec: number;
   };
@@ -80,6 +87,10 @@ function generateRust(): string {
     '',
     `pub const STARTING_POPULATION: u32 = ${b.population.starting};`,
     `pub const POPULATION_PER_RESIDENCE: u32 = ${b.population.perResidence};`,
+    `pub const RESIDENCE_POPULATION_NARROW: u32 = ${b.population.residencePopulationNarrow};`,
+    `pub const RESIDENCE_POPULATION_WIDE: u32 = ${b.population.residencePopulationWide};`,
+    `pub const NARROW_PARCEL_FRONTAGE_MAX: f64 = ${rustF64(b.population.narrowParcelFrontageMax)};`,
+    `pub const WIDE_PARCEL_FRONTAGE_MIN: f64 = ${rustF64(b.population.wideParcelFrontageMin)};`,
     `pub const RESIDENCE_FIREWOOD_CAPACITY: f64 = ${rustF64(b.population.residenceFirewoodCapacity)};`,
     `pub const RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC: f64 = ${rustF64(b.population.residenceFirewoodPerPersonPerSec)};`,
     `pub const ABANDON_AFTER_DEFICIT_TICKS: u32 = ${b.population.abandonAfterDeficitTicks};`,
@@ -88,6 +99,8 @@ function generateRust(): string {
     '',
     `pub const LODGE_TIMBER_PER_CYCLE: f64 = ${rustF64(b.production.lodgeTimberPerCycle)};`,
     `pub const LODGE_FIREWOOD_PER_CYCLE: f64 = ${rustF64(b.production.lodgeFirewoodPerCycle)};`,
+    `pub const LODGE_DELIVERY_INTERVAL: f64 = ${rustF64(b.production.lodgeDeliveryInterval)};`,
+    `pub const LODGE_FIREWOOD_PER_DELIVERY: f64 = ${rustF64(b.production.lodgeFirewoodPerDelivery)};`,
     `pub const STONE_PER_HARVEST: f64 = ${rustF64(b.production.stonePerHarvest)};`,
     `pub const REFORESTER_REGROW_PER_SEC: f64 = ${rustF64(b.production.reforesterRegrowPerSec)};`,
     '',
@@ -110,6 +123,7 @@ function generateRust(): string {
   lines.push('    pub storage_firewood: f64,');
   lines.push('    pub storage_stone: f64,');
   lines.push('    pub accepts_labor: bool,');
+  lines.push('    pub max_labor: u32,');
   lines.push('    pub work_radius: f64,');
   lines.push('    pub action_interval: f64,');
   lines.push('    pub pick_radius: f64,');
@@ -131,6 +145,7 @@ function generateRust(): string {
     lines.push(`    storage_firewood: ${rustF64(def.storage.firewood)},`);
     lines.push(`    storage_stone: ${rustF64(def.storage.stone)},`);
     lines.push(`    accepts_labor: ${def.acceptsLabor},`);
+    lines.push(`    max_labor: ${def.maxLabor},`);
     lines.push(`    work_radius: ${rustF64(def.workRadius)},`);
     lines.push(`    action_interval: ${rustF64(def.harvestInterval)},`);
     lines.push(`    pick_radius: ${rustF64(def.pickRadius)},`);
@@ -175,12 +190,22 @@ function generateTypeScript(): string {
     '',
     `export const STARTING_POPULATION = ${b.population.starting};`,
     `export const POPULATION_PER_RESIDENCE = ${b.population.perResidence};`,
+    `export const RESIDENCE_POPULATION_NARROW = ${b.population.residencePopulationNarrow};`,
+    `export const RESIDENCE_POPULATION_WIDE = ${b.population.residencePopulationWide};`,
+    `export const NARROW_PARCEL_FRONTAGE_MAX = ${b.population.narrowParcelFrontageMax};`,
+    `export const WIDE_PARCEL_FRONTAGE_MIN = ${b.population.wideParcelFrontageMin};`,
     `export const RESIDENCE_FIREWOOD_CAPACITY = ${b.population.residenceFirewoodCapacity};`,
     `export const RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC = ${b.population.residenceFirewoodPerPersonPerSec};`,
     `export const ABANDON_AFTER_DEFICIT_TICKS = ${b.population.abandonAfterDeficitTicks};`,
     '',
     `export const BUILDING_ROAD_ACCESS_DISTANCE = ${b.roads.buildingRoadAccessDistance};`,
     `export const BURGAGE_ROAD_FRONTAGE_DISTANCE = ${b.roads.burgageRoadFrontageDistance};`,
+    '',
+    `export const LODGE_TIMBER_PER_CYCLE = ${b.production.lodgeTimberPerCycle};`,
+    `export const LODGE_FIREWOOD_PER_CYCLE = ${b.production.lodgeFirewoodPerCycle};`,
+    `export const LODGE_DELIVERY_INTERVAL = ${b.production.lodgeDeliveryInterval};`,
+    `export const LODGE_FIREWOOD_PER_DELIVERY = ${b.production.lodgeFirewoodPerDelivery};`,
+    `export const STONE_PER_HARVEST = ${b.production.stonePerHarvest};`,
     '',
     'export type BuildingResourceCost = {',
     '  timber: number;',
@@ -200,6 +225,7 @@ function generateTypeScript(): string {
     '  pickRadius: number;',
     '  harvestInterval: number;',
     '  regrowRatePerSecond: number;',
+    '  maxLabor: number;',
     '  acceptsLabor: boolean;',
     '};',
     '',
@@ -214,6 +240,7 @@ function generateTypeScript(): string {
     lines.push(`    pickRadius: ${def.pickRadius},`);
     lines.push(`    harvestInterval: ${def.harvestInterval},`);
     lines.push(`    regrowRatePerSecond: ${def.regrowRatePerSecond},`);
+    lines.push(`    maxLabor: ${def.maxLabor},`);
     lines.push(`    acceptsLabor: ${def.acceptsLabor},`);
     lines.push('  },');
   }

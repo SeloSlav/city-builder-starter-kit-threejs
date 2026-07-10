@@ -5,7 +5,12 @@ import {
   STONE_SALVAGE_FRACTION,
   TIMBER_SALVAGE_FRACTION,
 } from '../buildingEconomy.ts';
-import { RESIDENCE_FIREWOOD_CAPACITY, residenceNeedsStatus } from '../resourceTotals.ts';
+import {
+  formatFirewoodRunwayDays,
+  RESIDENCE_FIREWOOD_CAPACITY,
+  residenceFirewoodRunwayDays,
+  residenceNeedsStatus,
+} from '../resourceTotals.ts';
 import type { InspectableTarget } from '../types.ts';
 import type { InspectorRenderContext, InspectorView } from './renderInspectableTarget.ts';
 import { hiddenLabor } from './renderInspectableTarget.ts';
@@ -22,6 +27,14 @@ export function renderResidenceInspector(
   const needs = residenceNeedsStatus(residence);
   const nearestRoad = context.worldQueries.getNearestRoadNodeDistance(residence.x, residence.z);
   const roadAccess = context.worldQueries.getRoadAccessLabel(residence.x, residence.z);
+  const servingLodge = context.worldQueries.getServingLodgeForResidence(residence);
+  const runwayDays = residenceFirewoodRunwayDays(residence);
+  const firewoodRunwayLabel = runwayDays == null
+    ? '—'
+    : formatFirewoodRunwayDays(runwayDays);
+  const lodgeLabel = servingLodge
+    ? context.worldQueries.getBuildingLabel(servingLodge.kind)
+    : 'None on branch';
 
   return {
     eyebrow: 'Residence',
@@ -38,6 +51,8 @@ export function renderResidenceInspector(
       <li><span>Parcel</span><span>#${residence.parcelIndex + 1}</span></li>
       <li><span>Population</span><span>${residence.abandoned ? 0 : residence.population}</span></li>
       <li><span>Firewood stock</span><span>${Math.round(residence.firewoodStock)} / ${RESIDENCE_FIREWOOD_CAPACITY}</span></li>
+      <li><span>Firewood runway</span><span>${firewoodRunwayLabel}</span></li>
+      <li><span>Serving lodge</span><span>${lodgeLabel}</span></li>
       <li><span>Road access</span><span>${roadAccess}</span></li>
       <li><span>Build cost</span><span>${formatBuildingCost(singleCost)}</span></li>
       <li><span>Nearest road</span><span>${nearestRoad == null ? 'None nearby' : `${nearestRoad.toFixed(1)} m`}</span></li>

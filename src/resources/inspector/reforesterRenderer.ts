@@ -1,4 +1,5 @@
 import { getBuildingCost } from '../buildingEconomy.ts';
+import { getBuildingDefinition } from '../buildings.ts';
 import type { InspectableTarget } from '../types.ts';
 import {
   buildingCostRows,
@@ -17,17 +18,22 @@ export function renderReforesterInspector(
   const { building, matureTrees, stumpTrees, growingTrees } = target;
   const label = context.worldQueries.getBuildingLabel(building.kind);
   const cost = getBuildingCost(building.kind);
+  const definition = getBuildingDefinition(building.kind);
+  const regrowing = building.assignedLabor > 0 && stumpTrees + growingTrees > 0;
 
   return {
     eyebrow: 'Building',
     title: label,
-    statusText: stumpTrees + growingTrees > 0
-      ? `Reforesting — ${stumpTrees} stumps, ${growingTrees} growing`
-      : 'Idle — no stumps in range',
-    statusState: stumpTrees + growingTrees > 0 ? 'active' : 'draft',
+    statusText: building.assignedLabor === 0
+      ? 'Idle — assign a forester to regrow stumps'
+      : stumpTrees + growingTrees > 0
+        ? `Reforesting — ${stumpTrees} stumps, ${growingTrees} growing`
+        : 'Idle — no stumps in range',
+    statusState: regrowing ? 'active' : building.assignedLabor === 0 ? 'idle' : 'draft',
     detailsHtml: `
       ${buildingCostRows(building.kind, cost)}
       ${buildingWorkRadiusRow(building.kind)}
+      <li><span>Regrowth rate</span><span>${building.assignedLabor > 0 ? `${(definition.regrowRatePerSecond * building.assignedLabor).toFixed(3)}/s` : `${definition.regrowRatePerSecond}/s per worker`}</span></li>
       ${treeCountRows(matureTrees, stumpTrees, growingTrees)}
       ${buildingStorageRows(building, building.kind)}
     `,

@@ -12,8 +12,12 @@
     "residenceStoneCost": 12
   },
   "population": {
-    "starting": 6,
-    "perResidence": 4,
+    "starting": 5,
+    "perResidence": 3,
+    "residencePopulationNarrow": 2,
+    "residencePopulationWide": 4,
+    "narrowParcelFrontageMax": 9.6,
+    "wideParcelFrontageMin": 14,
     "residenceFirewoodCapacity": 40,
     "residenceFirewoodPerPersonPerSec": 0.02,
     "abandonAfterDeficitTicks": 3600
@@ -25,6 +29,8 @@
   "production": {
     "lodgeTimberPerCycle": 3,
     "lodgeFirewoodPerCycle": 3,
+    "lodgeDeliveryInterval": 4,
+    "lodgeFirewoodPerDelivery": 2,
     "stonePerHarvest": 3,
     "reforesterRegrowPerSec": 0.014
   },
@@ -37,6 +43,7 @@
       "pickRadius": 8,
       "harvestInterval": 9,
       "regrowRatePerSecond": 0,
+      "maxLabor": 3,
       "acceptsLabor": true,
       "requiresRoad": true,
       "requiresMatureTrees": true,
@@ -50,7 +57,8 @@
       "pickRadius": 8,
       "harvestInterval": 0,
       "regrowRatePerSecond": 0.014,
-      "acceptsLabor": false,
+      "maxLabor": 1,
+      "acceptsLabor": true,
       "requiresRoad": false,
       "requiresMatureTrees": false,
       "requiresQuarryStone": false
@@ -63,6 +71,7 @@
       "pickRadius": 8,
       "harvestInterval": 5,
       "regrowRatePerSecond": 0,
+      "maxLabor": 2,
       "acceptsLabor": true,
       "requiresRoad": true,
       "requiresMatureTrees": false,
@@ -76,6 +85,7 @@
       "pickRadius": 10,
       "harvestInterval": 9,
       "regrowRatePerSecond": 0,
+      "maxLabor": 4,
       "acceptsLabor": true,
       "requiresRoad": false,
       "requiresMatureTrees": false,

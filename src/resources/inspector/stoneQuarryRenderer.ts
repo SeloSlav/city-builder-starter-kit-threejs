@@ -1,5 +1,6 @@
 import { getBuildingCost } from '../buildingEconomy.ts';
 import { getBuildingDefinition } from '../buildings.ts';
+import { laborScaledInterval } from '../resourceTotals.ts';
 import type { InspectableTarget } from '../types.ts';
 import {
   buildingCostRows,
@@ -24,6 +25,7 @@ export function renderStoneQuarryInspector(
     building.workRadius,
   );
   const active = building.assignedLabor > 0 && nearestQuarry != null;
+  const cycleSeconds = laborScaledInterval(definition.harvestInterval, building.assignedLabor);
 
   return {
     eyebrow: 'Building',
@@ -37,7 +39,7 @@ export function renderStoneQuarryInspector(
     detailsHtml: `
       ${buildingCostRows(building.kind, cost)}
       ${buildingWorkRadiusRow(building.kind)}
-      <li><span>Harvest interval</span><span>${definition.harvestInterval}s</span></li>
+      <li><span>Harvest interval</span><span>${building.assignedLabor > 0 ? `${cycleSeconds.toFixed(1)}s` : `${definition.harvestInterval}s`} (${building.assignedLabor} workers)</span></li>
       ${buildingStorageRows(building, building.kind)}
     `,
     demolish: {

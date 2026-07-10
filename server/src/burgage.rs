@@ -16,6 +16,7 @@ pub struct ZoneCorners {
 
 pub struct ResidencePlacement {
     pub parcel_index: u32,
+    pub parcel_frontage: f64,
     pub x: f64,
     pub z: f64,
     pub yaw: f64,
@@ -159,6 +160,7 @@ pub fn compute_burgage_layout(
 
         residences.push(ResidencePlacement {
             parcel_index: i as u32,
+            parcel_frontage,
             x: house_center.x,
             z: house_center.z,
             yaw,

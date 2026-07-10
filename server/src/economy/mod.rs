@@ -3,7 +3,7 @@
 mod population;
 mod storage;
 
-pub use population::{assign_building_labor, residence_population};
+pub use population::{assign_building_labor, residence_population_for_parcel};
 pub use storage::{
     building_storage_caps, credit_treasury_stone, credit_treasury_timber, deposit_building,
     residence_firewood_capacity, spend_aggregate_stone, spend_aggregate_timber, total_stone,

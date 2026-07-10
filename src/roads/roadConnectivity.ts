@@ -35,6 +35,30 @@ export function hasRoadAccess(
   return nearestRoadDistance(x, z, network) <= maxDistance;
 }
 
+const ROAD_SURFACE_MARGIN = 0.15;
+
+/** True when a point lies on paved road surface (not merely near a road). */
+export function isOnRoadSurface(x: number, z: number, network: RoadNetwork): boolean {
+  for (const edge of network.edges.values()) {
+    if (edge.sampledPath.length < 2) continue;
+    const distance = distancePointToPolylineXZ(x, z, edge.sampledPath);
+    if (distance <= edge.width * 0.5 + ROAD_SURFACE_MARGIN) return true;
+  }
+
+  for (const node of network.nodes.values()) {
+    let maxHalfWidth = 0;
+    for (const edgeId of node.edgeIds) {
+      const edge = network.edges.get(edgeId);
+      if (edge) maxHalfWidth = Math.max(maxHalfWidth, edge.width * 0.5);
+    }
+    if (maxHalfWidth <= 0) continue;
+    const nodeDistance = Math.hypot(x - node.position.x, z - node.position.z);
+    if (nodeDistance <= maxHalfWidth + ROAD_SURFACE_MARGIN) return true;
+  }
+
+  return false;
+}
+
 export function areRoadConnected(
   ax: number,
   az: number,

@@ -297,6 +297,7 @@ export class BurgagePreview {
     placing = false,
     placementStage = 0,
     hoverPoint: THREE.Vector3 | null = null,
+    frontageEdge = 0,
   ): void {
     if (!placing && corners.length === 0) {
       this.clear();
@@ -304,7 +305,7 @@ export class BurgagePreview {
     }
 
     const hoverSignature = hoverPoint ? `${hoverPoint.x.toFixed(2)},${hoverPoint.z.toFixed(2)}` : 'none';
-    const signature = `${cornersSignature(corners)}|${hoverSignature}|${valid ? 1 : 0}|${layoutSignature(layout)}|${placing ? 1 : 0}|${placementStage}`;
+    const signature = `${cornersSignature(corners)}|${hoverSignature}|${valid ? 1 : 0}|${layoutSignature(layout)}|${placing ? 1 : 0}|${placementStage}|${frontageEdge}`;
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;
 

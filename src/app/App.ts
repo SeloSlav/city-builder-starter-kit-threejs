@@ -324,10 +324,22 @@ export class App {
           roadTool.setEnabled(false);
           buildingTool.setMode('off');
           this.toastManager?.show(
-            'Click four corners along the road frontage and depth — the 4th click closes the rectangle. Use +/− for plot count.',
+            'Draw the rectangle along the road, then use the on-screen plot controls to choose how many homes fit.',
             { variant: 'info', durationMs: 6500 },
           );
         }
+        this.syncToolbar();
+      },
+      onBurgagePlotDecrease: () => {
+        burgageTool.adjustPlotCount(-1);
+        this.syncToolbar();
+      },
+      onBurgagePlotIncrease: () => {
+        burgageTool.adjustPlotCount(1);
+        this.syncToolbar();
+      },
+      onBurgageRotateFrontage: () => {
+        burgageTool.rotateFrontageEdge();
         this.syncToolbar();
       },
       onMenuOpenChange: (open) => {
@@ -631,6 +643,10 @@ export class App {
     const burgageTool = this.burgageTool;
     if (!this.toolbar || !roadTool || !burgageTool) return;
     const burgageEnabled = burgageTool.isEnabled();
+    const layoutHudState = burgageEnabled ? burgageTool.getLayoutHudState() : null;
+    const layoutHudPosition = layoutHudState ? burgageTool.getLayoutHudPosition() : null;
+    this.toolbar.setBurgageLayoutHud(layoutHudPosition, layoutHudState);
+
     const visible = burgageEnabled
       ? burgageTool.isDraftBuildable()
       : roadTool.isDraftBuildable();

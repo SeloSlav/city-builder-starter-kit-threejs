@@ -2,6 +2,8 @@ import {
   ABANDON_AFTER_DEFICIT_TICKS,
   BUILDING_DEFINITIONS,
   BUILDING_STORAGE_CAPS,
+  LODGE_DELIVERY_INTERVAL,
+  LODGE_FIREWOOD_PER_DELIVERY,
   POPULATION_PER_RESIDENCE,
   RESIDENCE_FIREWOOD_CAPACITY,
   RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC,
@@ -22,6 +24,9 @@ export {
 
 export type { StorageCaps };
 
+/** One in-game day for firewood runway display (60 sim seconds). */
+export const GAME_DAY_SECONDS = 60;
+
 export type ResourceTotals = {
   timber: number;
   stone: number;
@@ -41,6 +46,52 @@ export function buildingStorageCaps(kind: BuildingKind): StorageCaps {
 
 export function buildingAcceptsLabor(kind: BuildingKind): boolean {
   return BUILDING_DEFINITIONS[kind].acceptsLabor;
+}
+
+export function buildingMaxLabor(kind: BuildingKind): number {
+  const definition = BUILDING_DEFINITIONS[kind];
+  return definition.acceptsLabor ? definition.maxLabor : 0;
+}
+
+export function laborScaledInterval(baseInterval: number, assignedLabor: number): number {
+  if (assignedLabor <= 0 || baseInterval <= 0) return baseInterval;
+  return baseInterval / assignedLabor;
+}
+
+export function residenceFirewoodDemandPerSecond(residence: ResidenceState): number {
+  if (residence.abandoned || residence.population <= 0) return 0;
+  return residence.population * RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC;
+}
+
+export function residenceFirewoodRunwaySeconds(residence: ResidenceState): number | null {
+  const demand = residenceFirewoodDemandPerSecond(residence);
+  if (demand <= 0) return null;
+  return residence.firewoodStock / demand;
+}
+
+export function residenceFirewoodRunwayDays(residence: ResidenceState): number | null {
+  const runwaySeconds = residenceFirewoodRunwaySeconds(residence);
+  if (runwaySeconds == null) return null;
+  return runwaySeconds / GAME_DAY_SECONDS;
+}
+
+export function formatFirewoodRunwayDays(days: number): string {
+  if (days >= 10) return `${Math.round(days)} days`;
+  if (days >= 1) return `${days.toFixed(1)} days`;
+  const runwaySeconds = days * GAME_DAY_SECONDS;
+  if (runwaySeconds >= 3600) return `~${(runwaySeconds / 3600).toFixed(1)} h`;
+  const minutes = runwaySeconds / 60;
+  return `~${Math.max(1, Math.round(minutes))} min`;
+}
+
+export function lodgeFirewoodPerDelivery(assignedLabor: number): number {
+  if (assignedLabor <= 0) return 0;
+  return LODGE_FIREWOOD_PER_DELIVERY * assignedLabor;
+}
+
+export function lodgeDeliveryIntervalSeconds(assignedLabor: number): number {
+  if (assignedLabor <= 0) return Infinity;
+  return LODGE_DELIVERY_INTERVAL / assignedLabor;
 }
 
 export function computeResourceTotals(state: GameState): ResourceTotals {
@@ -91,7 +142,8 @@ export function maxAssignableLabor(
   stats: PopulationStats,
 ): number {
   const assignedElsewhere = stats.assigned - building.assignedLabor;
-  return Math.max(0, stats.total - assignedElsewhere);
+  const fromPool = Math.max(0, stats.total - assignedElsewhere);
+  return Math.min(fromPool, buildingMaxLabor(building.kind));
 }
 
 export function residenceNeedsStatus(residence: ResidenceState): {
@@ -112,17 +164,34 @@ export function residenceNeedsStatus(residence: ResidenceState): {
       state: 'warning',
     };
   }
-  if (residence.firewoodStock <= 0.5) {
-    const demandPerSec = residence.population * RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC;
-    const runwaySeconds = demandPerSec > 0 ? residence.firewoodStock / demandPerSec : 0;
+
+  const runwayDays = residenceFirewoodRunwayDays(residence);
+  if (runwayDays == null) {
+    return { label: 'Needs met', state: 'active' };
+  }
+
+  if (runwayDays <= 0.25) {
     return {
-      label: runwaySeconds > 30
-        ? `Firewood low — ~${formatShortDuration(runwaySeconds)} of stock left`
-        : 'Awaiting firewood delivery',
+      label: 'Out of firewood — awaiting delivery',
       state: 'warning',
     };
   }
-  return { label: 'Needs met', state: 'active' };
+  if (runwayDays < 1) {
+    return {
+      label: `Low firewood — ${formatFirewoodRunwayDays(runwayDays)} left`,
+      state: 'warning',
+    };
+  }
+  if (runwayDays < 3) {
+    return {
+      label: `Firewood low — ${formatFirewoodRunwayDays(runwayDays)} left`,
+      state: 'warning',
+    };
+  }
+  return {
+    label: `Needs met — ${formatFirewoodRunwayDays(runwayDays)} of firewood`,
+    state: 'active',
+  };
 }
 
 function formatShortDuration(seconds: number): string {

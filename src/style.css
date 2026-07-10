@@ -52,6 +52,7 @@ button {
 [data-ui-root] .road-tools,
 [data-ui-root] .road-tool-button,
 [data-ui-root] .floating-build-button,
+[data-ui-root] .burgage-layout-hud,
 [data-ui-root] .delete-popup,
 [data-ui-root] .resource-stockpile-hud,
 [data-ui-root] .resource-inspector-panel,
@@ -750,6 +751,107 @@ button {
   padding: 0;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(12px);
+}
+
+.burgage-layout-hud {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(23, 25, 21, 0.9);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(12px);
+}
+
+.burgage-layout-hud[hidden] {
+  display: none;
+}
+
+.burgage-layout-hud[data-state='ready'] {
+  border-color: rgba(132, 166, 107, 0.55);
+}
+
+.burgage-layout-hud[data-state='warning'] {
+  border-color: rgba(201, 112, 85, 0.65);
+}
+
+.burgage-layout-hud-button {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  background: rgba(238, 232, 220, 0.08);
+  border: 1px solid rgba(238, 232, 220, 0.16);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.burgage-layout-hud-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.burgage-layout-hud-button:not(:disabled):hover,
+.burgage-layout-hud-button:not(:disabled):focus-visible,
+.burgage-layout-hud-frontage:hover,
+.burgage-layout-hud-frontage:focus-visible {
+  border-color: rgba(215, 180, 99, 0.75);
+  outline: none;
+}
+
+.burgage-layout-hud-count {
+  display: grid;
+  justify-items: center;
+  min-width: 72px;
+  padding: 0 2px;
+  line-height: 1.1;
+}
+
+.burgage-layout-hud-count strong {
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.burgage-layout-hud-count span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.burgage-layout-hud-frontage {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+  background: rgba(238, 232, 220, 0.06);
+  border: 1px solid rgba(238, 232, 220, 0.14);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.burgage-layout-hud-frontage[hidden] {
+  display: none;
+}
+
+.burgage-layout-hud-frontage span:first-child {
+  color: var(--accent);
+  font-size: 14px;
+  line-height: 1;
 }
 
 .road-tool-button.icon-button svg {

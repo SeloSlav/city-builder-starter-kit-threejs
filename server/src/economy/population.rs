@@ -1,12 +1,31 @@
 use spacetimedb::ReducerContext;
 
 use crate::building_defs::building_def;
-use crate::constants::{POPULATION_PER_RESIDENCE, STARTING_POPULATION};
+use crate::constants::{
+    NARROW_PARCEL_FRONTAGE_MAX, POPULATION_PER_RESIDENCE, RESIDENCE_POPULATION_NARROW,
+    RESIDENCE_POPULATION_WIDE, STARTING_POPULATION, WIDE_PARCEL_FRONTAGE_MIN,
+};
 use crate::db::*;
 use crate::tables::Building;
 
-pub fn residence_population() -> u32 {
-    POPULATION_PER_RESIDENCE
+pub fn residence_population_for_parcel(parcel_frontage: f64) -> u32 {
+    if parcel_frontage >= WIDE_PARCEL_FRONTAGE_MIN {
+        RESIDENCE_POPULATION_WIDE
+    } else if parcel_frontage <= NARROW_PARCEL_FRONTAGE_MAX {
+        RESIDENCE_POPULATION_NARROW
+    } else {
+        POPULATION_PER_RESIDENCE
+    }
+}
+
+pub fn building_max_labor(kind: &str) -> u32 {
+    building_def(kind).map_or(0, |def| {
+        if def.accepts_labor {
+            def.max_labor
+        } else {
+            0
+        }
+    })
 }
 
 fn total_population(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u32 {
@@ -47,6 +66,14 @@ pub fn assign_building_labor(
     }
     if !building_accepts_labor(&building.kind) {
         return Err("This building does not use labor.".to_string());
+    }
+
+    let building_cap = building_max_labor(&building.kind);
+    if requested_labor > building_cap {
+        return Err(format!(
+            "This building supports at most {} workers.",
+            building_cap
+        ));
     }
 
     let assigned_elsewhere = total_assigned_labor(ctx, owner).saturating_sub(building.assigned_labor);

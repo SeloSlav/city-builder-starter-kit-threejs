@@ -4,7 +4,7 @@ import type { RoadNetwork } from '../roads/RoadNetwork.ts';
 import type { GameState } from '../resources/types.ts';
 import { computeResourceTotals } from '../resources/resourceTotals.ts';
 import type { BurgageFrontageEdge } from './burgageLayout.ts';
-import { cornersFromPoints, MAX_ZONE_DEPTH, MIN_ZONE_DEPTH, resolveBurgageLayout } from './burgageLayout.ts';
+import { cornersFromPoints, getZoneEdge, MAX_ZONE_DEPTH, MIN_ZONE_DEPTH, resolveBurgageLayout, suggestPlotCount } from './burgageLayout.ts';
 import {
   rectangleCornersToPoints,
   rectangleFromFrontageAndBackPoint,
@@ -13,6 +13,9 @@ import { initialPlotCount } from './burgagePlacementValidation.ts';
 import { BurgagePreview } from './BurgagePreview.ts';
 import {
   detectFrontageEdge,
+  cycleFrontageEdge,
+  frontageEdgeLabel,
+  validFrontageEdges,
   validateBurgagePlacement,
   type BurgagePlacementFailureReason,
 } from './burgagePlacementValidation.ts';
@@ -25,6 +28,17 @@ export type BurgageZoneCommit = {
   corners: THREE.Vector3[];
   frontageEdge: BurgageFrontageEdge;
   plotCount: number;
+};
+
+export type BurgageLayoutHudState = {
+  plotCount: number;
+  residenceCount: number | null;
+  maxPlotCount: number;
+  canDecrease: boolean;
+  canIncrease: boolean;
+  canRotateFrontage: boolean;
+  frontageLabel: string | null;
+  valid: boolean;
 };
 
 type BurgageToolOptions = {
@@ -55,6 +69,7 @@ export class BurgageTool {
   private frontageEdge: BurgageFrontageEdge = 0;
   private plotCount = 1;
   private plotCountTouched = false;
+  private frontageTouched = false;
   private hoverPoint: THREE.Vector3 | null = null;
   private pointerInside = false;
   private pointerClientX = 0;
@@ -129,7 +144,7 @@ export class BurgageTool {
       return `Click the third corner to set plot depth (${Math.round(MIN_ZONE_DEPTH)}–${Math.round(MAX_ZONE_DEPTH)}m)`;
     }
     if (this.placementStage === 3) {
-      return 'Click the fourth corner to close the rectangle';
+      return 'Click the fourth corner to close the rectangle — use the plot controls on the zone';
     }
     const validation = this.getValidation();
     if (!validation.ok) {
@@ -141,7 +156,84 @@ export class BurgageTool {
     }
     const count = validation.layout.residences.length;
     const cost = validation.layout.totalCost;
-    return `${count} ${count === 1 ? 'residence' : 'residences'} — ${cost.timber} timber, ${cost.stone} stone`;
+    const frontageOptions = this.getZoneCorners()
+      ? validFrontageEdges(this.getZoneCorners()!, this.options.roadNetwork).length
+      : 1;
+    const frontageHint = frontageOptions > 1
+      ? ` · frontage ${frontageEdgeLabel(this.frontageEdge)} (F to rotate)`
+      : '';
+    return `${count} ${count === 1 ? 'residence' : 'residences'} — ${cost.timber} timber, ${cost.stone} stone${frontageHint}`;
+  }
+
+  getLayoutHudState(): BurgageLayoutHudState | null {
+    if (!this.enabled || !this.canAdjustLayout()) return null;
+    const maxPlotCount = this.getMaxPlotCount();
+    const validation = this.getValidation();
+    const residenceCount = validation.ok ? validation.layout.residences.length : null;
+    const frontageOptions = this.getZoneCorners()
+      ? validFrontageEdges(this.getZoneCorners()!, this.options.roadNetwork).length
+      : 0;
+    return {
+      plotCount: this.plotCount,
+      residenceCount,
+      maxPlotCount,
+      canDecrease: this.plotCount > 1,
+      canIncrease: this.plotCount < maxPlotCount,
+      canRotateFrontage: frontageOptions > 1,
+      frontageLabel: frontageOptions > 1 ? frontageEdgeLabel(this.frontageEdge) : null,
+      valid: validation.ok,
+    };
+  }
+
+  getLayoutHudPosition(): { clientX: number; clientY: number } | null {
+    if (!this.enabled || !this.canAdjustLayout()) return null;
+    const corners = this.resolvePreviewCorners();
+    if (corners.length !== 4) return null;
+    const zoneCorners = cornersFromPoints(corners.map((point) => ({ x: point.x, z: point.z })));
+    if (!zoneCorners) return null;
+
+    const [frontStart, frontEnd] = getZoneEdge(zoneCorners, this.frontageEdge);
+    const midX = (frontStart.x + frontEnd.x) * 0.5;
+    const midZ = (frontStart.z + frontEnd.z) * 0.5;
+    const rect = this.options.domElement.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+
+    const projected = new THREE.Vector3(
+      midX,
+      this.options.getHeightAt(midX, midZ) + 2.4,
+      midZ,
+    );
+    projected.project(this.options.camera);
+    if (projected.z < -1 || projected.z > 1) return null;
+
+    return {
+      clientX: rect.left + (projected.x * 0.5 + 0.5) * rect.width,
+      clientY: rect.top + (-projected.y * 0.5 + 0.5) * rect.height,
+    };
+  }
+
+  adjustPlotCount(delta: number): void {
+    if (!this.canAdjustLayout() || delta === 0) return;
+    const maxPlotCount = this.getMaxPlotCount();
+    const next = Math.max(1, Math.min(maxPlotCount, this.plotCount + delta));
+    if (next === this.plotCount) return;
+    this.plotCountTouched = true;
+    this.plotCount = next;
+    this.refreshPreview();
+    this.options.onModeChanged();
+  }
+
+  rotateFrontageEdge(): void {
+    if (!this.canAdjustLayout()) return;
+    const corners = this.getZoneCorners();
+    if (!corners) return;
+    const next = cycleFrontageEdge(corners, this.options.roadNetwork, this.frontageEdge);
+    if (next === this.frontageEdge) return;
+    this.frontageTouched = true;
+    this.frontageEdge = next;
+    if (!this.plotCountTouched) this.syncPlotCountFromFrontage();
+    this.refreshPreview();
+    this.options.onModeChanged();
   }
 
   commitDraft(): void {
@@ -299,7 +391,7 @@ export class BurgageTool {
       return;
     }
 
-    if (this.placementStage < 4) return;
+    if (!this.canAdjustLayout()) return;
 
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -308,26 +400,17 @@ export class BurgageTool {
     }
     if (event.key === '+' || event.key === '=') {
       event.preventDefault();
-      this.plotCountTouched = true;
-      this.plotCount += 1;
-      this.refreshPreview();
-      this.options.onModeChanged();
+      this.adjustPlotCount(1);
       return;
     }
     if (event.key === '-' || event.key === '_') {
       event.preventDefault();
-      this.plotCountTouched = true;
-      this.plotCount = Math.max(1, this.plotCount - 1);
-      this.refreshPreview();
-      this.options.onModeChanged();
+      this.adjustPlotCount(-1);
       return;
     }
-    if (event.key.toLowerCase() === 'f') {
+    if (event.code === 'KeyF') {
       event.preventDefault();
-      this.frontageEdge = ((this.frontageEdge + 1) % 4) as BurgageFrontageEdge;
-      if (!this.plotCountTouched) this.syncPlotCountFromFrontage();
-      this.refreshPreview();
-      this.options.onModeChanged();
+      this.rotateFrontageEdge();
     }
   };
 
@@ -367,6 +450,7 @@ export class BurgageTool {
     this.frontageEdge = 0;
     this.plotCount = 1;
     this.plotCountTouched = false;
+    this.frontageTouched = false;
     this.preview.clear();
     if (notify) this.options.onModeChanged();
   }
@@ -390,6 +474,16 @@ export class BurgageTool {
     const corners = this.resolvePreviewCorners();
     const placing = this.placementStage < 4;
 
+    if (this.canAdjustLayout() && !this.frontageTouched && corners.length === 4) {
+      const zoneCorners = cornersFromPoints(corners.map((point) => ({ x: point.x, z: point.z })));
+      if (zoneCorners) {
+        this.frontageEdge = detectFrontageEdge(zoneCorners, this.options.roadNetwork);
+        if (!this.plotCountTouched) {
+          this.plotCount = initialPlotCount(zoneCorners, this.frontageEdge);
+        }
+      }
+    }
+
     let layout = null;
     let previewFrontageEdge = this.frontageEdge;
     let previewPlotCount = this.plotCount;
@@ -398,7 +492,7 @@ export class BurgageTool {
       const cornerPoints = corners.map((point) => ({ x: point.x, z: point.z }));
       const zoneCorners = cornersFromPoints(cornerPoints);
       if (zoneCorners) {
-        if (placing) {
+        if (placing && !this.frontageTouched) {
           previewFrontageEdge = detectFrontageEdge(zoneCorners, this.options.roadNetwork);
           if (!this.plotCountTouched) {
             previewPlotCount = initialPlotCount(zoneCorners, previewFrontageEdge);
@@ -408,22 +502,24 @@ export class BurgageTool {
       }
     }
 
-    const validation = this.placementStage >= 4
-      ? this.getValidation()
-      : corners.length === 4
-        ? validateBurgagePlacement({
-          corners,
-          frontageEdge: previewFrontageEdge,
-          plotCount: previewPlotCount,
-          stockpile: computeResourceTotals(this.options.getState()),
-          existingZones: this.options.getState().burgageZones.values(),
-          existingBuildings: this.options.getState().buildings.values(),
-          roadNetwork: this.options.roadNetwork,
-          isWaterAt: this.options.isWaterAt,
-          isQuarryPitAt: this.options.isQuarryPitAt,
-          getNaturalHeightAt: this.options.getNaturalHeightAt,
-        })
-        : { ok: false as const, reason: 'invalid_shape' as const };
+    const validation = this.canAdjustLayout()
+      ? (this.placementStage >= 4
+        ? this.getValidation()
+        : corners.length === 4
+          ? validateBurgagePlacement({
+            corners,
+            frontageEdge: previewFrontageEdge,
+            plotCount: previewPlotCount,
+            stockpile: computeResourceTotals(this.options.getState()),
+            existingZones: this.options.getState().burgageZones.values(),
+            existingBuildings: this.options.getState().buildings.values(),
+            roadNetwork: this.options.roadNetwork,
+            isWaterAt: this.options.isWaterAt,
+            isQuarryPitAt: this.options.isQuarryPitAt,
+            getNaturalHeightAt: this.options.getNaturalHeightAt,
+          })
+          : { ok: false as const, reason: 'invalid_shape' as const })
+      : { ok: false as const, reason: 'invalid_shape' as const };
 
     if (this.hoverPoint) {
       this.lastHoverPreviewX = this.hoverPoint.x;
@@ -437,6 +533,7 @@ export class BurgageTool {
       placing,
       this.placementStage,
       this.hoverPoint,
+      previewFrontageEdge,
     );
   }
 
@@ -480,19 +577,35 @@ export class BurgageTool {
     });
   }
 
+  private canAdjustLayout(): boolean {
+    return this.placementStage >= 3;
+  }
+
+  private getZoneCorners() {
+    const corners = this.resolvePreviewCorners();
+    if (corners.length !== 4) return null;
+    return cornersFromPoints(corners.map((point) => ({ x: point.x, z: point.z })));
+  }
+
   private syncFrontageAndPlotCount(): void {
-    const cornerPoints = this.points.map((point) => ({ x: point.x, z: point.z }));
-    const corners = cornersFromPoints(cornerPoints);
+    const corners = this.getZoneCorners();
     if (!corners) return;
     this.frontageEdge = detectFrontageEdge(corners, this.options.roadNetwork);
+    this.frontageTouched = false;
     this.syncPlotCountFromFrontage();
   }
 
   private syncPlotCountFromFrontage(): void {
-    const cornerPoints = this.points.map((point) => ({ x: point.x, z: point.z }));
-    const corners = cornersFromPoints(cornerPoints);
+    const corners = this.getZoneCorners();
     if (!corners) return;
     this.plotCount = initialPlotCount(corners, this.frontageEdge);
+  }
+
+  private getMaxPlotCount(): number {
+    const corners = this.getZoneCorners();
+    if (!corners) return 1;
+    const [start, end] = getZoneEdge(corners, this.frontageEdge);
+    return suggestPlotCount(Math.hypot(end.x - start.x, end.z - start.z));
   }
 
   private pickPoint(clientX: number, clientY: number): THREE.Vector3 | null {

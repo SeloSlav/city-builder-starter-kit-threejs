@@ -55,6 +55,7 @@ pub struct Building {
     pub z: f64,
     pub work_radius: f64,
     pub action_cooldown: f64,
+    pub delivery_cooldown: f64,
     pub timber: f64,
     pub firewood: f64,
     pub stone: f64,

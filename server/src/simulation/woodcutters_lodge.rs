@@ -2,10 +2,14 @@ use spacetimedb::ReducerContext;
 
 use crate::building_defs::building_def;
 use crate::constants::{
-    LODGE_FIREWOOD_PER_CYCLE, LODGE_TIMBER_PER_CYCLE, TICK_DT,
+    LODGE_DELIVERY_INTERVAL, LODGE_FIREWOOD_PER_CYCLE, LODGE_FIREWOOD_PER_DELIVERY,
+    LODGE_TIMBER_PER_CYCLE, TICK_DT,
 };
 use crate::db::*;
 use crate::economy::{building_storage_caps, deposit_building, withdraw_building};
+use crate::simulation::road_logistics::{
+    claim_residences_for_lodges, owner_lodges, road_path_distance, sort_mills_by_road_path,
+};
 use crate::simulation::tick_context::SimTickContext;
 use crate::tables::{Building, Residence};
 
@@ -13,28 +17,37 @@ pub fn step_woodcutters_lodge(ctx: &ReducerContext, tick: &SimTickContext, build
     let Some(def) = building_def(&building.kind) else {
         return;
     };
-
-    let cooldown = (building.action_cooldown - TICK_DT).max(0.0);
-    if cooldown > 0.0 {
+    let Some(network) = tick.road_network(building.owner) else {
         ctx.db.building().id().update(Building {
-            action_cooldown: cooldown,
+            action_cooldown: (building.action_cooldown - TICK_DT).max(0.0),
+            delivery_cooldown: (building.delivery_cooldown - TICK_DT).max(0.0),
             ..building
         });
         return;
-    }
+    };
 
     let mut lodge = building;
-    if lodge.assigned_labor > 0 {
-        lodge = process_timber_to_firewood(ctx, tick, lodge);
+    lodge.action_cooldown = (lodge.action_cooldown - TICK_DT).max(0.0);
+    lodge.delivery_cooldown = (lodge.delivery_cooldown - TICK_DT).max(0.0);
+
+    if lodge.assigned_labor > 0 && lodge.action_cooldown <= 0.0 {
+        lodge = process_timber_to_firewood(ctx, tick, network, lodge);
+        lodge.action_cooldown = def.action_interval;
     }
-    deliver_firewood_to_residences(ctx, tick, &mut lodge);
-    lodge.action_cooldown = def.action_interval;
+
+    if lodge.assigned_labor > 0 && lodge.delivery_cooldown <= 0.0 && lodge.firewood > 0.0 {
+        deliver_firewood_trip(ctx, tick, network, &mut lodge);
+        lodge.delivery_cooldown =
+            LODGE_DELIVERY_INTERVAL / lodge.assigned_labor.max(1) as f64;
+    }
+
     ctx.db.building().id().update(lodge);
 }
 
 fn process_timber_to_firewood(
     ctx: &ReducerContext,
     tick: &SimTickContext,
+    network: &crate::roads::RoadNetwork,
     lodge: Building,
 ) -> Building {
     let caps = building_storage_caps(&lodge.kind);
@@ -42,15 +55,18 @@ fn process_timber_to_firewood(
         return lodge;
     }
 
-    let lodge = ensure_lodge_timber(ctx, tick, lodge, LODGE_TIMBER_PER_CYCLE);
-    if lodge.timber + 1e-6 < LODGE_TIMBER_PER_CYCLE {
+    let labor = lodge.assigned_labor.max(1) as f64;
+    let timber_needed = LODGE_TIMBER_PER_CYCLE * labor;
+    let firewood_output = LODGE_FIREWOOD_PER_CYCLE * labor;
+
+    let lodge = ensure_lodge_timber(ctx, tick, network, lodge, timber_needed);
+    if lodge.timber + 1e-6 < timber_needed {
         return lodge;
     }
 
-    let (_, _, _, lodge_after_withdraw) =
-        withdraw_building(&lodge, LODGE_TIMBER_PER_CYCLE, 0.0, 0.0);
+    let (_, _, _, lodge_after_withdraw) = withdraw_building(&lodge, timber_needed, 0.0, 0.0);
     let (_, firewood_added, _, processed) =
-        deposit_building(&lodge_after_withdraw, caps, 0.0, LODGE_FIREWOOD_PER_CYCLE, 0.0);
+        deposit_building(&lodge_after_withdraw, caps, 0.0, firewood_output, 0.0);
     if firewood_added <= 0.0 {
         return lodge;
     }
@@ -60,6 +76,7 @@ fn process_timber_to_firewood(
 fn ensure_lodge_timber(
     ctx: &ReducerContext,
     tick: &SimTickContext,
+    network: &crate::roads::RoadNetwork,
     mut lodge: Building,
     needed: f64,
 ) -> Building {
@@ -80,11 +97,7 @@ fn ensure_lodge_timber(
                 && tick.road_connected(lodge.owner, row.x, row.z, lodge.x, lodge.z)
         })
         .collect();
-    mills.sort_by(|a, b| {
-        euclidean_distance_key(a.x, a.z, lodge.x, lodge.z)
-            .partial_cmp(&euclidean_distance_key(b.x, b.z, lodge.x, lodge.z))
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    sort_mills_by_road_path(network, &lodge, &mut mills);
 
     for mill in mills {
         if remaining <= 1e-6 {
@@ -108,59 +121,61 @@ fn ensure_lodge_timber(
     lodge
 }
 
-fn deliver_firewood_to_residences(
+fn deliver_firewood_trip(
     ctx: &ReducerContext,
-    tick: &SimTickContext,
+    _tick: &SimTickContext,
+    network: &crate::roads::RoadNetwork,
     lodge: &mut Building,
 ) {
-    if lodge.firewood <= 0.0 {
+    if lodge.firewood <= 0.0 || lodge.assigned_labor == 0 {
         return;
     }
 
-    let mut residences: Vec<Residence> = ctx
+    let lodges = owner_lodges(ctx, lodge.owner);
+    let residences: Vec<Residence> = ctx
         .db
         .residence()
         .owner()
         .filter(&lodge.owner)
         .filter(|residence| !residence.abandoned)
         .collect();
-    residences.sort_by(|a, b| {
-        euclidean_distance_key(a.x, a.z, lodge.x, lodge.z)
-            .partial_cmp(&euclidean_distance_key(b.x, b.z, lodge.x, lodge.z))
+    let claims = claim_residences_for_lodges(network, &lodges, &residences);
+
+    let mut targets: Vec<Residence> = residences
+        .into_iter()
+        .filter(|residence| claims.get(&residence.id).copied() == Some(lodge.id))
+        .collect();
+    targets.sort_by(|a, b| {
+        road_path_distance(network, lodge.x, lodge.z, a.x, a.z)
+            .unwrap_or(f64::INFINITY)
+            .partial_cmp(&road_path_distance(network, lodge.x, lodge.z, b.x, b.z).unwrap_or(f64::INFINITY))
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
     let capacity = crate::economy::residence_firewood_capacity();
+    let batch = LODGE_FIREWOOD_PER_DELIVERY * lodge.assigned_labor.max(1) as f64;
     let mut available = lodge.firewood;
-    for residence in residences {
+
+    for residence in targets {
         if available <= 1e-6 {
             break;
-        }
-        if !tick.road_connected(
-            lodge.owner,
-            residence.x,
-            residence.z,
-            lodge.x,
-            lodge.z,
-        ) {
-            continue;
         }
         let room = (capacity - residence.firewood_stock).max(0.0);
         if room <= 1e-6 {
             continue;
         }
-        let delivered = available.min(room);
+        let delivered = available.min(room).min(batch);
+        if delivered <= 1e-6 {
+            continue;
+        }
         available -= delivered;
         ctx.db.residence().id().update(Residence {
             firewood_stock: residence.firewood_stock + delivered,
             needs_deficit_ticks: 0,
             ..residence
         });
+        break;
     }
 
     lodge.firewood = available;
-}
-
-fn euclidean_distance_key(ax: f64, az: f64, bx: f64, bz: f64) -> f64 {
-    ((ax - bx).powi(2) + (az - bz).powi(2)).sqrt()
 }

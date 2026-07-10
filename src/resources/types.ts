@@ -61,6 +61,7 @@ export type BuildingState = {
   z: number;
   workRadius: number;
   actionCooldown: number;
+  deliveryCooldown: number;
   timber: number;
   firewood: number;
   stone: number;

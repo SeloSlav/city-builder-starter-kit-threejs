@@ -12,14 +12,24 @@ export const TIMBER_SALVAGE_FRACTION = 0.7;
 export const RESIDENCE_TIMBER_COST = 8;
 export const RESIDENCE_STONE_COST = 12;
 
-export const STARTING_POPULATION = 6;
-export const POPULATION_PER_RESIDENCE = 4;
+export const STARTING_POPULATION = 5;
+export const POPULATION_PER_RESIDENCE = 3;
+export const RESIDENCE_POPULATION_NARROW = 2;
+export const RESIDENCE_POPULATION_WIDE = 4;
+export const NARROW_PARCEL_FRONTAGE_MAX = 9.6;
+export const WIDE_PARCEL_FRONTAGE_MIN = 14;
 export const RESIDENCE_FIREWOOD_CAPACITY = 40;
 export const RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC = 0.02;
 export const ABANDON_AFTER_DEFICIT_TICKS = 3600;
 
 export const BUILDING_ROAD_ACCESS_DISTANCE = 20;
 export const BURGAGE_ROAD_FRONTAGE_DISTANCE = 16;
+
+export const LODGE_TIMBER_PER_CYCLE = 3;
+export const LODGE_FIREWOOD_PER_CYCLE = 3;
+export const LODGE_DELIVERY_INTERVAL = 4;
+export const LODGE_FIREWOOD_PER_DELIVERY = 2;
+export const STONE_PER_HARVEST = 3;
 
 export type BuildingResourceCost = {
   timber: number;
@@ -39,6 +49,7 @@ export type BuildingDefinition = {
   pickRadius: number;
   harvestInterval: number;
   regrowRatePerSecond: number;
+  maxLabor: number;
   acceptsLabor: boolean;
 };
 
@@ -50,6 +61,7 @@ export const BUILDING_DEFINITIONS = {
     pickRadius: 8,
     harvestInterval: 9,
     regrowRatePerSecond: 0,
+    maxLabor: 3,
     acceptsLabor: true,
   },
   reforester: {
@@ -59,7 +71,8 @@ export const BUILDING_DEFINITIONS = {
     pickRadius: 8,
     harvestInterval: 0,
     regrowRatePerSecond: 0.014,
-    acceptsLabor: false,
+    maxLabor: 1,
+    acceptsLabor: true,
   },
   woodcutters_lodge: {
     kind: 'woodcutters_lodge',
@@ -68,6 +81,7 @@ export const BUILDING_DEFINITIONS = {
     pickRadius: 8,
     harvestInterval: 5,
     regrowRatePerSecond: 0,
+    maxLabor: 2,
     acceptsLabor: true,
   },
   stone_quarry: {
@@ -77,6 +91,7 @@ export const BUILDING_DEFINITIONS = {
     pickRadius: 10,
     harvestInterval: 9,
     regrowRatePerSecond: 0,
+    maxLabor: 4,
     acceptsLabor: true,
   },
 } as const satisfies Record<BuildingKind, BuildingDefinition>;

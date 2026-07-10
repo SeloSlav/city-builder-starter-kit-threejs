@@ -18,6 +18,7 @@ export const Building = __t.object("Building", {
   z: __t.f64(),
   workRadius: __t.f64(),
   actionCooldown: __t.f64(),
+  deliveryCooldown: __t.f64(),
   timber: __t.f64(),
   firewood: __t.f64(),
   stone: __t.f64(),

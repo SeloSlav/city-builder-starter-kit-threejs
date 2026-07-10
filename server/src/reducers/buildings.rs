@@ -8,7 +8,7 @@ use crate::economy::{
     total_stone, total_timber,
 };
 use crate::lifecycle::ensure_player_resources;
-use crate::placement_validation::{building_overlaps_residence_zone, is_on_quarry_pit};
+use crate::placement_validation::{building_overlaps_residence_zone, building_overlaps_road_surface, is_on_quarry_pit};
 use crate::roads::has_building_road_access;
 use crate::tables::{Building, WorldConfig};
 
@@ -90,6 +90,10 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
         return Err("Cannot build inside a residence plot.".to_string());
     }
 
+    if building_overlaps_road_surface(ctx, owner, &kind, x, z) {
+        return Err("Cannot build on a road.".to_string());
+    }
+
     if is_within_same_kind_work_radius(ctx, &kind, x, z) {
         return Err("Another building of the same type already covers this area.".to_string());
     }
@@ -142,6 +146,7 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
         z,
         work_radius: def.work_radius,
         action_cooldown: 0.0,
+        delivery_cooldown: 0.0,
         timber: 0.0,
         firewood: 0.0,
         stone: 0.0,
