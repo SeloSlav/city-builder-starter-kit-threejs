@@ -1,16 +1,22 @@
 /** Matches CameraController default orbit distance at 100% zoom. */
 export const BASELINE_CAMERA_DISTANCE = 88;
 
+/** Close ground detail (dirt, grass tufts, reeds) reaches full strength at this zoom. */
+export const CLOSE_GROUND_FULL_ZOOM_PERCENT = 400;
+
+/** Close ground detail begins fading in above this zoom; below it the map stays meadow. */
+export const CLOSE_GROUND_FADE_START_ZOOM_PERCENT = 160;
+
 /** Dirt is fully active at this zoom and beyond. */
-export const DIRT_REVEAL_ZOOM_PERCENT = 400;
+export const DIRT_REVEAL_ZOOM_PERCENT = CLOSE_GROUND_FULL_ZOOM_PERCENT;
 
 /** Dirt begins fading in above this zoom; below it the map stays meadow. */
-export const DIRT_FADE_START_ZOOM_PERCENT = 300;
+export const DIRT_FADE_START_ZOOM_PERCENT = CLOSE_GROUND_FADE_START_ZOOM_PERCENT;
 
-/** Pow easing on the zoom gate (< 1 = dirt ramps in more gradually between 300–400%). */
+/** Pow easing on the zoom gate (< 1 = detail ramps in gradually across the fade band). */
 export const DIRT_BLEND_EASE = 0.72;
 
-/** Orbit distances matching the 300% / 400% zoom band. */
+/** Orbit distances matching the 160% / 400% close-ground zoom band. */
 export const TERRAIN_DIRT_CLOSE_DISTANCE =
   BASELINE_CAMERA_DISTANCE / (DIRT_REVEAL_ZOOM_PERCENT / 100);
 
@@ -31,15 +37,6 @@ export const GRASS_BLADE_REVEAL = {
   close: TERRAIN_DIRT_CLOSE_DISTANCE,
   far: TERRAIN_DIRT_FAR_DISTANCE,
 } as const;
-
-/** River reeds reach full strength at this zoom (wide band = slow ease-in from 200%). */
-export const REED_FULL_ZOOM_PERCENT = 360;
-
-/** Reeds begin fading in above this zoom; at/below 200% they stay hidden. */
-export const REED_FADE_START_ZOOM_PERCENT = 200;
-
-/** Gradual ease across the reed zoom band — same feel as dirt/grass close LOD. */
-export const REED_BLEND_EASE = 0.72;
 
 /** Horizontal radius where 3D grass tufts render — fades before dirt ends. */
 export const GRASS_BLADE_NEAR_RADIUS = 54;
@@ -69,7 +66,7 @@ export const GRASS_STREAM_FOCUS_DRIFT = 3.5;
 /** Soft falloff band at the outer edge of the grass patch (world units). */
 export const GRASS_EDGE_FADE_BAND = 24;
 
-/** 0 below 300% zoom → 1 at 400% zoom; controls whether close dirt is allowed at all. */
+/** 0 below 160% zoom → 1 at 400% zoom; shared by dirt, grass tufts, and reeds. */
 export function dirtZoomGate(cameraDistance: number): number {
   const t = smoothstep(TERRAIN_DIRT_CLOSE_DISTANCE, TERRAIN_DIRT_FAR_DISTANCE, cameraDistance);
   return Math.pow(1 - t, DIRT_BLEND_EASE);
@@ -79,11 +76,8 @@ export function grassBladeRevealOpacity(cameraDistance: number): number {
   return dirtZoomGate(cameraDistance);
 }
 
-/** 0 at 200% zoom → 1 at 360% zoom; reeds ease in slowly before grass tufts. */
 export function reedRevealOpacity(cameraDistance: number): number {
-  const zoomPercent = (BASELINE_CAMERA_DISTANCE / cameraDistance) * 100;
-  const t = smoothstep(REED_FADE_START_ZOOM_PERCENT, REED_FULL_ZOOM_PERCENT, zoomPercent);
-  return Math.pow(t, REED_BLEND_EASE);
+  return dirtZoomGate(cameraDistance);
 }
 
 export function resolveReedLod(cameraDistance: number, firstPersonActive: boolean): number {
@@ -105,6 +99,10 @@ export function resolveCloseGroundLod(
 
 export function isGrassBladeZoomActive(cameraDistance: number): boolean {
   return grassBladeRevealOpacity(cameraDistance) > 0.02;
+}
+
+export function isReedZoomActive(cameraDistance: number): boolean {
+  return reedRevealOpacity(cameraDistance) > 0.02;
 }
 
 /** 1 near focus, 0 at outer radius — matches streamed grass tuft falloff. */

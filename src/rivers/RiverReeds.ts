@@ -7,7 +7,6 @@ import type { RiverField } from './RiverField.ts';
 
 type TslNode = {
   rgb: TslNode;
-  a: TslNode;
 };
 
 type ReedPlacement = {
@@ -68,12 +67,19 @@ export function createRiverReeds(
   mesh.visible = false;
   mesh.count = placements.length;
 
+  const hideAllInstances = (): void => {
+    for (let index = 0; index < placements.length; index++) {
+      mesh.setMatrixAt(index, hiddenMatrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  };
+
   placements.forEach((placement, index) => {
-    composeReedMatrix(placement, terrain, composeMatrix, composeQuaternion, composePosition, composeScale, composeEuler);
-    mesh.setMatrixAt(index, composeMatrix);
     composeColor.setHSL(placement.hue, placement.sat, placement.light);
     mesh.setColorAt(index, composeColor);
   });
+
+  hideAllInstances();
 
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -130,10 +136,9 @@ export function createRiverReeds(
     ) {
       const reedLod = resolveReedLod(cameraDistance, firstPersonActive);
       const reedOpacity = reedLod * REED_PEAK_OPACITY;
-      const reedZoomVisible = reedLod > 0.001 && placements.length > 0;
-      mesh.visible = reedZoomVisible;
+      const reedZoomVisible = reedLod > 0.02 && placements.length > 0;
 
-      if (!Number.isFinite(lastMaterialOpacity) || Math.abs(reedOpacity - lastMaterialOpacity) > 0.004) {
+      if (!Number.isFinite(lastMaterialOpacity) || Math.abs(reedOpacity - lastMaterialOpacity) > 0.008) {
         lastMaterialOpacity = reedOpacity;
         material.opacity = reedOpacity;
         const useTransparency = reedOpacity < 0.995;
@@ -144,10 +149,12 @@ export function createRiverReeds(
         }
       }
 
+      mesh.visible = reedZoomVisible;
       if (!reedZoomVisible) {
         wasReedVisible = false;
         lastFocusX = Number.NaN;
         lastFocusZ = Number.NaN;
+        hideAllInstances();
         return;
       }
 
@@ -330,14 +337,12 @@ function createReedMaterial(): MeshStandardNodeMaterial {
   material.side = THREE.DoubleSide;
   material.transparent = true;
   material.opacity = 0;
-  material.alphaTest = 0.06;
+  material.alphaTest = 0.15;
   material.depthWrite = true;
   material.roughness = 0.94;
   material.metalness = 0;
   material.color.set(0xffffff);
-  const vc = vertexColor() as TslNode;
-  material.colorNode = vc.rgb;
-  material.opacityNode = vc.a;
+  material.colorNode = (vertexColor() as TslNode).rgb;
   return material;
 }
 
@@ -357,7 +362,7 @@ function createReedGeometry(): THREE.BufferGeometry {
   geometry.setIndex(indices);
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeBoundingSphere();
   return geometry;
 }
@@ -375,18 +380,18 @@ function appendReedBlade(
   const base = positions.length / 3;
 
   const rings = [
-    { y: 0, width: 0.04, alpha: 0, shade: 0.72 },
-    { y: 0.14, width: 0.42, alpha: 0.18, shade: 0.76 },
-    { y: 0.58, width: 0.92, alpha: 0.78, shade: 0.84 },
-    { y: 1.02, width: 0.78, alpha: 0.9, shade: 0.88 },
-    { y: 1.16, width: 1.08, alpha: 0.94, shade: 0.86 },
-    { y: 1.28, width: 0.92, alpha: 0.88, shade: 0.84 },
+    { y: 0, width: 0.04, shade: 0.45 },
+    { y: 0.14, width: 0.42, shade: 0.58 },
+    { y: 0.58, width: 0.92, shade: 0.76 },
+    { y: 1.02, width: 0.78, shade: 0.84 },
+    { y: 1.16, width: 1.08, shade: 0.82 },
+    { y: 1.28, width: 0.92, shade: 0.78 },
   ];
 
   for (const ring of rings) {
     positions.push(cos * halfWidth * ring.width, ring.y, sin * halfWidth * ring.width);
     normals.push(cos * 0.42, 0.78, sin * 0.42);
-    colors.push(ring.shade, ring.shade * 1.02, ring.shade * 0.92, ring.alpha);
+    colors.push(ring.shade, ring.shade * 1.02, ring.shade * 0.92);
   }
 
   for (let i = 0; i < rings.length - 2; i++) {
