@@ -1,23 +1,14 @@
 use spacetimedb::ReducerContext;
 
 use crate::burgage::{zone_corners_polygon, zone_overlaps_footprint, ZoneCorners};
-use crate::constants::{
-    LUMBER_MILL_PICK_RADIUS, REFORESTER_PICK_RADIUS, STONE_QUARRY_PICK_RADIUS,
-    WOODCUTTERS_LODGE_PICK_RADIUS,
-};
+use crate::building_defs::building_def;
 use crate::db::*;
 
 const LARGE_QUARRY_PIT_RADIUS: f64 = 58.0;
 const SMALL_QUARRY_PIT_RADIUS: f64 = 30.0;
 
 pub fn building_pick_radius(kind: &str) -> Option<f64> {
-    match kind {
-        "lumber_mill" => Some(LUMBER_MILL_PICK_RADIUS),
-        "reforester" => Some(REFORESTER_PICK_RADIUS),
-        "woodcutters_lodge" => Some(WOODCUTTERS_LODGE_PICK_RADIUS),
-        "stone_quarry" => Some(STONE_QUARRY_PICK_RADIUS),
-        _ => None,
-    }
+    building_def(kind).map(|def| def.pick_radius)
 }
 
 pub fn building_overlaps_residence_zone(

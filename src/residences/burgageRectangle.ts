@@ -1,6 +1,6 @@
 import type { Point2 } from '../utils/polygonGeometry.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
-import { distancePointToPolylineXZ } from '../utils/pathGeometry.ts';
+import { nearestRoadDistance } from '../roads/roadConnectivity.ts';
 import { MIN_ZONE_DEPTH } from './burgageLayout.ts';
 
 export type RectangleCorners = {
@@ -32,16 +32,6 @@ function scale2(v: Point2, scalar: number): Point2 {
 
 function midpoint2(a: Point2, b: Point2): Point2 {
   return { x: (a.x + b.x) * 0.5, z: (a.z + b.z) * 0.5 };
-}
-
-function nearestRoadDistance(x: number, z: number, roadNetwork: RoadNetwork): number {
-  const paths = [...roadNetwork.edges.values()].map((edge) => edge.sampledPath);
-  if (paths.length === 0) return Infinity;
-  let minDistance = Infinity;
-  for (const path of paths) {
-    minDistance = Math.min(minDistance, distancePointToPolylineXZ(x, z, path));
-  }
-  return minDistance;
 }
 
 /** Perpendicular into the lot (away from the road along the frontage edge). */

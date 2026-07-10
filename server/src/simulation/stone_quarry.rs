@@ -1,12 +1,19 @@
 use spacetimedb::ReducerContext;
 
-use crate::constants::{STONE_PER_HARVEST, STONE_QUARRY_INTERVAL, STONE_QUARRY_RADIUS, TICK_DT};
+use crate::building_defs::building_def;
+use crate::constants::{STONE_PER_HARVEST, TICK_DT};
 use crate::db::*;
 use crate::economy::{building_storage_caps, deposit_building};
 use crate::simulation::spatial::find_nearest_quarry;
 use crate::tables::{Building, Quarry};
 
 pub fn step_stone_quarry(ctx: &ReducerContext, building: Building) {
+    let Some(def) = building_def(&building.kind) else {
+        return;
+    };
+    let interval = def.action_interval;
+    let work_radius = def.work_radius;
+
     let cooldown = (building.action_cooldown - TICK_DT).max(0.0);
     if cooldown > 0.0 {
         ctx.db.building().id().update(Building {
@@ -18,7 +25,7 @@ pub fn step_stone_quarry(ctx: &ReducerContext, building: Building) {
 
     if building.assigned_labor == 0 {
         ctx.db.building().id().update(Building {
-            action_cooldown: STONE_QUARRY_INTERVAL,
+            action_cooldown: interval,
             ..building
         });
         return;
@@ -27,15 +34,15 @@ pub fn step_stone_quarry(ctx: &ReducerContext, building: Building) {
     let caps = building_storage_caps(&building.kind);
     if building.stone >= caps.stone - 1e-6 {
         ctx.db.building().id().update(Building {
-            action_cooldown: STONE_QUARRY_INTERVAL,
+            action_cooldown: interval,
             ..building
         });
         return;
     }
 
-    let Some(quarry) = find_nearest_quarry(ctx, building.x, building.z, STONE_QUARRY_RADIUS) else {
+    let Some(quarry) = find_nearest_quarry(ctx, building.x, building.z, work_radius) else {
         ctx.db.building().id().update(Building {
-            action_cooldown: STONE_QUARRY_INTERVAL,
+            action_cooldown: interval,
             ..building
         });
         return;
@@ -44,7 +51,7 @@ pub fn step_stone_quarry(ctx: &ReducerContext, building: Building) {
     let extracted = STONE_PER_HARVEST.min(quarry.remaining);
     if extracted <= 0.0 {
         ctx.db.building().id().update(Building {
-            action_cooldown: STONE_QUARRY_INTERVAL,
+            action_cooldown: interval,
             ..building
         });
         return;
@@ -56,6 +63,6 @@ pub fn step_stone_quarry(ctx: &ReducerContext, building: Building) {
     });
 
     let (_, _, _, mut updated) = deposit_building(&building, caps, 0.0, 0.0, extracted);
-    updated.action_cooldown = STONE_QUARRY_INTERVAL;
+    updated.action_cooldown = interval;
     ctx.db.building().id().update(updated);
 }

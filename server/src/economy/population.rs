@@ -1,18 +1,15 @@
 use spacetimedb::ReducerContext;
 
+use crate::building_defs::building_def;
 use crate::constants::{POPULATION_PER_RESIDENCE, STARTING_POPULATION};
 use crate::db::*;
 use crate::tables::Building;
-
-pub fn starting_population() -> u32 {
-    STARTING_POPULATION
-}
 
 pub fn residence_population() -> u32 {
     POPULATION_PER_RESIDENCE
 }
 
-pub fn total_population(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u32 {
+fn total_population(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u32 {
     let from_residences: u32 = ctx
         .db
         .residence()
@@ -24,17 +21,13 @@ pub fn total_population(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u
     STARTING_POPULATION.saturating_add(from_residences)
 }
 
-pub fn total_assigned_labor(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u32 {
+fn total_assigned_labor(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u32 {
     ctx.db
         .building()
         .owner()
         .filter(&owner)
         .map(|building| building.assigned_labor)
         .sum()
-}
-
-pub fn available_labor(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u32 {
-    total_population(ctx, owner).saturating_sub(total_assigned_labor(ctx, owner))
 }
 
 pub fn assign_building_labor(
@@ -73,5 +66,5 @@ pub fn assign_building_labor(
 }
 
 pub fn building_accepts_labor(kind: &str) -> bool {
-    matches!(kind, "lumber_mill" | "woodcutters_lodge" | "stone_quarry")
+    building_def(kind).is_some_and(|def| def.accepts_labor)
 }

@@ -1,12 +1,9 @@
 import type { RoadNetwork } from './RoadNetwork.ts';
 import { distancePointToPolylineXZ } from '../utils/pathGeometry.ts';
 import type { BuildingState, ResidenceState } from '../resources/types.ts';
+import { BUILDING_ROAD_ACCESS_DISTANCE, BURGAGE_ROAD_FRONTAGE_DISTANCE } from '../generated/gameBalance.ts';
 
-/** Must match server `BUILDING_ROAD_ACCESS_DISTANCE`. */
-export const BUILDING_ROAD_ACCESS_DISTANCE = 20;
-
-/** Must match server `BURGAGE_ROAD_FRONTAGE_DISTANCE`. */
-export const BURGAGE_ROAD_FRONTAGE_DISTANCE = 16;
+export { BUILDING_ROAD_ACCESS_DISTANCE, BURGAGE_ROAD_FRONTAGE_DISTANCE };
 
 type RoadGraph = {
   nodes: Map<string, { x: number; z: number }>;

@@ -2,28 +2,14 @@ import * as THREE from 'three';
 import type { TerrainProjector } from '../terrain/TerrainProjector.ts';
 import type { SceneManager } from '../scene/SceneManager.ts';
 import { disposeObject3D } from '../utils/dispose.ts';
-import { formatResourceAmount } from './yields.ts';
 import {
-  buildingSalvageRefund,
-  formatBuildingCost,
-  getBuildingCost,
-  residenceZoneCost,
-  residenceZoneSalvageRefund,
-  STONE_SALVAGE_FRACTION,
-  TIMBER_SALVAGE_FRACTION,
-} from './buildingEconomy.ts';
-import { getBuildingDefinition } from './buildings.ts';
-import {
-  buildingAcceptsLabor,
-  buildingStorageCaps,
   maxAssignableLabor,
-  RESIDENCE_FIREWOOD_CAPACITY,
-  residenceNeedsStatus,
   type PopulationStats,
   type ResourceTotals,
 } from './resourceTotals.ts';
 import type { GameState, InspectableTarget } from './types.ts';
 import type { WorldQueries } from './WorldQueries.ts';
+import { renderInspectableTarget } from './inspector/renderInspectableTarget.ts';
 
 type ResourceInspectorOptions = {
   domElement: HTMLElement;
@@ -286,218 +272,27 @@ export class ResourceInspector {
   }
 
   private renderTarget(target: InspectableTarget): void {
-    if (target.kind === 'quarry') {
-      this.laborSection.hidden = true;
-      this.demolishSection.hidden = true;
-      const { definition, state } = target;
-      this.eyebrow.textContent = 'Quarry';
-      this.title.textContent = definition.label;
-      this.status.textContent = `${Math.round(state.remaining)} / ${Math.round(state.maxYield)} stone remaining`;
-      this.status.dataset.state = state.remaining > 0 ? 'active' : 'idle';
+    const view = renderInspectableTarget(target, {
+      worldQueries: this.options.worldQueries,
+      populationStats: this.populationStats,
+    });
 
-      const nearestRoad = this.options.worldQueries.getNearestRoadNodeDistance(definition.x, definition.z);
-      this.detailList.innerHTML = `
-        <li><span>Resource</span><span>stone</span></li>
-        <li><span>Site ID</span><span>${definition.id}</span></li>
-        <li><span>Yield left</span><span>${Math.round(state.remaining)}</span></li>
-        <li><span>Nearest road</span><span>${nearestRoad == null ? 'None nearby' : `${nearestRoad.toFixed(1)} m`}</span></li>
-      `;
-      return;
+    this.eyebrow.textContent = view.eyebrow;
+    this.title.textContent = view.title;
+    this.status.textContent = view.statusText;
+    this.status.dataset.state = view.statusState;
+    this.detailList.innerHTML = view.detailsHtml;
+
+    this.demolishSection.hidden = !view.demolish.visible;
+    this.demolishHint.textContent = view.demolish.hint;
+
+    this.laborSection.hidden = !view.labor.visible;
+    if (view.labor.visible) {
+      this.laborCount.textContent = view.labor.count.toString();
+      this.laborHint.textContent = view.labor.hint;
+      this.laborDecrease.disabled = view.labor.decreaseDisabled;
+      this.laborIncrease.disabled = view.labor.increaseDisabled;
     }
-
-    if (target.kind === 'building') {
-      const { building, matureTrees, stumpTrees, growingTrees } = target;
-      const label = this.options.worldQueries.getBuildingLabel(building.kind);
-      this.eyebrow.textContent = 'Building';
-      this.title.textContent = label;
-      const definition = getBuildingDefinition(building.kind);
-      const cost = getBuildingCost(building.kind);
-      const refund = buildingSalvageRefund(building.kind);
-      const caps = buildingStorageCaps(building.kind);
-      const acceptsLabor = buildingAcceptsLabor(building.kind);
-      const maxLabor = maxAssignableLabor(building, this.populationStats);
-
-      this.demolishSection.hidden = false;
-      this.demolishHint.textContent =
-        `Salvages about ${refund.timber} timber and ${refund.stone} stone (${Math.round(STONE_SALVAGE_FRACTION * 100)}% stone, ${Math.round(TIMBER_SALVAGE_FRACTION * 100)}% timber of ${formatBuildingCost(cost)}).`;
-
-      if (acceptsLabor) {
-        this.laborSection.hidden = false;
-        this.laborCount.textContent = building.assignedLabor.toString();
-        this.laborHint.textContent = `${this.populationStats.available} workers available (${this.populationStats.total} population, ${this.populationStats.assigned} assigned).`;
-        this.laborDecrease.disabled = building.assignedLabor <= 0;
-        this.laborIncrease.disabled = building.assignedLabor >= maxLabor;
-      } else {
-        this.laborSection.hidden = true;
-      }
-
-      const storageRows = [
-        caps.timber > 0 ? `<li><span>Timber stored</span><span>${Math.round(building.timber)} / ${caps.timber}</span></li>` : '',
-        caps.firewood > 0 ? `<li><span>Firewood stored</span><span>${Math.round(building.firewood)} / ${caps.firewood}</span></li>` : '',
-        caps.stone > 0 ? `<li><span>Stone stored</span><span>${Math.round(building.stone)} / ${caps.stone}</span></li>` : '',
-      ].filter(Boolean).join('');
-
-      const roadAccess = this.options.worldQueries.getRoadAccessLabel(building.x, building.z);
-      const roadAccessRow = `<li><span>Road access</span><span>${roadAccess}</span></li>`;
-
-      if (building.kind === 'lumber_mill') {
-        const active = building.assignedLabor > 0 && matureTrees > 0;
-        this.status.textContent = building.assignedLabor === 0
-          ? 'Idle — assign labor to harvest timber'
-          : matureTrees > 0
-            ? `Harvesting — ${matureTrees} mature trees in range`
-            : 'Idle — no mature trees in range';
-        this.status.dataset.state = active ? 'active' : 'idle';
-
-        this.detailList.innerHTML = `
-        <li><span>Kind</span><span>${building.kind}</span></li>
-        <li><span>Build cost</span><span>${formatBuildingCost(cost)}</span></li>
-        ${roadAccessRow}
-        <li><span>Work radius</span><span>${definition.workRadius} m</span></li>
-        <li><span>Mature trees</span><span>${matureTrees}</span></li>
-        <li><span>Stumps</span><span>${stumpTrees}</span></li>
-        <li><span>Growing saplings</span><span>${growingTrees}</span></li>
-        ${storageRows}
-      `;
-        return;
-      }
-
-      if (building.kind === 'woodcutters_lodge') {
-        const connectedMills = this.options.worldQueries.getRoadConnectedMills(building);
-        const connectedResidences = this.options.worldQueries.getRoadConnectedResidencesForLodge(building);
-        const millsWithTimber = connectedMills.filter((mill) => mill.timber > 0).length;
-        const onRoad = roadAccess.startsWith('Connected');
-        const active = building.assignedLabor > 0 && onRoad && millsWithTimber > 0 && connectedResidences.length > 0;
-
-        if (!onRoad) {
-          this.status.textContent = 'Not connected — place near a road and link with paths';
-          this.status.dataset.state = 'idle';
-        } else if (building.assignedLabor === 0) {
-          this.status.textContent = 'Idle — assign labor to process timber into firewood';
-          this.status.dataset.state = 'idle';
-        } else if (connectedMills.length === 0) {
-          this.status.textContent = 'No road-linked lumber mills — connect a mill by road';
-          this.status.dataset.state = 'warning';
-        } else if (millsWithTimber === 0) {
-          this.status.textContent = 'Road-linked mills have no timber yet';
-          this.status.dataset.state = 'warning';
-        } else if (connectedResidences.length === 0) {
-          this.status.textContent = 'No road-linked residences to deliver firewood';
-          this.status.dataset.state = 'warning';
-        } else if (building.firewood >= caps.firewood) {
-          this.status.textContent = 'Storage full — residences cannot accept more yet';
-          this.status.dataset.state = 'idle';
-        } else if (building.timber <= 0) {
-          this.status.textContent = `Pulling timber from ${millsWithTimber} road-linked mill${millsWithTimber === 1 ? '' : 's'}`;
-          this.status.dataset.state = 'active';
-        } else {
-          this.status.textContent = `Processing and delivering to ${connectedResidences.length} road-linked cottage${connectedResidences.length === 1 ? '' : 's'}`;
-          this.status.dataset.state = active ? 'active' : 'idle';
-        }
-
-        const millSummary = connectedMills.length === 0
-          ? 'None'
-          : `${connectedMills.length} linked (${millsWithTimber} with timber)`;
-        const residenceSummary = connectedResidences.length === 0
-          ? 'None'
-          : `${connectedResidences.length} linked`;
-
-        this.detailList.innerHTML = `
-        <li><span>Kind</span><span>${building.kind}</span></li>
-        <li><span>Build cost</span><span>${formatBuildingCost(cost)}</span></li>
-        ${roadAccessRow}
-        <li><span>Road-linked mills</span><span>${millSummary}</span></li>
-        <li><span>Road-linked cottages</span><span>${residenceSummary}</span></li>
-        <li><span>Process interval</span><span>${definition.harvestInterval}s</span></li>
-        ${storageRows}
-      `;
-        return;
-      }
-
-      if (building.kind === 'stone_quarry') {
-        const nearestQuarry = this.options.worldQueries.findNearestQuarryWithRemaining(building.x, building.z, building.workRadius);
-        const active = building.assignedLabor > 0 && nearestQuarry != null;
-        this.status.textContent = building.assignedLabor === 0
-          ? 'Idle — assign labor to extract stone'
-          : nearestQuarry
-            ? `Extracting — ${Math.round(nearestQuarry.remaining)} stone left at site`
-            : 'Idle — no quarry stone in range';
-        this.status.dataset.state = active ? 'active' : 'idle';
-
-        this.detailList.innerHTML = `
-        <li><span>Kind</span><span>${building.kind}</span></li>
-        <li><span>Build cost</span><span>${formatBuildingCost(cost)}</span></li>
-        <li><span>Work radius</span><span>${definition.workRadius} m</span></li>
-        <li><span>Harvest interval</span><span>${definition.harvestInterval}s</span></li>
-        ${storageRows}
-      `;
-        return;
-      }
-
-      this.status.textContent = stumpTrees + growingTrees > 0
-        ? `Reforesting — ${stumpTrees} stumps, ${growingTrees} growing`
-        : 'Idle — no stumps in range';
-      this.status.dataset.state = stumpTrees + growingTrees > 0 ? 'active' : 'draft';
-
-      this.detailList.innerHTML = `
-        <li><span>Kind</span><span>${building.kind}</span></li>
-        <li><span>Build cost</span><span>${formatBuildingCost(cost)}</span></li>
-        <li><span>Work radius</span><span>${definition.workRadius} m</span></li>
-        <li><span>Mature trees</span><span>${matureTrees}</span></li>
-        <li><span>Stumps</span><span>${stumpTrees}</span></li>
-        <li><span>Growing saplings</span><span>${growingTrees}</span></li>
-        ${storageRows}
-      `;
-      return;
-    }
-
-    if (target.kind === 'residence') {
-      const { residence, zone, residenceCount } = target;
-      const cost = residenceZoneCost(residenceCount);
-      const refund = residenceZoneSalvageRefund(residenceCount);
-      const needs = residenceNeedsStatus(residence);
-      this.eyebrow.textContent = 'Residence';
-      this.title.textContent = residence.abandoned
-        ? 'Abandoned cottage'
-        : residenceCount === 1
-          ? 'Burgage cottage'
-          : `Burgage zone (${residenceCount} cottages)`;
-      this.status.textContent = needs.label;
-      this.status.dataset.state = needs.state;
-      this.demolishSection.hidden = false;
-      this.laborSection.hidden = true;
-      this.demolishHint.textContent =
-        `Removes the whole zone and salvages about ${refund.timber} timber and ${refund.stone} stone (${Math.round(STONE_SALVAGE_FRACTION * 100)}% stone, ${Math.round(TIMBER_SALVAGE_FRACTION * 100)}% timber of ${formatBuildingCost(cost)}).`;
-
-      const nearestRoad = this.options.worldQueries.getNearestRoadNodeDistance(residence.x, residence.z);
-      const roadAccess = this.options.worldQueries.getRoadAccessLabel(residence.x, residence.z);
-      this.detailList.innerHTML = `
-        <li><span>Zone plots</span><span>${zone.plotCount}</span></li>
-        <li><span>Cottages</span><span>${residenceCount}</span></li>
-        <li><span>Parcel</span><span>#${residence.parcelIndex + 1}</span></li>
-        <li><span>Population</span><span>${residence.abandoned ? 0 : residence.population}</span></li>
-        <li><span>Firewood stock</span><span>${Math.round(residence.firewoodStock)} / ${RESIDENCE_FIREWOOD_CAPACITY}</span></li>
-        <li><span>Road access</span><span>${roadAccess}</span></li>
-        <li><span>Build cost</span><span>${formatBuildingCost(cost)}</span></li>
-        <li><span>Nearest road</span><span>${nearestRoad == null ? 'None nearby' : `${nearestRoad.toFixed(1)} m`}</span></li>
-      `;
-      return;
-    }
-
-    this.eyebrow.textContent = 'River';
-    this.demolishSection.hidden = true;
-    this.laborSection.hidden = true;
-    this.title.textContent = target.onWater ? 'Open water' : 'River access';
-    this.status.textContent = target.onWater
-      ? 'Direct water access — useful for mills and wells.'
-      : `Shoreline access (${target.shoreDistance.toFixed(1)} m from bank)`;
-    this.status.dataset.state = 'active';
-    this.detailList.innerHTML = `
-      <li><span>Resource</span><span>water</span></li>
-      <li><span>On water</span><span>${target.onWater ? 'Yes' : 'No'}</span></li>
-      <li><span>Shore distance</span><span>${target.shoreDistance.toFixed(1)} m</span></li>
-      <li><span>Stored water</span><span>${formatResourceAmount('water', 0)}</span></li>
-    `;
   }
 
   private updateMarker(): void {

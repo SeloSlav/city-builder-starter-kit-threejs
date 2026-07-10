@@ -1,0 +1,49 @@
+import {
+  formatBuildingCost,
+  residenceZoneCost,
+  residenceZoneSalvageRefund,
+  STONE_SALVAGE_FRACTION,
+  TIMBER_SALVAGE_FRACTION,
+} from '../buildingEconomy.ts';
+import { RESIDENCE_FIREWOOD_CAPACITY, residenceNeedsStatus } from '../resourceTotals.ts';
+import type { InspectableTarget } from '../types.ts';
+import type { InspectorRenderContext, InspectorView } from './renderInspectableTarget.ts';
+import { hiddenLabor } from './renderInspectableTarget.ts';
+
+export function renderResidenceInspector(
+  target: Extract<InspectableTarget, { kind: 'residence' }>,
+  context: InspectorRenderContext,
+): InspectorView {
+  const { residence, zone, residenceCount } = target;
+  const cost = residenceZoneCost(residenceCount);
+  const refund = residenceZoneSalvageRefund(residenceCount);
+  const needs = residenceNeedsStatus(residence);
+  const nearestRoad = context.worldQueries.getNearestRoadNodeDistance(residence.x, residence.z);
+  const roadAccess = context.worldQueries.getRoadAccessLabel(residence.x, residence.z);
+
+  return {
+    eyebrow: 'Residence',
+    title: residence.abandoned
+      ? 'Abandoned cottage'
+      : residenceCount === 1
+        ? 'Burgage cottage'
+        : `Burgage zone (${residenceCount} cottages)`,
+    statusText: needs.label,
+    statusState: needs.state,
+    detailsHtml: `
+      <li><span>Zone plots</span><span>${zone.plotCount}</span></li>
+      <li><span>Cottages</span><span>${residenceCount}</span></li>
+      <li><span>Parcel</span><span>#${residence.parcelIndex + 1}</span></li>
+      <li><span>Population</span><span>${residence.abandoned ? 0 : residence.population}</span></li>
+      <li><span>Firewood stock</span><span>${Math.round(residence.firewoodStock)} / ${RESIDENCE_FIREWOOD_CAPACITY}</span></li>
+      <li><span>Road access</span><span>${roadAccess}</span></li>
+      <li><span>Build cost</span><span>${formatBuildingCost(cost)}</span></li>
+      <li><span>Nearest road</span><span>${nearestRoad == null ? 'None nearby' : `${nearestRoad.toFixed(1)} m`}</span></li>
+    `,
+    demolish: {
+      visible: true,
+      hint: `Removes the whole zone and salvages about ${refund.timber} timber and ${refund.stone} stone (${Math.round(STONE_SALVAGE_FRACTION * 100)}% stone, ${Math.round(TIMBER_SALVAGE_FRACTION * 100)}% timber of ${formatBuildingCost(cost)}).`,
+    },
+    labor: hiddenLabor(),
+  };
+}

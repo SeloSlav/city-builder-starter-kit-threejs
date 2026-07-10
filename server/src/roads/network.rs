@@ -173,19 +173,6 @@ pub fn has_building_road_access(ctx: &ReducerContext, owner: Identity, x: f64, z
         .unwrap_or(false)
 }
 
-pub fn buildings_road_connected(
-    ctx: &ReducerContext,
-    owner: Identity,
-    ax: f64,
-    az: f64,
-    bx: f64,
-    bz: f64,
-) -> bool {
-    load_owner_road_network(ctx, owner)
-        .map(|network| network.road_connected(ax, az, bx, bz))
-        .unwrap_or(false)
-}
-
 fn distance(ax: f64, az: f64, bx: f64, bz: f64) -> f64 {
     ((ax - bx).powi(2) + (az - bz).powi(2)).sqrt()
 }

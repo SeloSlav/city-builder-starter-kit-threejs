@@ -27,6 +27,10 @@ Write-Host "[BOOTSTRAP] Generating world tree bootstrap data..." -ForegroundColo
 npm run generate:world-bootstrap
 Assert-LastExit "Generate world bootstrap data"
 
+Write-Host "[BALANCE] Generating shared game balance..." -ForegroundColor Yellow
+npm run generate:game-balance
+Assert-LastExit "Generate game balance"
+
 Set-Location $modulePath
 
 Write-Host "[BUILD] Clearing database and deploying fresh module..." -ForegroundColor Yellow

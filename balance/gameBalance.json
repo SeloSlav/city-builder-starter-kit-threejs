@@ -1,0 +1,85 @@
+{
+  "sim": {
+    "tickMicros": 200000,
+    "tickDt": 0.2
+  },
+  "economy": {
+    "startingTimber": 120,
+    "startingStone": 140,
+    "stoneSalvageFraction": 0.92,
+    "timberSalvageFraction": 0.7,
+    "residenceTimberCost": 8,
+    "residenceStoneCost": 12
+  },
+  "population": {
+    "starting": 6,
+    "perResidence": 4,
+    "residenceFirewoodCapacity": 40,
+    "residenceFirewoodPerPersonPerSec": 0.02,
+    "abandonAfterDeficitTicks": 3600
+  },
+  "roads": {
+    "buildingRoadAccessDistance": 20,
+    "burgageRoadFrontageDistance": 16
+  },
+  "production": {
+    "lodgeTimberPerCycle": 3,
+    "lodgeFirewoodPerCycle": 3,
+    "stonePerHarvest": 3,
+    "reforesterRegrowPerSec": 0.014
+  },
+  "buildings": {
+    "lumber_mill": {
+      "label": "Lumber mill",
+      "cost": { "timber": 45, "stone": 15 },
+      "storage": { "timber": 240, "firewood": 0, "stone": 0 },
+      "workRadius": 210,
+      "pickRadius": 8,
+      "harvestInterval": 9,
+      "regrowRatePerSecond": 0,
+      "acceptsLabor": true,
+      "requiresRoad": true,
+      "requiresMatureTrees": true,
+      "requiresQuarryStone": false
+    },
+    "reforester": {
+      "label": "Reforester",
+      "cost": { "timber": 35, "stone": 10 },
+      "storage": { "timber": 0, "firewood": 0, "stone": 0 },
+      "workRadius": 190,
+      "pickRadius": 8,
+      "harvestInterval": 0,
+      "regrowRatePerSecond": 0.014,
+      "acceptsLabor": false,
+      "requiresRoad": false,
+      "requiresMatureTrees": false,
+      "requiresQuarryStone": false
+    },
+    "woodcutters_lodge": {
+      "label": "Woodcutter's lodge",
+      "cost": { "timber": 40, "stone": 12 },
+      "storage": { "timber": 60, "firewood": 120, "stone": 0 },
+      "workRadius": 0,
+      "pickRadius": 8,
+      "harvestInterval": 5,
+      "regrowRatePerSecond": 0,
+      "acceptsLabor": true,
+      "requiresRoad": true,
+      "requiresMatureTrees": false,
+      "requiresQuarryStone": false
+    },
+    "stone_quarry": {
+      "label": "Stonecutter's camp",
+      "cost": { "timber": 25, "stone": 40 },
+      "storage": { "timber": 0, "firewood": 0, "stone": 180 },
+      "workRadius": 55,
+      "pickRadius": 10,
+      "harvestInterval": 9,
+      "regrowRatePerSecond": 0,
+      "acceptsLabor": true,
+      "requiresRoad": false,
+      "requiresMatureTrees": false,
+      "requiresQuarryStone": true
+    }
+  }
+}

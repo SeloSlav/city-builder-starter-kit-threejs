@@ -1,21 +1,24 @@
-import type { BuildingKind } from './types.ts';
+import type { BuildingKind } from '../generated/gameBalance.ts';
 import type { ResourceTotals } from './resourceTotals.ts';
+import {
+  BUILDING_COSTS,
+  RESIDENCE_STONE_COST,
+  RESIDENCE_TIMBER_COST,
+  STONE_SALVAGE_FRACTION,
+  TIMBER_SALVAGE_FRACTION,
+  type BuildingResourceCost,
+} from '../generated/gameBalance.ts';
 
-export type BuildingResourceCost = {
-  timber: number;
-  stone: number;
-};
+export {
+  RESIDENCE_STONE_COST,
+  RESIDENCE_TIMBER_COST,
+  STARTING_STONE,
+  STARTING_TIMBER,
+  STONE_SALVAGE_FRACTION,
+  TIMBER_SALVAGE_FRACTION,
+} from '../generated/gameBalance.ts';
 
-/** Enough for one lumber mill + one stone quarry, plus reserve for early residences. */
-export const STARTING_TIMBER = 120;
-export const STARTING_STONE = 140;
-
-export const STONE_SALVAGE_FRACTION = 0.92;
-export const TIMBER_SALVAGE_FRACTION = 0.7;
-
-/** Per main house in a burgage zone — cost scales with residence count at placement. */
-export const RESIDENCE_TIMBER_COST = 8;
-export const RESIDENCE_STONE_COST = 12;
+export type { BuildingResourceCost };
 
 /** Planned cottage-scale residence footprint reference. */
 export const ESTIMATED_COTTAGE_COST: BuildingResourceCost = {
@@ -29,13 +32,6 @@ export function residenceZoneCost(residenceCount: number): BuildingResourceCost 
     stone: RESIDENCE_STONE_COST * residenceCount,
   };
 }
-
-export const BUILDING_COSTS: Record<BuildingKind, BuildingResourceCost> = {
-  lumber_mill: { timber: 45, stone: 15 },
-  reforester: { timber: 35, stone: 10 },
-  woodcutters_lodge: { timber: 40, stone: 12 },
-  stone_quarry: { timber: 25, stone: 40 },
-};
 
 export function residenceZoneSalvageRefund(residenceCount: number): BuildingResourceCost {
   const cost = residenceZoneCost(residenceCount);

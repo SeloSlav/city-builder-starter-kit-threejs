@@ -1,15 +1,16 @@
 use spacetimedb::ReducerContext;
 
+use crate::building_defs::BuildingSimKind;
 use crate::db::*;
 use crate::schedule::SimTickSchedule;
+use crate::simulation::SimTickContext;
+use crate::simulation::{
+    step_lumber_mill, step_reforester, step_residence_needs, step_stone_quarry,
+    step_woodcutters_lodge,
+};
+use crate::tables::WorldConfig;
 
 pub fn run_sim_tick(ctx: &ReducerContext, _schedule: SimTickSchedule) {
-    use crate::simulation::{
-        step_lumber_mill, step_reforester, step_residence_needs, step_stone_quarry,
-        step_woodcutters_lodge,
-    };
-    use crate::tables::WorldConfig;
-
     if let Some(config) = ctx.db.world_config().id().find(&0) {
         ctx.db.world_config().id().update(WorldConfig {
             sim_tick: config.sim_tick + 1,
@@ -17,17 +18,21 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: SimTickSchedule) {
         });
     }
 
+    let tick = SimTickContext::new(ctx);
+
     let building_ids: Vec<u64> = ctx.db.building().iter().map(|b| b.id).collect();
     for building_id in building_ids {
         let Some(building) = ctx.db.building().id().find(&building_id) else {
             continue;
         };
-        match building.kind.as_str() {
-            "lumber_mill" => step_lumber_mill(ctx, building),
-            "reforester" => step_reforester(ctx, building),
-            "stone_quarry" => step_stone_quarry(ctx, building),
-            "woodcutters_lodge" => step_woodcutters_lodge(ctx, building),
-            _ => {}
+        let Some(sim_kind) = crate::building_defs::building_def(&building.kind).and_then(|def| def.sim_kind) else {
+            continue;
+        };
+        match sim_kind {
+            BuildingSimKind::LumberMill => step_lumber_mill(ctx, building),
+            BuildingSimKind::Reforester => step_reforester(ctx, building),
+            BuildingSimKind::StoneQuarry => step_stone_quarry(ctx, building),
+            BuildingSimKind::WoodcuttersLodge => step_woodcutters_lodge(ctx, &tick, building),
         }
     }
 

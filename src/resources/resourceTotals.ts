@@ -1,18 +1,26 @@
+import {
+  ABANDON_AFTER_DEFICIT_TICKS,
+  BUILDING_DEFINITIONS,
+  BUILDING_STORAGE_CAPS,
+  POPULATION_PER_RESIDENCE,
+  RESIDENCE_FIREWOOD_CAPACITY,
+  RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC,
+  SIM_TICK_SECONDS,
+  STARTING_POPULATION,
+  type StorageCaps,
+} from '../generated/gameBalance.ts';
 import type { BuildingKind, BuildingState, GameState, ResidenceState } from './types.ts';
 
-export const STARTING_POPULATION = 6;
-export const POPULATION_PER_RESIDENCE = 4;
-export const RESIDENCE_FIREWOOD_CAPACITY = 40;
-export const RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC = 0.02;
-export const ABANDON_AFTER_DEFICIT_TICKS = 3600;
-/** Must match server `TICK_DT`. */
-export const SIM_TICK_SECONDS = 0.2;
-
-export type StorageCaps = {
-  timber: number;
-  firewood: number;
-  stone: number;
+export {
+  ABANDON_AFTER_DEFICIT_TICKS,
+  POPULATION_PER_RESIDENCE,
+  RESIDENCE_FIREWOOD_CAPACITY,
+  RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC,
+  SIM_TICK_SECONDS,
+  STARTING_POPULATION,
 };
+
+export type { StorageCaps };
 
 export type ResourceTotals = {
   timber: number;
@@ -27,19 +35,12 @@ export type PopulationStats = {
   available: number;
 };
 
-const BUILDING_STORAGE_CAPS: Record<BuildingKind, StorageCaps> = {
-  lumber_mill: { timber: 240, firewood: 0, stone: 0 },
-  woodcutters_lodge: { timber: 60, firewood: 120, stone: 0 },
-  stone_quarry: { timber: 0, firewood: 0, stone: 180 },
-  reforester: { timber: 0, firewood: 0, stone: 0 },
-};
-
 export function buildingStorageCaps(kind: BuildingKind): StorageCaps {
   return BUILDING_STORAGE_CAPS[kind];
 }
 
 export function buildingAcceptsLabor(kind: BuildingKind): boolean {
-  return kind === 'lumber_mill' || kind === 'woodcutters_lodge' || kind === 'stone_quarry';
+  return BUILDING_DEFINITIONS[kind].acceptsLabor;
 }
 
 export function computeResourceTotals(state: GameState): ResourceTotals {

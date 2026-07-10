@@ -1,9 +1,7 @@
 use spacetimedb::ReducerContext;
 
-use crate::constants::{
-    LUMBER_MILL_TIMBER_CAPACITY, RESIDENCE_FIREWOOD_CAPACITY, STONE_QUARRY_STONE_CAPACITY,
-    WOODCUTTERS_LODGE_FIREWOOD_CAPACITY, WOODCUTTERS_LODGE_TIMBER_CAPACITY,
-};
+use crate::building_defs::building_def;
+use crate::constants::RESIDENCE_FIREWOOD_CAPACITY;
 use crate::db::*;
 use crate::tables::Building;
 
@@ -15,23 +13,13 @@ pub struct StorageCaps {
 }
 
 pub fn building_storage_caps(kind: &str) -> StorageCaps {
-    match kind {
-        "lumber_mill" => StorageCaps {
-            timber: LUMBER_MILL_TIMBER_CAPACITY,
-            firewood: 0.0,
-            stone: 0.0,
-        },
-        "woodcutters_lodge" => StorageCaps {
-            timber: WOODCUTTERS_LODGE_TIMBER_CAPACITY,
-            firewood: WOODCUTTERS_LODGE_FIREWOOD_CAPACITY,
-            stone: 0.0,
-        },
-        "stone_quarry" => StorageCaps {
-            timber: 0.0,
-            firewood: 0.0,
-            stone: STONE_QUARRY_STONE_CAPACITY,
-        },
-        _ => StorageCaps::default(),
+    let Some(def) = building_def(kind) else {
+        return StorageCaps::default();
+    };
+    StorageCaps {
+        timber: def.storage_timber,
+        firewood: def.storage_firewood,
+        stone: def.storage_stone,
     }
 }
 
@@ -46,12 +34,6 @@ pub fn total_timber(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
 
 pub fn total_stone(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
     treasury_stone(ctx, owner) + building_sum(ctx, owner, |building| building.stone)
-}
-
-pub fn total_firewood(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
-    treasury_firewood(ctx, owner)
-        + building_sum(ctx, owner, |building| building.firewood)
-        + residence_firewood_sum(ctx, owner)
 }
 
 pub fn deposit_building(building: &Building, caps: StorageCaps, timber: f64, firewood: f64, stone: f64) -> (f64, f64, f64, Building) {
@@ -79,78 +61,90 @@ pub fn withdraw_building(building: &Building, timber: f64, firewood: f64, stone:
     (timber_withdrawn, firewood_withdrawn, stone_withdrawn, next)
 }
 
-pub fn spend_aggregate_timber(ctx: &ReducerContext, owner: spacetimedb::Identity, amount: f64) -> Result<(), String> {
+enum AggregateSpendField {
+    Timber,
+    Stone,
+}
+
+fn spend_aggregate(
+    ctx: &ReducerContext,
+    owner: spacetimedb::Identity,
+    amount: f64,
+    field: AggregateSpendField,
+) -> Result<(), String> {
     if amount <= 0.0 {
         return Ok(());
     }
+
+    let resource_name = match field {
+        AggregateSpendField::Timber => "timber",
+        AggregateSpendField::Stone => "stone",
+    };
+
     let mut remaining = amount;
     if let Some(mut treasury) = ctx.db.player_resources().owner().find(&owner) {
-        let from_treasury = remaining.min(treasury.timber);
-        treasury.timber -= from_treasury;
+        let from_treasury = match field {
+            AggregateSpendField::Timber => {
+                let withdraw = remaining.min(treasury.timber);
+                treasury.timber -= withdraw;
+                withdraw
+            }
+            AggregateSpendField::Stone => {
+                let withdraw = remaining.min(treasury.stone);
+                treasury.stone -= withdraw;
+                withdraw
+            }
+        };
         remaining -= from_treasury;
         ctx.db.player_resources().owner().update(treasury);
     }
+
     if remaining <= 1e-6 {
         return Ok(());
     }
+
     for building in ctx.db.building().owner().filter(&owner) {
         if remaining <= 1e-6 {
             break;
         }
-        let withdraw = remaining.min(building.timber);
+        let available = match field {
+            AggregateSpendField::Timber => building.timber,
+            AggregateSpendField::Stone => building.stone,
+        };
+        let withdraw = remaining.min(available);
         if withdraw <= 0.0 {
             continue;
         }
-        ctx.db.building().id().update(Building {
-            timber: building.timber - withdraw,
-            ..building
-        });
+        let updated = match field {
+            AggregateSpendField::Timber => Building {
+                timber: building.timber - withdraw,
+                ..building
+            },
+            AggregateSpendField::Stone => Building {
+                stone: building.stone - withdraw,
+                ..building
+            },
+        };
+        ctx.db.building().id().update(updated);
         remaining -= withdraw;
     }
+
     if remaining > 1e-6 {
         return Err(format!(
-            "Not enough timber (need {} more).",
+            "Not enough {resource_name} (need {} more).",
             remaining.round() as i64
         ));
     }
+
     Ok(())
 }
 
+pub fn spend_aggregate_timber(ctx: &ReducerContext, owner: spacetimedb::Identity, amount: f64) -> Result<(), String> {
+    spend_aggregate(ctx, owner, amount, AggregateSpendField::Timber)
+}
+
 pub fn spend_aggregate_stone(ctx: &ReducerContext, owner: spacetimedb::Identity, amount: f64) -> Result<(), String> {
-    if amount <= 0.0 {
-        return Ok(());
-    }
-    let mut remaining = amount;
-    if let Some(mut treasury) = ctx.db.player_resources().owner().find(&owner) {
-        let from_treasury = remaining.min(treasury.stone);
-        treasury.stone -= from_treasury;
-        remaining -= from_treasury;
-        ctx.db.player_resources().owner().update(treasury);
-    }
-    if remaining <= 1e-6 {
-        return Ok(());
-    }
-    for building in ctx.db.building().owner().filter(&owner) {
-        if remaining <= 1e-6 {
-            break;
-        }
-        let withdraw = remaining.min(building.stone);
-        if withdraw <= 0.0 {
-            continue;
-        }
-        ctx.db.building().id().update(Building {
-            stone: building.stone - withdraw,
-            ..building
-        });
-        remaining -= withdraw;
-    }
-    if remaining > 1e-6 {
-        return Err(format!(
-            "Not enough stone (need {} more).",
-            remaining.round() as i64
-        ));
-    }
-    Ok(())
+    spend_aggregate(ctx, owner, amount, AggregateSpendField::Stone)
 }
 
 pub fn credit_treasury_timber(ctx: &ReducerContext, owner: spacetimedb::Identity, amount: f64) {
@@ -191,15 +185,6 @@ fn treasury_stone(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
         .unwrap_or(0.0)
 }
 
-fn treasury_firewood(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
-    ctx.db
-        .player_resources()
-        .owner()
-        .find(&owner)
-        .map(|row| row.firewood)
-        .unwrap_or(0.0)
-}
-
 fn building_sum<F>(ctx: &ReducerContext, owner: spacetimedb::Identity, pick: F) -> f64
 where
     F: Fn(&Building) -> f64,
@@ -209,14 +194,5 @@ where
         .owner()
         .filter(&owner)
         .map(|building| pick(&building))
-        .sum()
-}
-
-fn residence_firewood_sum(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
-    ctx.db
-        .residence()
-        .owner()
-        .filter(&owner)
-        .map(|residence| residence.firewood_stock)
         .sum()
 }

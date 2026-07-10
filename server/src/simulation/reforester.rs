@@ -1,15 +1,20 @@
 use spacetimedb::ReducerContext;
 
+use crate::building_defs::building_def;
+use crate::constants::{REFORESTER_REGROW_PER_SEC, TICK_DT};
 use crate::db::*;
-
-use crate::constants::{REFORESTER_RADIUS, REFORESTER_REGROW_PER_SEC, TICK_DT};
 use crate::tables::{Building, TreeEntity};
 
 pub fn step_reforester(ctx: &ReducerContext, building: Building) {
+    let Some(def) = building_def(&building.kind) else {
+        return;
+    };
+    let work_radius = def.work_radius;
+
     for tree in ctx.db.tree_entity().iter() {
         let dx = tree.x - building.x;
         let dz = tree.z - building.z;
-        if dx * dx + dz * dz > REFORESTER_RADIUS * REFORESTER_RADIUS {
+        if dx * dx + dz * dz > work_radius * work_radius {
             continue;
         }
 
