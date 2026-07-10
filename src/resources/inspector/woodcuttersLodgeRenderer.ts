@@ -6,7 +6,6 @@ import {
 } from '../../generated/gameBalance.ts';
 import type { InspectableTarget } from '../types.ts';
 import {
-  buildingStorageCaps,
   lodgeDeliveryIntervalSeconds,
   lodgeFirewoodPerDelivery,
 } from '../resourceTotals.ts';
@@ -33,7 +32,6 @@ export function renderWoodcuttersLodgeInspector(
   const label = context.worldQueries.getBuildingLabel(building.kind);
   const cost = getBuildingCost(building.kind);
   const definition = getBuildingDefinition(building.kind);
-  const caps = buildingStorageCaps(building.kind);
   const connectedMills = context.worldQueries.getRoadConnectedMills(building);
   const claimedResidences = context.worldQueries.getClaimedResidencesForLodge(building);
   const millsWithTimber = connectedMills.filter((mill) => mill.timber > 0).length;

@@ -35,11 +35,7 @@ function snapNodes(network: RoadNetwork, x: number, z: number): string[] | null 
 
   for (const edge of network.edges.values()) {
     if (edge.sampledPath.length < 2) continue;
-    const dist = distancePointToPolylineXZ(
-      x,
-      z,
-      edge.sampledPath.map((point) => ({ x: point.x, z: point.z })),
-    );
+    const dist = distancePointToPolylineXZ(x, z, edge.sampledPath);
     if (dist > bestDistance + 1e-6) continue;
     if (dist < bestDistance - 1e-6) {
       bestDistance = dist;
