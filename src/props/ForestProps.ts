@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Terrain } from '../terrain/Terrain.ts';
-import { ForestManager, type ConiferForestInstances } from './ForestManager.ts';
+import { ForestManager, type MixedForestInstances } from './ForestManager.ts';
 import { applyTreeShadowReceiveFilter, setTreeShadowInstanceAttributes } from './treeShadowReceiveFilter.ts';
 import type { RendererBackendKind } from '../scene/RendererBackend.ts';
 import {
@@ -24,7 +24,8 @@ import {
 } from './forestField.ts';
 type ForestMaterialSet = {
   bark: THREE.MeshStandardMaterial;
-  needles: THREE.MeshStandardMaterial[];
+  coniferFoliage: THREE.MeshStandardMaterial;
+  broadleafFoliage: THREE.MeshStandardMaterial;
   rock: THREE.MeshStandardMaterial;
   shadowCast: THREE.MeshStandardMaterial;
   shadowDepth: THREE.MeshDepthMaterial;
@@ -34,8 +35,48 @@ type ForestMaterialSet = {
 type TreePlacement = {
   x: number;
   z: number;
-  form: 'narrow' | 'broad' | 'young' | 'midstory';
+  species: TreeSpecies;
+  form: TreeForm;
   scale: number;
+};
+
+type TreeForm = 'narrow' | 'broad' | 'young' | 'midstory';
+type TreeCanopyKind = 'conifer' | 'broadleaf';
+type ForestZone = 'core' | 'hillEdge' | 'sapling';
+
+type TreeSpecies =
+  | 'beech'
+  | 'silverFir'
+  | 'norwaySpruce'
+  | 'sycamoreMaple'
+  | 'norwayMaple'
+  | 'ash'
+  | 'wychElm'
+  | 'lime'
+  | 'hornbeam'
+  | 'sessileOak'
+  | 'scotsPine'
+  | 'larch';
+
+type LocalForestHabitat = {
+  density: number;
+  hillFactor: number;
+  dampRavine: number;
+  lowerWarmth: number;
+  poorerGround: number;
+  plantedPatch: number;
+};
+
+type TreeSpeciesProfile = {
+  canopy: TreeCanopyKind;
+  barkColor: number;
+  foliageColor: number;
+  heightMul: number;
+  spreadMul: number;
+  trunkMul: number;
+  lowWhorl: number;
+  crownSpan: number;
+  radiusPower: number;
 };
 
 type RockProfile = 'flat' | 'moderate' | 'tall';
@@ -83,10 +124,10 @@ export async function createForestProps(
   const hillEdgePlacements = createHillEdgeTreePlacements(rng, spawnConfig, treePlacements, isBlockedAt);
   const saplingPlacements = createSaplingPlacements(rng, forestCores, spawnConfig, treePlacements, isBlockedAt);
   const allTreePlacements = [...treePlacements, ...hillEdgePlacements, ...saplingPlacements];
-  const conifer = createConiferForest(allTreePlacements, terrain, materials, rng);
+  const treeInstances = createMixedMountainForest(allTreePlacements, terrain, materials, rng);
   const rockPlacements = createRockPlacements(rng, forestCores, allTreePlacements, spawnConfig, isBlockedAt);
 
-  forest.add(conifer.group);
+  forest.add(treeInstances.group);
   forest.add(
     createRockField(
       rockPlacements,
@@ -100,7 +141,7 @@ export async function createForestProps(
 
   return new ForestManager(
     forest,
-    conifer,
+    treeInstances,
     rockPlacements,
     null,
     [],
@@ -134,29 +175,17 @@ function createTreePlacements(
     const density = forestDensityAt(x, z, forestCores, spawnConfig.extent, spawnConfig.terrainExtent);
     if (density < 0.12 || rng() > density * 1.14) continue;
 
+    const habitat = sampleLocalForestHabitat(x, z, density, spawnConfig);
     const formNoise = valueNoise2(x * 0.025 + 37.2, z * 0.025 - 11.8);
-    const broadChance = THREE.MathUtils.clamp(0.18 + density * 0.34 + (formNoise - 0.5) * 0.22, 0.1, 0.48);
-    const youngChance = THREE.MathUtils.clamp(0.24 - density * 0.12, 0.08, 0.22);
-    const form: TreePlacement['form'] = rng() < broadChance ? 'broad' : rng() < youngChance ? 'young' : 'narrow';
-    const densitySpacing = THREE.MathUtils.lerp(1, 0.68, density);
-    const minDistance =
-      (form === 'broad'
-        ? THREE.MathUtils.lerp(7.2, 4.8, density)
-        : form === 'young'
-          ? THREE.MathUtils.lerp(4.8, 3.2, density)
-          : THREE.MathUtils.lerp(6.1, 3.6, density)) * densitySpacing;
+    const species = pickTreeSpecies(rng, habitat, 'core');
+    const form = pickTreeForm(rng, species, habitat, 'core', formNoise);
+    const scale = pickTreeScale(rng, species, form, habitat);
+    const minDistance = getTreePlacementSpacing(species, form, scale, habitat);
     if (!hasMinimumDistance(placements, x, z, minDistance)) continue;
 
-    const scale =
-      form === 'broad'
-        ? THREE.MathUtils.lerp(1.05, 1.78, Math.pow(rng(), 0.76)) * THREE.MathUtils.lerp(1.08, 0.94, density)
-        : form === 'young'
-          ? THREE.MathUtils.lerp(0.64, 0.92, Math.pow(rng(), 0.7))
-          : THREE.MathUtils.lerp(0.88, 1.68, Math.pow(rng(), 0.68)) * THREE.MathUtils.lerp(1.04, 0.92, density);
+    if (isTreePlacementBlocked(x, z, species, form, scale, isBlockedAt)) continue;
 
-    if (isTreePlacementBlocked(x, z, form, scale, isBlockedAt)) continue;
-
-    placements.push({ x, z, form, scale });
+    placements.push({ x, z, species, form, scale });
   }
 
   return placements;
@@ -183,21 +212,18 @@ function createHillEdgeTreePlacements(
     const density = forestDensityAt(x, z, [], spawnConfig.extent, spawnConfig.terrainExtent);
     if (rng() > 0.22 + hillFactor * 0.74) continue;
 
+    const habitat = sampleLocalForestHabitat(x, z, THREE.MathUtils.clamp(density + hillFactor * 0.42, 0, 1), spawnConfig);
     const formNoise = valueNoise2(x * 0.025 + 37.2, z * 0.025 - 11.8);
-    const broadChance = THREE.MathUtils.clamp(0.28 + density * 0.28 + (formNoise - 0.5) * 0.16, 0.16, 0.52);
-    const form: TreePlacement['form'] = rng() < broadChance ? 'broad' : 'narrow';
-    const minDistance = THREE.MathUtils.lerp(4.6, 2.2, hillFactor);
+    const species = pickTreeSpecies(rng, habitat, 'hillEdge');
+    const form = pickTreeForm(rng, species, habitat, 'hillEdge', formNoise);
+    const scale = pickTreeScale(rng, species, form, habitat);
+    const minDistance = getTreePlacementSpacing(species, form, scale, habitat) * THREE.MathUtils.lerp(0.9, 0.62, hillFactor);
     if (!hasMinimumDistance(placements, x, z, minDistance)) continue;
     if (distanceToNearest(existingTrees, x, z) < minDistance * 0.82) continue;
 
-    const scale =
-      form === 'broad'
-        ? THREE.MathUtils.lerp(1.12, 1.86, Math.pow(rng(), 0.72)) * THREE.MathUtils.lerp(1.02, 0.96, hillFactor)
-        : THREE.MathUtils.lerp(0.96, 1.74, Math.pow(rng(), 0.64)) * THREE.MathUtils.lerp(1.06, 0.98, hillFactor);
+    if (isTreePlacementBlocked(x, z, species, form, scale, isBlockedAt)) continue;
 
-    if (isTreePlacementBlocked(x, z, form, scale, isBlockedAt)) continue;
-
-    placements.push({ x, z, form, scale });
+    placements.push({ x, z, species, form, scale });
   }
 
   return placements;
@@ -227,17 +253,366 @@ function createSaplingPlacements(
     const minDistance = THREE.MathUtils.lerp(2.8, 1.9, density);
     if (!hasMinimumDistance(placements, x, z, minDistance)) continue;
     if (distanceToNearest(existingTrees, x, z) < 2.4) continue;
-    if (isTreePlacementBlocked(x, z, 'midstory', 0.8, isBlockedAt)) continue;
+    const habitat = sampleLocalForestHabitat(x, z, density, spawnConfig);
+    const species = pickTreeSpecies(rng, habitat, 'sapling');
+    const form = pickTreeForm(rng, species, habitat, 'sapling', valueNoise2(x * 0.032, z * 0.032));
+    const scale = pickTreeScale(rng, species, form, habitat);
+    if (isTreePlacementBlocked(x, z, species, form, scale, isBlockedAt)) continue;
 
     placements.push({
       x,
       z,
-      form: 'midstory',
-      scale: THREE.MathUtils.lerp(0.84, 1.18, Math.pow(rng(), 0.82)),
+      species,
+      form,
+      scale,
     });
   }
 
   return placements;
+}
+
+function sampleLocalForestHabitat(
+  x: number,
+  z: number,
+  density: number,
+  spawnConfig: ForestSpawnConfig,
+): LocalForestHabitat {
+  const hillFactor = getEdgeHillFactor(x, z, spawnConfig.playableSize, spawnConfig.terrainSize);
+  const dampNoise = fbm2(x * 0.017 + 9.4, z * 0.017 - 12.8, 4);
+  const warmNoise = fbm2(x * 0.007 - 41.6, z * 0.007 + 27.1, 3);
+  const poorNoise = fbm2(x * 0.021 + 18.2, z * 0.021 - 5.7, 3);
+  const plantedNoise = fbm2(x * 0.012 - 34.6, z * 0.012 + 2.1, 3);
+
+  return {
+    density,
+    hillFactor,
+    dampRavine: saturate(smoothstep(0.52, 0.84, dampNoise) * (1 - hillFactor * 0.34) + density * 0.16),
+    lowerWarmth: saturate(smoothstep(0.48, 0.78, warmNoise) * (1 - hillFactor * 0.82)),
+    poorerGround: saturate(smoothstep(0.56, 0.86, poorNoise) * (0.42 + hillFactor * 0.48)),
+    plantedPatch: saturate(smoothstep(0.62, 0.88, plantedNoise) * (0.28 + hillFactor * 0.86)),
+  };
+}
+
+function pickTreeSpecies(rng: () => number, habitat: LocalForestHabitat, zone: ForestZone): TreeSpecies {
+  const weights: Array<{ species: TreeSpecies; weight: number }> = [];
+  const cold = habitat.hillFactor;
+  const damp = habitat.dampRavine;
+  const warm = habitat.lowerWarmth;
+  const poor = habitat.poorerGround;
+  const planted = habitat.plantedPatch;
+  const edgeLight = 1 - habitat.density;
+
+  addSpeciesWeight(weights, 'beech', 34 + damp * 6 + warm * 7 - cold * 8);
+  addSpeciesWeight(weights, 'silverFir', 30 + cold * 17 + damp * 5 + habitat.density * 4);
+  addSpeciesWeight(weights, 'norwaySpruce', 10 + cold * 22 + planted * 9 + poor * 3);
+  addSpeciesWeight(weights, 'sycamoreMaple', 4 + damp * 9 + warm * 2);
+  addSpeciesWeight(weights, 'norwayMaple', 2.6 + warm * 5 + edgeLight * 1.6);
+  addSpeciesWeight(weights, 'ash', 1.8 + damp * 7);
+  addSpeciesWeight(weights, 'wychElm', 1.3 + damp * 5.2);
+  addSpeciesWeight(weights, 'lime', 1.8 + warm * 4.4);
+  addSpeciesWeight(weights, 'hornbeam', 0.9 + warm * 6.5 + edgeLight * 1.2);
+  addSpeciesWeight(weights, 'sessileOak', 0.65 + warm * 5.4 + edgeLight * 2.2);
+  addSpeciesWeight(weights, 'scotsPine', 0.8 + poor * 6.8 + edgeLight * 1.2);
+  addSpeciesWeight(weights, 'larch', 0.24 + planted * 4.8 + cold * 0.8);
+
+  if (zone === 'hillEdge') {
+    multiplySpeciesWeight(weights, 'beech', 0.68);
+    multiplySpeciesWeight(weights, 'silverFir', 1.18);
+    multiplySpeciesWeight(weights, 'norwaySpruce', 1.5);
+    multiplySpeciesWeight(weights, 'larch', 1.7);
+    multiplySpeciesWeight(weights, 'sessileOak', 0.34);
+    multiplySpeciesWeight(weights, 'hornbeam', 0.45);
+    multiplySpeciesWeight(weights, 'lime', 0.58);
+  } else if (zone === 'sapling') {
+    multiplySpeciesWeight(weights, 'beech', 1.18);
+    multiplySpeciesWeight(weights, 'silverFir', 1.1);
+    multiplySpeciesWeight(weights, 'norwaySpruce', 0.92);
+    multiplySpeciesWeight(weights, 'sycamoreMaple', 1.2);
+    multiplySpeciesWeight(weights, 'hornbeam', 1.32);
+    multiplySpeciesWeight(weights, 'sessileOak', 0.42);
+    multiplySpeciesWeight(weights, 'scotsPine', 0.55);
+    multiplySpeciesWeight(weights, 'larch', 0.38);
+  }
+
+  return pickWeightedSpecies(weights, rng);
+}
+
+function addSpeciesWeight(
+  weights: Array<{ species: TreeSpecies; weight: number }>,
+  species: TreeSpecies,
+  weight: number,
+): void {
+  weights.push({ species, weight: Math.max(0.04, weight) });
+}
+
+function multiplySpeciesWeight(
+  weights: Array<{ species: TreeSpecies; weight: number }>,
+  species: TreeSpecies,
+  multiplier: number,
+): void {
+  const entry = weights.find((candidate) => candidate.species === species);
+  if (entry) entry.weight *= multiplier;
+}
+
+function pickWeightedSpecies(
+  weights: Array<{ species: TreeSpecies; weight: number }>,
+  rng: () => number,
+): TreeSpecies {
+  const total = weights.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = rng() * total;
+  for (const entry of weights) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.species;
+  }
+  return 'beech';
+}
+
+function pickTreeForm(
+  rng: () => number,
+  species: TreeSpecies,
+  habitat: LocalForestHabitat,
+  zone: ForestZone,
+  formNoise: number,
+): TreeForm {
+  const profile = getTreeSpeciesProfile(species);
+  if (zone === 'sapling') return profile.canopy === 'conifer' ? 'young' : 'midstory';
+
+  const youngChance = THREE.MathUtils.clamp(
+    0.2 - habitat.density * 0.12 + habitat.hillFactor * 0.05 + (formNoise - 0.5) * 0.08,
+    0.06,
+    0.24,
+  );
+  if (profile.canopy === 'conifer') return rng() < youngChance ? 'young' : 'narrow';
+
+  const subcanopyBias =
+    species === 'hornbeam'
+      ? 0.34
+      : species === 'lime' || species === 'norwayMaple'
+        ? 0.16
+        : species === 'ash' || species === 'wychElm'
+          ? 0.1
+          : 0.04;
+  const midstoryChance = THREE.MathUtils.clamp(
+    subcanopyBias + habitat.density * 0.12 + habitat.dampRavine * 0.08 - habitat.lowerWarmth * 0.04,
+    0.02,
+    0.42,
+  );
+  if (rng() < youngChance * 0.48) return 'young';
+  if (rng() < midstoryChance) return 'midstory';
+  return 'broad';
+}
+
+function pickTreeScale(
+  rng: () => number,
+  species: TreeSpecies,
+  form: TreeForm,
+  habitat: LocalForestHabitat,
+): number {
+  const profile = getTreeSpeciesProfile(species);
+  if (form === 'young') {
+    const highSiteMul = profile.canopy === 'conifer' ? THREE.MathUtils.lerp(0.96, 1.1, habitat.hillFactor) : 1;
+    return THREE.MathUtils.lerp(0.58, 0.98, Math.pow(rng(), 0.72)) * highSiteMul;
+  }
+  if (form === 'midstory') {
+    const dampMul = THREE.MathUtils.lerp(0.92, 1.12, habitat.dampRavine);
+    return THREE.MathUtils.lerp(0.78, 1.22, Math.pow(rng(), 0.82)) * dampMul;
+  }
+
+  const densityMul = THREE.MathUtils.lerp(1.08, 0.94, habitat.density);
+  const highSiteMul =
+    profile.canopy === 'conifer'
+      ? THREE.MathUtils.lerp(0.98, 1.1, habitat.hillFactor)
+      : THREE.MathUtils.lerp(1.05, 0.93, habitat.hillFactor);
+  const speciesScale =
+    species === 'silverFir'
+      ? THREE.MathUtils.lerp(1.04, 1.82, Math.pow(rng(), 0.66))
+      : species === 'norwaySpruce'
+        ? THREE.MathUtils.lerp(0.94, 1.66, Math.pow(rng(), 0.7))
+        : species === 'beech'
+          ? THREE.MathUtils.lerp(1.0, 1.7, Math.pow(rng(), 0.72))
+          : species === 'sessileOak'
+            ? THREE.MathUtils.lerp(0.9, 1.5, Math.pow(rng(), 0.8))
+            : species === 'scotsPine'
+              ? THREE.MathUtils.lerp(0.88, 1.48, Math.pow(rng(), 0.74))
+              : species === 'larch'
+                ? THREE.MathUtils.lerp(0.92, 1.56, Math.pow(rng(), 0.72))
+                : THREE.MathUtils.lerp(0.86, 1.48, Math.pow(rng(), 0.78));
+  return speciesScale * densityMul * highSiteMul;
+}
+
+function getTreePlacementSpacing(
+  species: TreeSpecies,
+  form: TreeForm,
+  scale: number,
+  habitat: LocalForestHabitat,
+): number {
+  const profile = getTreeSpeciesProfile(species);
+  const canopyRadius = getEstimatedCanopyRadius(species, form, scale);
+  const densitySpacing = THREE.MathUtils.lerp(1.08, 0.72, habitat.density);
+  const formMul = form === 'young' ? 0.86 : form === 'midstory' ? 0.78 : profile.canopy === 'broadleaf' ? 1.12 : 0.96;
+  const habitatMul = THREE.MathUtils.lerp(1.04, 0.86, habitat.hillFactor);
+  return Math.max(form === 'young' || form === 'midstory' ? 2.2 : 3.4, canopyRadius * densitySpacing * formMul * habitatMul);
+}
+
+function getEstimatedCanopyRadius(species: TreeSpecies, form: TreeForm, scale: number): number {
+  const profile = getTreeSpeciesProfile(species);
+  if (form === 'young') return 2.1 * scale * profile.spreadMul;
+  if (form === 'midstory') return 2.5 * scale * profile.spreadMul;
+  if (profile.canopy === 'broadleaf') return 4.2 * scale * profile.spreadMul;
+  return 3.15 * scale * profile.spreadMul;
+}
+
+function getTreeSpeciesProfile(species: TreeSpecies): TreeSpeciesProfile {
+  switch (species) {
+    case 'beech':
+      return {
+        canopy: 'broadleaf',
+        barkColor: 0xbbb7aa,
+        foliageColor: 0x6f8f53,
+        heightMul: 1.04,
+        spreadMul: 1.04,
+        trunkMul: 0.92,
+        lowWhorl: 0.5,
+        crownSpan: 0.38,
+        radiusPower: 0.82,
+      };
+    case 'silverFir':
+      return {
+        canopy: 'conifer',
+        barkColor: 0x77766d,
+        foliageColor: 0x526b45,
+        heightMul: 1.18,
+        spreadMul: 1.1,
+        trunkMul: 1.04,
+        lowWhorl: 0.16,
+        crownSpan: 0.78,
+        radiusPower: 1.08,
+      };
+    case 'norwaySpruce':
+      return {
+        canopy: 'conifer',
+        barkColor: 0x5c5147,
+        foliageColor: 0x46583f,
+        heightMul: 1.1,
+        spreadMul: 0.86,
+        trunkMul: 0.94,
+        lowWhorl: 0.13,
+        crownSpan: 0.82,
+        radiusPower: 1.38,
+      };
+    case 'sycamoreMaple':
+      return {
+        canopy: 'broadleaf',
+        barkColor: 0x8b8679,
+        foliageColor: 0x779a5a,
+        heightMul: 0.98,
+        spreadMul: 1.08,
+        trunkMul: 0.9,
+        lowWhorl: 0.46,
+        crownSpan: 0.42,
+        radiusPower: 0.78,
+      };
+    case 'norwayMaple':
+      return {
+        canopy: 'broadleaf',
+        barkColor: 0x756f63,
+        foliageColor: 0x829c54,
+        heightMul: 0.9,
+        spreadMul: 1.0,
+        trunkMul: 0.86,
+        lowWhorl: 0.45,
+        crownSpan: 0.43,
+        radiusPower: 0.8,
+      };
+    case 'ash':
+      return {
+        canopy: 'broadleaf',
+        barkColor: 0x8f897d,
+        foliageColor: 0x6d8b5c,
+        heightMul: 1.02,
+        spreadMul: 0.92,
+        trunkMul: 0.82,
+        lowWhorl: 0.55,
+        crownSpan: 0.34,
+        radiusPower: 0.9,
+      };
+    case 'wychElm':
+      return {
+        canopy: 'broadleaf',
+        barkColor: 0x675d51,
+        foliageColor: 0x5f8053,
+        heightMul: 0.94,
+        spreadMul: 0.98,
+        trunkMul: 0.9,
+        lowWhorl: 0.48,
+        crownSpan: 0.4,
+        radiusPower: 0.82,
+      };
+    case 'lime':
+      return {
+        canopy: 'broadleaf',
+        barkColor: 0x7a7468,
+        foliageColor: 0x789b58,
+        heightMul: 0.86,
+        spreadMul: 1.04,
+        trunkMul: 0.84,
+        lowWhorl: 0.43,
+        crownSpan: 0.44,
+        radiusPower: 0.74,
+      };
+    case 'hornbeam':
+      return {
+        canopy: 'broadleaf',
+        barkColor: 0xa5a094,
+        foliageColor: 0x66864f,
+        heightMul: 0.72,
+        spreadMul: 0.86,
+        trunkMul: 0.7,
+        lowWhorl: 0.38,
+        crownSpan: 0.5,
+        radiusPower: 0.84,
+      };
+    case 'sessileOak':
+      return {
+        canopy: 'broadleaf',
+        barkColor: 0x5d5144,
+        foliageColor: 0x657a43,
+        heightMul: 0.9,
+        spreadMul: 1.18,
+        trunkMul: 1.08,
+        lowWhorl: 0.42,
+        crownSpan: 0.43,
+        radiusPower: 0.72,
+      };
+    case 'scotsPine':
+      return {
+        canopy: 'conifer',
+        barkColor: 0x9a6b42,
+        foliageColor: 0x5c7045,
+        heightMul: 1,
+        spreadMul: 0.78,
+        trunkMul: 0.84,
+        lowWhorl: 0.36,
+        crownSpan: 0.52,
+        radiusPower: 1.0,
+      };
+    case 'larch':
+      return {
+        canopy: 'conifer',
+        barkColor: 0x7d5e43,
+        foliageColor: 0x8fa85c,
+        heightMul: 0.98,
+        spreadMul: 0.82,
+        trunkMul: 0.86,
+        lowWhorl: 0.24,
+        crownSpan: 0.7,
+        radiusPower: 1.16,
+      };
+    default: {
+      const _exhaustive: never = species;
+      throw new Error(`Unhandled tree species: ${_exhaustive}`);
+    }
+  }
 }
 
 async function createForestMaterials(maxAnisotropy: number, enableTreeShadowFilter: boolean): Promise<ForestMaterialSet> {
@@ -252,7 +627,7 @@ async function createForestMaterials(maxAnisotropy: number, enableTreeShadowFilt
 
   const bark = new THREE.MeshStandardMaterial({
     map: barkMap,
-    color: 0x6f5844,
+    color: 0xffffff,
     roughness: 0.94,
     metalness: 0,
   });
@@ -267,17 +642,24 @@ async function createForestMaterials(maxAnisotropy: number, enableTreeShadowFilt
   });
   rock.normalScale.set(0.55, 0.55);
 
-  const needles = [
-    new THREE.MeshStandardMaterial({
-      map: foliageTextures.needleMap,
-      roughnessMap: foliageTextures.needleRoughnessMap,
-      color: 0xffffff,
-      roughness: 0.98,
-      metalness: 0,
-      side: THREE.DoubleSide,
-    }),
-  ];
-  if (enableTreeShadowFilter) applyTreeShadowReceiveFilter(needles[0]);
+  const coniferFoliage = new THREE.MeshStandardMaterial({
+    map: foliageTextures.needleMap,
+    roughnessMap: foliageTextures.needleRoughnessMap,
+    color: 0xffffff,
+    roughness: 0.98,
+    metalness: 0,
+    side: THREE.DoubleSide,
+  });
+  const broadleafFoliage = new THREE.MeshStandardMaterial({
+    map: foliageTextures.needleMap,
+    roughnessMap: foliageTextures.needleRoughnessMap,
+    color: 0xffffff,
+    roughness: 0.98,
+    metalness: 0,
+    side: THREE.DoubleSide,
+  });
+  if (enableTreeShadowFilter) applyTreeShadowReceiveFilter(coniferFoliage);
+  if (enableTreeShadowFilter) applyTreeShadowReceiveFilter(broadleafFoliage);
   if (enableTreeShadowFilter) applyTreeShadowReceiveFilter(bark);
 
   return {
@@ -292,7 +674,8 @@ async function createForestMaterials(maxAnisotropy: number, enableTreeShadowFilt
     shadowDepth: new THREE.MeshDepthMaterial({
       depthPacking: THREE.RGBADepthPacking,
     }),
-    needles,
+    coniferFoliage,
+    broadleafFoliage,
     textures,
   };
 }
@@ -333,15 +716,15 @@ function createPineBarkTexture(maxAnisotropy: number): THREE.Texture {
 function isTreePlacementBlocked(
   x: number,
   z: number,
-  form: TreePlacement['form'],
+  species: TreeSpecies,
+  form: TreeForm,
   scale: number,
   isBlockedAt?: (x: number, z: number) => boolean,
 ): boolean {
   if (!isBlockedAt) return false;
   if (isBlockedAt(x, z)) return true;
 
-  const canopyRadius =
-    form === 'broad' ? 3.5 * scale : form === 'young' || form === 'midstory' ? 1.9 * scale : 2.9 * scale;
+  const canopyRadius = getEstimatedCanopyRadius(species, form, scale) * 0.86;
   for (let i = 0; i < 6; i++) {
     const angle = (i / 6) * TAU;
     if (isBlockedAt(x + Math.cos(angle) * canopyRadius, z + Math.sin(angle) * canopyRadius)) return true;
@@ -466,53 +849,49 @@ function rockSuitabilityAt(
   return saturate(forestEdge * 0.38 + stoneNoise * 0.4 + openGround * 0.14 + ridgeBias);
 }
 
-function createConiferForest(
+function createMixedMountainForest(
   placements: TreePlacement[],
   terrain: Terrain,
   materials: ForestMaterialSet,
   rng: () => number,
-): ConiferForestInstances {
+): MixedForestInstances {
   const group = new THREE.Group();
-  group.name = 'Instanced pine forest';
-  if (placements.length === 0) {
-    return {
-      group,
-      trunkMesh: new THREE.InstancedMesh(new THREE.CylinderGeometry(0.28, 1, 1, 8, 1, false), materials.bark, 0),
-      foliageMesh: new THREE.InstancedMesh(createPineTierGeometry(), materials.needles[0], 0),
-      shadowTierMesh: new THREE.InstancedMesh(createPineShadowTierGeometry(), materials.shadowCast, 0),
-      placements,
-      layerCounts: [],
-      foliageStartIndex: [],
-      trunkMatrices: [],
-      foliageMatrices: [],
-    };
-  }
+  group.name = 'Instanced Gorski kotar mixed mountain forest';
 
   const trunkGeometry = new THREE.CylinderGeometry(0.28, 1, 1, 8, 1, false);
-  const tierGeometry = createPineTierGeometry();
-  const shadowTierGeometry = createPineShadowTierGeometry();
+  const coniferGeometry = createPineTierGeometry();
+  const coniferShadowGeometry = createPineShadowTierGeometry();
+  const broadleafGeometry = createPineTierGeometry();
+  const broadleafShadowGeometry = createPineShadowTierGeometry();
   const trunkMesh = new THREE.InstancedMesh(trunkGeometry, materials.bark, placements.length);
-  const layerCounts = placements.map((placement) => {
-    const formLayers =
-      placement.form === 'broad'
-        ? 10
-        : placement.form === 'young'
-          ? 5
-          : placement.form === 'midstory'
-            ? 5
-            : 8;
-    return formLayers + Math.floor(rng() * 2);
-  });
-  const totalLayers = layerCounts.reduce((sum, count) => sum + count, 0);
-  const foliageMesh = new THREE.InstancedMesh(tierGeometry, materials.needles[0], totalLayers);
-  const shadowTierMesh = new THREE.InstancedMesh(shadowTierGeometry, materials.shadowCast, totalLayers);
-  const foliageStartIndex: number[] = [];
+  const coniferLayerCounts = placements.map((placement) => getConiferLayerCount(placement, rng));
+  const broadleafLayerCounts = placements.map((placement) => getBroadleafLayerCount(placement, rng));
+  const coniferStartIndex: number[] = [];
+  const broadleafStartIndex: number[] = [];
+  let totalConiferLayers = 0;
+  let totalBroadleafLayers = 0;
+  for (let i = 0; i < placements.length; i++) {
+    coniferStartIndex[i] = totalConiferLayers;
+    broadleafStartIndex[i] = totalBroadleafLayers;
+    totalConiferLayers += coniferLayerCounts[i];
+    totalBroadleafLayers += broadleafLayerCounts[i];
+  }
+
+  const coniferFoliageMesh = new THREE.InstancedMesh(coniferGeometry, materials.coniferFoliage, totalConiferLayers);
+  const broadleafFoliageMesh = new THREE.InstancedMesh(broadleafGeometry, materials.broadleafFoliage, totalBroadleafLayers);
+  const coniferShadowMesh = new THREE.InstancedMesh(coniferShadowGeometry, materials.shadowCast, totalConiferLayers);
+  const broadleafShadowMesh = new THREE.InstancedMesh(broadleafShadowGeometry, materials.shadowCast, totalBroadleafLayers);
   const trunkMatrices = placements.map(() => new THREE.Matrix4());
-  const foliageMatrices = Array.from({ length: totalLayers }, () => new THREE.Matrix4());
-  const foliageTreeRoots = new Float32Array(totalLayers * 2);
-  const foliageTreeBaseYs = new Float32Array(totalLayers);
-  const foliageTreeHeights = new Float32Array(totalLayers);
-  const foliageCanopyRadii = new Float32Array(totalLayers);
+  const coniferFoliageMatrices = Array.from({ length: totalConiferLayers }, () => new THREE.Matrix4());
+  const broadleafFoliageMatrices = Array.from({ length: totalBroadleafLayers }, () => new THREE.Matrix4());
+  const coniferTreeRoots = new Float32Array(totalConiferLayers * 2);
+  const coniferTreeBaseYs = new Float32Array(totalConiferLayers);
+  const coniferTreeHeights = new Float32Array(totalConiferLayers);
+  const coniferCanopyRadii = new Float32Array(totalConiferLayers);
+  const broadleafTreeRoots = new Float32Array(totalBroadleafLayers * 2);
+  const broadleafTreeBaseYs = new Float32Array(totalBroadleafLayers);
+  const broadleafTreeHeights = new Float32Array(totalBroadleafLayers);
+  const broadleafCanopyRadii = new Float32Array(totalBroadleafLayers);
   const trunkTreeRoots = new Float32Array(placements.length * 2);
   const trunkTreeBaseYs = new Float32Array(placements.length);
   const trunkTreeHeights = new Float32Array(placements.length);
@@ -522,113 +901,411 @@ function createConiferForest(
   const scaleVector = new THREE.Vector3();
   const position = new THREE.Vector3();
   const color = new THREE.Color();
-  let layerIndex = 0;
+  const root = new THREE.Vector3();
+  let coniferLayerIndex = 0;
+  let broadleafLayerIndex = 0;
 
-  trunkMesh.name = 'Instanced pine trunks';
+  trunkMesh.name = 'Instanced mixed forest trunks';
   trunkMesh.castShadow = true;
   trunkMesh.receiveShadow = true;
-  shadowTierMesh.name = 'Instanced pine shadow tiers';
-  shadowTierMesh.layers.set(TREE_SHADOW_CAST_LAYER);
-  shadowTierMesh.castShadow = true;
-  shadowTierMesh.receiveShadow = false;
-  shadowTierMesh.customDepthMaterial = materials.shadowDepth;
-  foliageMesh.name = 'Instanced pine needle tiers';
-  foliageMesh.castShadow = false;
-  foliageMesh.receiveShadow = true;
+  coniferShadowMesh.name = 'Instanced conifer crown shadows';
+  coniferShadowMesh.layers.set(TREE_SHADOW_CAST_LAYER);
+  coniferShadowMesh.castShadow = true;
+  coniferShadowMesh.receiveShadow = false;
+  coniferShadowMesh.customDepthMaterial = materials.shadowDepth;
+  broadleafShadowMesh.name = 'Instanced broadleaf crown shadows';
+  broadleafShadowMesh.layers.set(TREE_SHADOW_CAST_LAYER);
+  broadleafShadowMesh.castShadow = true;
+  broadleafShadowMesh.receiveShadow = false;
+  broadleafShadowMesh.customDepthMaterial = materials.shadowDepth;
+  coniferFoliageMesh.name = 'Instanced fir spruce pine larch tiers';
+  coniferFoliageMesh.castShadow = false;
+  coniferFoliageMesh.receiveShadow = true;
+  broadleafFoliageMesh.name = 'Instanced beech maple ash elm lime oak textured tiers';
+  broadleafFoliageMesh.castShadow = false;
+  broadleafFoliageMesh.receiveShadow = true;
 
   placements.forEach((placement, treeIndex) => {
+    const profile = getTreeSpeciesProfile(placement.species);
     const rootY = terrain.getHeightAt(placement.x, placement.z);
-    const isBroad = placement.form === 'broad';
     const isYoung = placement.form === 'young';
     const isMidstory = placement.form === 'midstory';
-    const heightMul = isBroad ? 0.88 : isYoung ? 0.72 : isMidstory ? 0.44 : 1.14;
-    const spreadMul = isBroad ? 1.48 : isYoung ? 0.74 : isMidstory ? 0.9 : 1.06;
-    const trunkMul = isBroad ? 1.2 : isYoung || isMidstory ? 0.68 : 1;
-    const height = isMidstory
-      ? (4.2 + rng() * 2.4) * placement.scale
-      : (15 + rng() * 7) * placement.scale * heightMul;
-    const trunkRadius = (0.28 + rng() * 0.13) * placement.scale * trunkMul;
-    const lean = new THREE.Vector3((rng() - 0.5) * 0.045, 1, (rng() - 0.5) * 0.045).normalize();
-    const lowWhorl = isBroad ? 0.14 : isMidstory ? 0.3 : isYoung ? 0.24 : 0.17;
-    const highWhorlSpan = isYoung || isMidstory ? 0.68 : 0.78;
-    const topTierHeight =
-      (2.02 * (1 - (isBroad ? 0.25 : 0.36)) + 0.18) * placement.scale * (isYoung || isMidstory ? 0.74 : 1);
-    const tierApexLocal = 0.44;
-    const trunkHeight = height * (lowWhorl + highWhorlSpan) + tierApexLocal * topTierHeight * 0.72;
-    const trunkTop = new THREE.Vector3(placement.x, rootY, placement.z).addScaledVector(lean, trunkHeight);
-    composeBranchMatrix(new THREE.Vector3(placement.x, rootY, placement.z), trunkTop, trunkRadius, matrix, quaternion, scaleVector, position);
+    const height = getRenderedTreeHeight(placement, profile, rng);
+    const trunkRadius = getRenderedTrunkRadius(placement, profile, rng);
+    const lean = new THREE.Vector3(
+      (rng() - 0.5) * (profile.canopy === 'broadleaf' ? 0.058 : 0.042),
+      1,
+      (rng() - 0.5) * (profile.canopy === 'broadleaf' ? 0.058 : 0.042),
+    ).normalize();
+    const crownTop = Math.min(0.97, profile.lowWhorl + profile.crownSpan + (isYoung ? 0.06 : 0.02));
+    const trunkHeight =
+      profile.canopy === 'broadleaf'
+        ? height * (isMidstory ? 0.74 : 0.82)
+        : height * crownTop + 0.38 * placement.scale;
+    root.set(placement.x, rootY, placement.z);
+    const trunkTop = root.clone().addScaledVector(lean, trunkHeight);
+    composeBranchMatrix(root, trunkTop, trunkRadius, matrix, quaternion, scaleVector, position);
     trunkMesh.setMatrixAt(treeIndex, matrix);
     trunkMatrices[treeIndex].copy(matrix);
+    color.set(profile.barkColor).offsetHSL((rng() - 0.5) * 0.012, (rng() - 0.5) * 0.04, (rng() - 0.5) * 0.08);
+    trunkMesh.setColorAt(treeIndex, color);
 
-    const layers = layerCounts[treeIndex];
-    foliageStartIndex[treeIndex] = layerIndex;
-    const yawOffset = rng() * TAU;
-    let maxTierRadius = 0;
-
-    for (let i = 0; i < layers; i++) {
-      const t = layers > 1 ? i / (layers - 1) : 0;
-      const whorl = lowWhorl + t * highWhorlSpan;
-      const tierRadius =
-        (3.35 * Math.pow(1 - t, isBroad ? 0.98 : 1.16) + (isYoung || isMidstory ? 0.36 : 0.5)) *
-        placement.scale *
-        spreadMul *
-        (0.94 + rng() * 0.12);
-      const tierHeight =
-        (2.02 * (1 - t * (isBroad ? 0.25 : 0.36)) + 0.18) * placement.scale * (isYoung || isMidstory ? 0.74 : 1);
-      const sway = (1 - t) * (isBroad ? 0.42 : 0.5);
-      position.set(
-        placement.x + lean.x * height * whorl + Math.cos(yawOffset + i * 1.74) * sway * rng(),
-        rootY + height * whorl,
-        placement.z + lean.z * height * whorl + Math.sin(yawOffset + i * 1.74) * sway * rng(),
+    let treeCanopyRadius = getEstimatedCanopyRadius(placement.species, placement.form, placement.scale);
+    if (profile.canopy === 'conifer') {
+      treeCanopyRadius = Math.max(
+        treeCanopyRadius,
+        placeConiferCrown({
+          placement,
+          profile,
+          rootY,
+          height,
+          lean,
+          rng,
+          layers: coniferLayerCounts[treeIndex],
+          coniferFoliageMesh,
+          coniferShadowMesh,
+          coniferFoliageMatrices,
+          coniferTreeRoots,
+          coniferTreeBaseYs,
+          coniferTreeHeights,
+          coniferCanopyRadii,
+          startIndex: coniferLayerIndex,
+          matrix,
+          quaternion,
+          scaleVector,
+          position,
+          color,
+        }),
       );
-      quaternion.setFromEuler(new THREE.Euler((rng() - 0.5) * 0.075, yawOffset + i * 0.83, (rng() - 0.5) * 0.075));
-      scaleVector.set(tierRadius, tierHeight, tierRadius * (0.9 + rng() * 0.16));
-      maxTierRadius = Math.max(maxTierRadius, tierRadius);
-      matrix.compose(position, quaternion, scaleVector);
-      foliageMesh.setMatrixAt(layerIndex, matrix);
-      shadowTierMesh.setMatrixAt(layerIndex, matrix);
-      foliageMatrices[layerIndex].copy(matrix);
-      color
-        .set(t < 0.42 ? 0xd1dcc4 : t < 0.76 ? 0xe1e8d0 : 0xc5cfb7)
-        .offsetHSL((rng() - 0.5) * 0.014, (rng() - 0.5) * 0.035, (rng() - 0.5) * 0.045);
-      foliageMesh.setColorAt(layerIndex, color);
-      foliageTreeRoots[layerIndex * 2] = placement.x;
-      foliageTreeRoots[layerIndex * 2 + 1] = placement.z;
-      foliageTreeBaseYs[layerIndex] = rootY;
-      foliageTreeHeights[layerIndex] = height;
-      layerIndex++;
+      coniferLayerIndex += coniferLayerCounts[treeIndex];
+    } else {
+      treeCanopyRadius = Math.max(
+        treeCanopyRadius,
+        placeBroadleafCrown({
+          placement,
+          profile,
+          rootY,
+          height,
+          lean,
+          rng,
+          layers: broadleafLayerCounts[treeIndex],
+          broadleafFoliageMesh,
+          broadleafShadowMesh,
+          broadleafFoliageMatrices,
+          broadleafTreeRoots,
+          broadleafTreeBaseYs,
+          broadleafTreeHeights,
+          broadleafCanopyRadii,
+          startIndex: broadleafLayerIndex,
+          matrix,
+          quaternion,
+          scaleVector,
+          position,
+          color,
+        }),
+      );
+      broadleafLayerIndex += broadleafLayerCounts[treeIndex];
     }
 
-    const treeCanopyRadius = maxTierRadius * 1.06;
     trunkTreeRoots[treeIndex * 2] = placement.x;
     trunkTreeRoots[treeIndex * 2 + 1] = placement.z;
     trunkTreeBaseYs[treeIndex] = rootY;
     trunkTreeHeights[treeIndex] = height;
     trunkCanopyRadii[treeIndex] = treeCanopyRadius;
-    for (let i = 0; i < layers; i++) {
-      foliageCanopyRadii[foliageStartIndex[treeIndex] + i] = treeCanopyRadius;
-    }
   });
 
   setTreeShadowInstanceAttributes(trunkGeometry, trunkTreeRoots, trunkTreeBaseYs, trunkTreeHeights, trunkCanopyRadii);
-  setTreeShadowInstanceAttributes(tierGeometry, foliageTreeRoots, foliageTreeBaseYs, foliageTreeHeights, foliageCanopyRadii);
+  setTreeShadowInstanceAttributes(coniferGeometry, coniferTreeRoots, coniferTreeBaseYs, coniferTreeHeights, coniferCanopyRadii);
+  setTreeShadowInstanceAttributes(broadleafGeometry, broadleafTreeRoots, broadleafTreeBaseYs, broadleafTreeHeights, broadleafCanopyRadii);
 
   trunkMesh.instanceMatrix.needsUpdate = true;
-  shadowTierMesh.instanceMatrix.needsUpdate = true;
-  foliageMesh.instanceMatrix.needsUpdate = true;
-  if (foliageMesh.instanceColor) foliageMesh.instanceColor.needsUpdate = true;
-  group.add(trunkMesh, shadowTierMesh, foliageMesh);
+  coniferShadowMesh.instanceMatrix.needsUpdate = true;
+  broadleafShadowMesh.instanceMatrix.needsUpdate = true;
+  coniferFoliageMesh.instanceMatrix.needsUpdate = true;
+  broadleafFoliageMesh.instanceMatrix.needsUpdate = true;
+  if (trunkMesh.instanceColor) trunkMesh.instanceColor.needsUpdate = true;
+  if (coniferFoliageMesh.instanceColor) coniferFoliageMesh.instanceColor.needsUpdate = true;
+  if (broadleafFoliageMesh.instanceColor) broadleafFoliageMesh.instanceColor.needsUpdate = true;
+  group.add(trunkMesh, coniferShadowMesh, broadleafShadowMesh, coniferFoliageMesh, broadleafFoliageMesh);
   return {
     group,
     trunkMesh,
-    foliageMesh,
-    shadowTierMesh,
+    coniferFoliageMesh,
+    broadleafFoliageMesh,
+    coniferShadowMesh,
+    broadleafShadowMesh,
     placements,
-    layerCounts,
-    foliageStartIndex,
+    coniferLayerCounts,
+    broadleafLayerCounts,
+    coniferStartIndex,
+    broadleafStartIndex,
     trunkMatrices,
-    foliageMatrices,
+    coniferFoliageMatrices,
+    broadleafFoliageMatrices,
   };
+}
+
+function getConiferLayerCount(placement: TreePlacement, rng: () => number): number {
+  if (getTreeSpeciesProfile(placement.species).canopy !== 'conifer') return 0;
+  const base =
+    placement.form === 'young'
+      ? 5
+      : placement.species === 'norwaySpruce'
+        ? 9
+        : placement.species === 'silverFir'
+          ? 8
+          : placement.species === 'scotsPine'
+            ? 6
+            : 7;
+  return base + Math.floor(rng() * 2);
+}
+
+function getBroadleafLayerCount(placement: TreePlacement, rng: () => number): number {
+  if (getTreeSpeciesProfile(placement.species).canopy !== 'broadleaf') return 0;
+  const base =
+    placement.form === 'young'
+      ? 4
+      : placement.form === 'midstory'
+        ? 5
+        : placement.species === 'sessileOak'
+          ? 10
+          : placement.species === 'ash'
+            ? 7
+            : 8;
+  return base + Math.floor(rng() * 3);
+}
+
+function getRenderedTreeHeight(
+  placement: TreePlacement,
+  profile: TreeSpeciesProfile,
+  rng: () => number,
+): number {
+  const base =
+    placement.form === 'midstory'
+      ? 4.8 + rng() * 3.8
+      : placement.form === 'young'
+        ? 7.2 + rng() * 4.4
+        : 15.5 + rng() * 7.5;
+  const formMul = placement.form === 'young' ? 0.78 : placement.form === 'midstory' ? 0.82 : 1;
+  return Math.min(47.5, base * placement.scale * profile.heightMul * formMul);
+}
+
+function getRenderedTrunkRadius(
+  placement: TreePlacement,
+  profile: TreeSpeciesProfile,
+  rng: () => number,
+): number {
+  const formMul = placement.form === 'young' || placement.form === 'midstory' ? 0.68 : 1;
+  return (0.25 + rng() * 0.14) * placement.scale * profile.trunkMul * formMul;
+}
+
+function placeConiferCrown(options: {
+  placement: TreePlacement;
+  profile: TreeSpeciesProfile;
+  rootY: number;
+  height: number;
+  lean: THREE.Vector3;
+  rng: () => number;
+  layers: number;
+  coniferFoliageMesh: THREE.InstancedMesh;
+  coniferShadowMesh: THREE.InstancedMesh;
+  coniferFoliageMatrices: THREE.Matrix4[];
+  coniferTreeRoots: Float32Array;
+  coniferTreeBaseYs: Float32Array;
+  coniferTreeHeights: Float32Array;
+  coniferCanopyRadii: Float32Array;
+  startIndex: number;
+  matrix: THREE.Matrix4;
+  quaternion: THREE.Quaternion;
+  scaleVector: THREE.Vector3;
+  position: THREE.Vector3;
+  color: THREE.Color;
+}): number {
+  const {
+    placement,
+    profile,
+    rootY,
+    height,
+    lean,
+    rng,
+    layers,
+    coniferFoliageMesh,
+    coniferShadowMesh,
+    coniferFoliageMatrices,
+    coniferTreeRoots,
+    coniferTreeBaseYs,
+    coniferTreeHeights,
+    coniferCanopyRadii,
+    startIndex,
+    matrix,
+    quaternion,
+    scaleVector,
+    position,
+    color,
+  } = options;
+  const yawOffset = rng() * TAU;
+  const isYoung = placement.form === 'young';
+  const lowWhorl = Math.min(isYoung ? Math.max(profile.lowWhorl, 0.22) : profile.lowWhorl, 0.42);
+  const crownSpan = Math.min(profile.crownSpan * (isYoung ? 0.78 : 1), 0.86 - lowWhorl);
+  const scaleMul = isYoung ? 0.74 : 1;
+  let maxTierRadius = 0;
+
+  for (let i = 0; i < layers; i++) {
+    const t = layers > 1 ? i / (layers - 1) : 0;
+    const layerIndex = startIndex + i;
+    const whorl = lowWhorl + t * crownSpan;
+    const tierRadius =
+      (3.15 * Math.pow(1 - t, profile.radiusPower) + (isYoung ? 0.34 : 0.5)) *
+      placement.scale *
+      profile.spreadMul *
+      scaleMul *
+      (0.92 + rng() * 0.16);
+    const tierHeight =
+      (1.95 * (1 - t * (placement.species === 'norwaySpruce' ? 0.28 : 0.36)) + 0.18) *
+      placement.scale *
+      scaleMul *
+      (placement.species === 'silverFir' ? 0.9 : placement.species === 'norwaySpruce' ? 1.08 : 1);
+    const sway = (1 - t) * (placement.species === 'scotsPine' ? 0.7 : 0.46);
+
+    position.set(
+      placement.x + lean.x * height * whorl + Math.cos(yawOffset + i * 1.74) * sway * rng(),
+      rootY + height * whorl,
+      placement.z + lean.z * height * whorl + Math.sin(yawOffset + i * 1.74) * sway * rng(),
+    );
+    quaternion.setFromEuler(
+      new THREE.Euler((rng() - 0.5) * 0.075, yawOffset + i * 0.83, (rng() - 0.5) * 0.075),
+    );
+    scaleVector.set(tierRadius, tierHeight, tierRadius * (0.9 + rng() * 0.16));
+    maxTierRadius = Math.max(maxTierRadius, tierRadius);
+    matrix.compose(position, quaternion, scaleVector);
+    coniferFoliageMesh.setMatrixAt(layerIndex, matrix);
+    coniferShadowMesh.setMatrixAt(layerIndex, matrix);
+    coniferFoliageMatrices[layerIndex].copy(matrix);
+    color
+      .set(profile.foliageColor)
+      .offsetHSL((rng() - 0.5) * 0.018, (rng() - 0.5) * 0.052, (t - 0.45) * 0.055 + (rng() - 0.5) * 0.04);
+    coniferFoliageMesh.setColorAt(layerIndex, color);
+    coniferTreeRoots[layerIndex * 2] = placement.x;
+    coniferTreeRoots[layerIndex * 2 + 1] = placement.z;
+    coniferTreeBaseYs[layerIndex] = rootY;
+    coniferTreeHeights[layerIndex] = height;
+  }
+
+  const canopyRadius = maxTierRadius * 1.06;
+  for (let i = 0; i < layers; i++) {
+    coniferCanopyRadii[startIndex + i] = canopyRadius;
+  }
+  return canopyRadius;
+}
+
+function placeBroadleafCrown(options: {
+  placement: TreePlacement;
+  profile: TreeSpeciesProfile;
+  rootY: number;
+  height: number;
+  lean: THREE.Vector3;
+  rng: () => number;
+  layers: number;
+  broadleafFoliageMesh: THREE.InstancedMesh;
+  broadleafShadowMesh: THREE.InstancedMesh;
+  broadleafFoliageMatrices: THREE.Matrix4[];
+  broadleafTreeRoots: Float32Array;
+  broadleafTreeBaseYs: Float32Array;
+  broadleafTreeHeights: Float32Array;
+  broadleafCanopyRadii: Float32Array;
+  startIndex: number;
+  matrix: THREE.Matrix4;
+  quaternion: THREE.Quaternion;
+  scaleVector: THREE.Vector3;
+  position: THREE.Vector3;
+  color: THREE.Color;
+}): number {
+  const {
+    placement,
+    profile,
+    rootY,
+    height,
+    lean,
+    rng,
+    layers,
+    broadleafFoliageMesh,
+    broadleafShadowMesh,
+    broadleafFoliageMatrices,
+    broadleafTreeRoots,
+    broadleafTreeBaseYs,
+    broadleafTreeHeights,
+    broadleafCanopyRadii,
+    startIndex,
+    matrix,
+    quaternion,
+    scaleVector,
+    position,
+    color,
+  } = options;
+  const yawOffset = rng() * TAU;
+  const isYoung = placement.form === 'young';
+  const isMidstory = placement.form === 'midstory';
+  const crownBase = Math.min(isYoung ? Math.max(profile.lowWhorl, 0.28) : profile.lowWhorl, 0.64);
+  const crownSpan = Math.min(profile.crownSpan * (isMidstory ? 0.78 : isYoung ? 0.72 : 1), 0.94 - crownBase);
+  const scaleMul = isYoung ? 0.72 : isMidstory ? 0.82 : 1;
+  const crownBreadth =
+    placement.species === 'sessileOak'
+      ? 1.14
+      : placement.species === 'ash'
+        ? 0.86
+        : placement.species === 'hornbeam'
+          ? 0.84
+          : 1;
+  let maxTierRadius = 0;
+
+  for (let i = 0; i < layers; i++) {
+    const layerIndex = startIndex + i;
+    const t = layers > 1 ? i / (layers - 1) : 0;
+    const whorl = crownBase + t * crownSpan;
+    const shoulder = 1 - Math.abs(t - 0.34) * 0.44;
+    const tierRadius =
+      (2.95 * Math.pow(1 - t * 0.72, profile.radiusPower) * shoulder + 0.42) *
+      placement.scale *
+      profile.spreadMul *
+      crownBreadth *
+      scaleMul *
+      (0.9 + rng() * 0.18);
+    const tierHeight =
+      (1.48 * (1 - t * 0.2) + 0.22) *
+      placement.scale *
+      scaleMul *
+      (placement.species === 'ash' || placement.species === 'wychElm' ? 1.08 : 1);
+    const sway = (1 - t) * (placement.species === 'sessileOak' ? 0.82 : 0.52);
+
+    position.set(
+      placement.x + lean.x * height * whorl + Math.cos(yawOffset + i * 1.58) * sway * rng(),
+      rootY + height * whorl,
+      placement.z + lean.z * height * whorl + Math.sin(yawOffset + i * 1.58) * sway * rng(),
+    );
+    quaternion.setFromEuler(
+      new THREE.Euler((rng() - 0.5) * 0.08, yawOffset + i * 0.92, (rng() - 0.5) * 0.08),
+    );
+    scaleVector.set(tierRadius, tierHeight, tierRadius * (0.88 + rng() * 0.18));
+    maxTierRadius = Math.max(maxTierRadius, tierRadius);
+    matrix.compose(position, quaternion, scaleVector);
+    broadleafFoliageMesh.setMatrixAt(layerIndex, matrix);
+    broadleafShadowMesh.setMatrixAt(layerIndex, matrix);
+    broadleafFoliageMatrices[layerIndex].copy(matrix);
+    color
+      .set(profile.foliageColor)
+      .offsetHSL((rng() - 0.5) * 0.026, (rng() - 0.5) * 0.08, (rng() - 0.5) * 0.075);
+    broadleafFoliageMesh.setColorAt(layerIndex, color);
+    broadleafTreeRoots[layerIndex * 2] = placement.x;
+    broadleafTreeRoots[layerIndex * 2 + 1] = placement.z;
+    broadleafTreeBaseYs[layerIndex] = rootY;
+    broadleafTreeHeights[layerIndex] = height;
+  }
+
+  const canopyRadius = maxTierRadius * 1.08;
+  for (let i = 0; i < layers; i++) {
+    broadleafCanopyRadii[startIndex + i] = canopyRadius;
+  }
+  return canopyRadius;
 }
 
 function composeBranchMatrix(
@@ -884,6 +1561,7 @@ function disposeForestMaterials(materials: ForestMaterialSet): void {
   materials.rock.dispose();
   materials.shadowCast.dispose();
   materials.shadowDepth.dispose();
-  materials.needles.forEach((material) => material.dispose());
+  materials.coniferFoliage.dispose();
+  materials.broadleafFoliage.dispose();
   materials.textures.forEach((texture) => texture.dispose());
 }

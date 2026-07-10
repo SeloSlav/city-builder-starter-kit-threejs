@@ -4,7 +4,7 @@ import type { MossyRockTextureSet } from '../utils/propTextureLoad.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
 import { RiverField } from './RiverField.ts';
 import { createRiverBankMeshes } from './RiverBankMesh.ts';
-import { createRiverReeds } from './RiverReeds.ts';
+import { createRiverReeds, type RiverReedField } from './RiverReeds.ts';
 import { createRiverShoreStones } from './RiverShoreStones.ts';
 import { createRiverWaterMesh, disposeSharedRiverWaterMaterial } from './RiverWaterMesh.ts';
 import type { RockObstacle } from '../utils/pathGeometry.ts';
@@ -29,8 +29,16 @@ function createPropShadowMaterials(): {
 export type RiverSystem = {
   field: RiverField;
   group: THREE.Group;
+  reedsGroup: THREE.Group;
   shoreRockPlacements: ReadonlyArray<RockObstacle>;
   isBlockedAt: (x: number, z: number) => boolean;
+  isGrassBlockedAt: (x: number, z: number) => boolean;
+  updateCameraState: (
+    cameraPosition: THREE.Vector3,
+    cameraTarget: THREE.Vector3,
+    cameraDistance: number,
+    firstPersonActive?: boolean,
+  ) => void;
   tick: (dt: number, timeSec: number) => void;
   dispose: () => void;
 };
@@ -50,7 +58,7 @@ export function createRiverSystem(
   const waterController = createRiverWaterMesh(group, terrain, riverField);
   const shoreStones = createRiverShoreStones(terrain, riverField, rockMaterial, rockShadowMaterials, rng);
   const bankMeshes = createRiverBankMeshes(terrain, riverField, bankMaterial);
-  const reeds = createRiverReeds(terrain, riverField, rng);
+  const reeds: RiverReedField = createRiverReeds(terrain, riverField, mulberry32(0x8eed1212));
   group.add(shoreStones.group, bankMeshes, reeds.group);
 
   const dispose = () => {
@@ -68,8 +76,13 @@ export function createRiverSystem(
   return {
     field: riverField,
     group,
+    reedsGroup: reeds.group,
     shoreRockPlacements: shoreStones.placements,
     isBlockedAt: (x, z) => riverField.isBlockedForProps(x, z),
+    isGrassBlockedAt: (x, z) => riverField.isGrassBlockedAt(x, z),
+    updateCameraState: (cameraPosition, cameraTarget, cameraDistance, firstPersonActive) => {
+      reeds.updateCameraState(cameraPosition, cameraTarget, cameraDistance, firstPersonActive);
+    },
     tick: (dt, timeSec) => waterController?.tick(dt, timeSec),
     dispose,
   };

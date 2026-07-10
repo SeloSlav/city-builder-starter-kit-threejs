@@ -52,6 +52,19 @@ declare module 'three/webgpu' {
     opacity: number;
     depthWrite: boolean;
     alphaMap: THREE.Texture | null;
+    backdropNode: unknown;
+    backdropAlphaNode: unknown;
+  }
+
+  export class MeshPhysicalNodeMaterial extends MeshStandardNodeMaterial {
+    ior: number;
+    transmission: number;
+    thickness: number;
+    attenuationDistance: number;
+    attenuationColor: THREE.Color;
+    specularIntensity: number;
+    thicknessNode: unknown;
+    specularIntensityNode: unknown;
   }
 
   export class RenderPipeline {
@@ -80,9 +93,16 @@ declare module 'three/tsl' {
   export const sin: (value: TslNode) => TslNode;
   export const min: (a: TslNode, b: TslNode) => TslNode;
   export const max: (a: TslNode, b: TslNode) => TslNode;
+  export const abs: (value: TslNode) => TslNode;
   export const cameraPosition: TslNode;
   export const positionWorld: TslNode;
+  export const dot: (a: TslNode, b: TslNode) => TslNode;
   export const distance: (a: TslNode, b: TslNode) => TslNode;
   export const sub: (a: TslNode, b: TslNode) => TslNode;
+  export const normalize: (value: TslNode) => TslNode;
+  export const normalView: TslNode;
+  export const screenUV: TslNode;
+  export const viewportSafeUV: (uv?: TslNode) => TslNode;
+  export const viewportSharedTexture: (uv?: TslNode) => TslNode;
   export function uniform<T>(value: T): { value: T };
 }

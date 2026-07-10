@@ -195,12 +195,12 @@ function buildCorridor(
     let halfWidth = lerp(2.4, 12, Math.pow(progress, 0.68)) * scale;
     const headwaterBlend = 1 - smoothstep(0, 0.18, progress);
     halfWidth = lerp(halfWidth, Math.max(halfWidth, 8.5 * scale), headwaterBlend);
-    let channelDepth = lerp(0.7, 2.2, Math.pow(progress, 0.82)) * scale;
-    channelDepth = lerp(channelDepth, Math.max(channelDepth, 1.35 * scale), headwaterBlend * 0.75);
+    let channelDepth = lerp(0.9, 2.65, Math.pow(progress, 0.82)) * scale;
+    channelDepth = lerp(channelDepth, Math.max(channelDepth, 1.65 * scale), headwaterBlend * 0.75);
     const distToDrain = Math.hypot(point.x - drain.x, point.z - drain.z);
     const mouthBlend = 1 - smoothstep(0, 130, distToDrain);
     halfWidth = lerp(halfWidth, 26, mouthBlend * 0.82);
-    channelDepth = lerp(channelDepth, 3.1, mouthBlend * 0.6);
+    channelDepth = lerp(channelDepth, 3.65, mouthBlend * 0.6);
     return { x: point.x, z: point.z, progress, halfWidth, channelDepth };
   });
 
@@ -265,7 +265,7 @@ function sampleConfluenceLake(
   const radius = CONFLUENCE_LAKE_RADIUS + shoreNoise;
   if (dist > radius * 1.05) return { mask: 0, depth: 0 };
   const mask = 1 - smoothstep(radius * 0.2, radius, dist);
-  const depth = (1 - smoothstep(radius * 0.15, radius, dist)) * 3.5;
+  const depth = (1 - smoothstep(radius * 0.15, radius, dist)) * 4.1;
   return { mask, depth };
 }
 

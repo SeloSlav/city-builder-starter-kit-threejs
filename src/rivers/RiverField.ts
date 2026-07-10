@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import type { TerrainBounds } from '../terrain/Terrain.ts';
 import type { RiverLayout } from './RiverLayout.ts';
 import { buildOrganicShoreSignedDistance, computeShoreSignedDistance, dilateRiverMask } from './organicShoreField.ts';
@@ -8,12 +9,15 @@ export type RiverFieldOptions = {
   resolution?: number;
 };
 
-const DEFAULT_RESOLUTION = 296;
+const DEFAULT_RESOLUTION = 512;
 const WATER_THRESHOLD = 0.48;
 const MASK_DILATE_THRESHOLD = 0.38;
 const RENDER_WATER_MASK_THRESHOLD = MASK_DILATE_THRESHOLD;
 const MASK_DILATE_RADIUS = 1.75;
 const SHORE_BAND_MAX = 5.2;
+const SHORE_MUD_FADE_START = 0.18;
+const SHORE_MUD_FADE_SPAN = 10.8;
+const SHORE_ORGANIC_DISTANCE_BLEND = 0.34;
 
 export class RiverField {
   readonly resolution: number;
@@ -137,15 +141,25 @@ export class RiverField {
 
   sampleMudBlendAt(x: number, z: number): number {
     if (this.isRenderedWetAt(x, z)) return 0;
-    const shore = this.sampleShoreDistance(x, z);
-    const t = clamp01((shore - 0.1) / 9.2);
+    const gridShore = this.sampleShoreDistance(x, z);
+    const cellStep = (this.stepX + this.stepZ) * 0.5;
+    const organicShore = Math.max(0, -this.sampleOrganicSignedDistance(x, z)) * cellStep;
+    const shore = THREE.MathUtils.lerp(gridShore, organicShore, SHORE_ORGANIC_DISTANCE_BLEND);
+    const t = clamp01((shore - SHORE_MUD_FADE_START) / SHORE_MUD_FADE_SPAN);
     const fade = t * t * (3 - 2 * t);
     return 1 - fade;
   }
 
   isBlockedForProps(x: number, z: number, margin = 4.2): boolean {
-    if (this.isWaterAt(x, z)) return true;
+    if (this.isRenderedWetAt(x, z)) return true;
     return this.sampleShoreDistance(x, z) < margin;
+  }
+
+  /** Close-up grass tufts — keep off water and the river-edge reed band. */
+  isGrassBlockedAt(x: number, z: number): boolean {
+    if (this.isRenderedWetAt(x, z)) return true;
+    const shore = this.sampleShoreDistance(x, z);
+    return shore >= 0.45 && shore <= SHORE_BAND_MAX;
   }
 
   isShoreStoneCandidate(x: number, z: number): boolean {
@@ -155,6 +169,28 @@ export class RiverField {
 
   sampleShoreDistance(x: number, z: number): number {
     return sampleBilinear(this.shoreDistance, this.resolution, this.worldToGrid(x, z));
+  }
+
+  createShoreBlendTexture(): THREE.DataTexture {
+    const { resolution, startX, startZ, stepX, stepZ } = this;
+    const data = new Uint8Array(resolution * resolution);
+    for (let iz = 0; iz < resolution; iz++) {
+      for (let ix = 0; ix < resolution; ix++) {
+        const x = startX + ix * stepX;
+        const z = startZ + iz * stepZ;
+        data[iz * resolution + ix] = Math.round(this.sampleMudBlendAt(x, z) * 255);
+      }
+    }
+
+    const texture = new THREE.DataTexture(data, resolution, resolution, THREE.RedFormat, THREE.UnsignedByteType);
+    texture.colorSpace = THREE.NoColorSpace;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+    return texture;
   }
 
   forEachWetCell(callback: (x: number, z: number, mask: number, gridX: number, gridZ: number) => void): void {

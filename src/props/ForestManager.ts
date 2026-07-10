@@ -18,19 +18,25 @@ type TreePlacement = {
   x: number;
   z: number;
   form: 'narrow' | 'broad' | 'young' | 'midstory';
+  species: string;
   scale: number;
 };
 
-export type ConiferForestInstances = {
+export type MixedForestInstances = {
   group: THREE.Group;
   trunkMesh: THREE.InstancedMesh;
-  foliageMesh: THREE.InstancedMesh;
-  shadowTierMesh: THREE.InstancedMesh;
+  coniferFoliageMesh: THREE.InstancedMesh;
+  broadleafFoliageMesh: THREE.InstancedMesh;
+  coniferShadowMesh: THREE.InstancedMesh;
+  broadleafShadowMesh: THREE.InstancedMesh;
   placements: TreePlacement[];
-  layerCounts: number[];
-  foliageStartIndex: number[];
+  coniferLayerCounts: number[];
+  broadleafLayerCounts: number[];
+  coniferStartIndex: number[];
+  broadleafStartIndex: number[];
   trunkMatrices: THREE.Matrix4[];
-  foliageMatrices: THREE.Matrix4[];
+  coniferFoliageMatrices: THREE.Matrix4[];
+  broadleafFoliageMatrices: THREE.Matrix4[];
 };
 
 export class ForestManager {
@@ -39,12 +45,17 @@ export class ForestManager {
   private readonly disposeResources: () => void;
   private readonly placements: TreePlacement[];
   private readonly trunkMesh: THREE.InstancedMesh;
-  private readonly foliageMesh: THREE.InstancedMesh;
-  private readonly shadowTierMesh: THREE.InstancedMesh;
-  private readonly layerCounts: number[];
-  private readonly foliageStartIndex: number[];
+  private readonly coniferFoliageMesh: THREE.InstancedMesh;
+  private readonly broadleafFoliageMesh: THREE.InstancedMesh;
+  private readonly coniferShadowMesh: THREE.InstancedMesh;
+  private readonly broadleafShadowMesh: THREE.InstancedMesh;
+  private readonly coniferLayerCounts: number[];
+  private readonly broadleafLayerCounts: number[];
+  private readonly coniferStartIndex: number[];
+  private readonly broadleafStartIndex: number[];
   private readonly trunkMatrices: THREE.Matrix4[];
-  private readonly foliageMatrices: THREE.Matrix4[];
+  private readonly coniferFoliageMatrices: THREE.Matrix4[];
+  private readonly broadleafFoliageMatrices: THREE.Matrix4[];
   private readonly undergrowth: UndergrowthInstances | null;
   private readonly undergrowthPlacements: UndergrowthPlacement[];
   private readonly stumpMesh: THREE.InstancedMesh;
@@ -55,7 +66,7 @@ export class ForestManager {
 
   constructor(
     root: THREE.Group,
-    conifer: ConiferForestInstances,
+    forestInstances: MixedForestInstances,
     rockPlacements: ReadonlyArray<RockObstacle>,
     undergrowth: UndergrowthInstances | null,
     undergrowthPlacements: UndergrowthPlacement[],
@@ -65,14 +76,19 @@ export class ForestManager {
     this.group = root;
     this.rockPlacements = rockPlacements;
     this.disposeResources = disposeResources;
-    this.placements = conifer.placements;
-    this.trunkMesh = conifer.trunkMesh;
-    this.foliageMesh = conifer.foliageMesh;
-    this.shadowTierMesh = conifer.shadowTierMesh;
-    this.layerCounts = conifer.layerCounts;
-    this.foliageStartIndex = conifer.foliageStartIndex;
-    this.trunkMatrices = conifer.trunkMatrices;
-    this.foliageMatrices = conifer.foliageMatrices;
+    this.placements = forestInstances.placements;
+    this.trunkMesh = forestInstances.trunkMesh;
+    this.coniferFoliageMesh = forestInstances.coniferFoliageMesh;
+    this.broadleafFoliageMesh = forestInstances.broadleafFoliageMesh;
+    this.coniferShadowMesh = forestInstances.coniferShadowMesh;
+    this.broadleafShadowMesh = forestInstances.broadleafShadowMesh;
+    this.coniferLayerCounts = forestInstances.coniferLayerCounts;
+    this.broadleafLayerCounts = forestInstances.broadleafLayerCounts;
+    this.coniferStartIndex = forestInstances.coniferStartIndex;
+    this.broadleafStartIndex = forestInstances.broadleafStartIndex;
+    this.trunkMatrices = forestInstances.trunkMatrices;
+    this.coniferFoliageMatrices = forestInstances.coniferFoliageMatrices;
+    this.broadleafFoliageMatrices = forestInstances.broadleafFoliageMatrices;
     this.undergrowth = undergrowth;
     this.undergrowthPlacements = undergrowthPlacements;
     this.terrain = terrain;
@@ -99,8 +115,10 @@ export class ForestManager {
 
     this.removedTrees = nextRemoved;
     this.trunkMesh.instanceMatrix.needsUpdate = true;
-    this.foliageMesh.instanceMatrix.needsUpdate = true;
-    this.shadowTierMesh.instanceMatrix.needsUpdate = true;
+    this.coniferFoliageMesh.instanceMatrix.needsUpdate = true;
+    this.broadleafFoliageMesh.instanceMatrix.needsUpdate = true;
+    this.coniferShadowMesh.instanceMatrix.needsUpdate = true;
+    this.broadleafShadowMesh.instanceMatrix.needsUpdate = true;
 
     this.syncUndergrowthClearance(edges);
     this.syncRoadStumps(network);
@@ -160,23 +178,53 @@ export class ForestManager {
 
   private hideTree(treeIndex: number): void {
     this.trunkMesh.setMatrixAt(treeIndex, this.hiddenMatrix);
-    const foliageStart = this.foliageStartIndex[treeIndex];
-    const foliageCount = this.layerCounts[treeIndex];
-    for (let i = 0; i < foliageCount; i++) {
-      const layerIndex = foliageStart + i;
-      this.foliageMesh.setMatrixAt(layerIndex, this.hiddenMatrix);
-      this.shadowTierMesh.setMatrixAt(layerIndex, this.hiddenMatrix);
-    }
+    this.hideConiferLayers(treeIndex);
+    this.hideBroadleafLayers(treeIndex);
   }
 
   private showTree(treeIndex: number): void {
     this.trunkMesh.setMatrixAt(treeIndex, this.trunkMatrices[treeIndex]);
-    const foliageStart = this.foliageStartIndex[treeIndex];
-    const foliageCount = this.layerCounts[treeIndex];
+    this.showConiferLayers(treeIndex);
+    this.showBroadleafLayers(treeIndex);
+  }
+
+  private hideConiferLayers(treeIndex: number): void {
+    const foliageStart = this.coniferStartIndex[treeIndex];
+    const foliageCount = this.coniferLayerCounts[treeIndex];
     for (let i = 0; i < foliageCount; i++) {
       const layerIndex = foliageStart + i;
-      this.foliageMesh.setMatrixAt(layerIndex, this.foliageMatrices[layerIndex]);
-      this.shadowTierMesh.setMatrixAt(layerIndex, this.foliageMatrices[layerIndex]);
+      this.coniferFoliageMesh.setMatrixAt(layerIndex, this.hiddenMatrix);
+      this.coniferShadowMesh.setMatrixAt(layerIndex, this.hiddenMatrix);
+    }
+  }
+
+  private showConiferLayers(treeIndex: number): void {
+    const foliageStart = this.coniferStartIndex[treeIndex];
+    const foliageCount = this.coniferLayerCounts[treeIndex];
+    for (let i = 0; i < foliageCount; i++) {
+      const layerIndex = foliageStart + i;
+      this.coniferFoliageMesh.setMatrixAt(layerIndex, this.coniferFoliageMatrices[layerIndex]);
+      this.coniferShadowMesh.setMatrixAt(layerIndex, this.coniferFoliageMatrices[layerIndex]);
+    }
+  }
+
+  private hideBroadleafLayers(treeIndex: number): void {
+    const foliageStart = this.broadleafStartIndex[treeIndex];
+    const foliageCount = this.broadleafLayerCounts[treeIndex];
+    for (let i = 0; i < foliageCount; i++) {
+      const layerIndex = foliageStart + i;
+      this.broadleafFoliageMesh.setMatrixAt(layerIndex, this.hiddenMatrix);
+      this.broadleafShadowMesh.setMatrixAt(layerIndex, this.hiddenMatrix);
+    }
+  }
+
+  private showBroadleafLayers(treeIndex: number): void {
+    const foliageStart = this.broadleafStartIndex[treeIndex];
+    const foliageCount = this.broadleafLayerCounts[treeIndex];
+    for (let i = 0; i < foliageCount; i++) {
+      const layerIndex = foliageStart + i;
+      this.broadleafFoliageMesh.setMatrixAt(layerIndex, this.broadleafFoliageMatrices[layerIndex]);
+      this.broadleafShadowMesh.setMatrixAt(layerIndex, this.broadleafFoliageMatrices[layerIndex]);
     }
   }
 }

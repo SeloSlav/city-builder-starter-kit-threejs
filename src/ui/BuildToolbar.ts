@@ -44,6 +44,7 @@ export class BuildToolbar {
       onOpenRoads: () => void;
       onBuildRoad: () => void;
       onMenuOpenChange?: (open: boolean) => void;
+      canOpenMenuFromKeyboard?: () => boolean;
     },
   ) {
     root.innerHTML = `
@@ -95,6 +96,7 @@ export class BuildToolbar {
               <li><span>Pan map</span><span class="road-controls-key">R-drag / WASD</span></li>
               <li><span>Rotate view</span><span class="road-controls-key">MMB / Q E</span></li>
               <li><span>Zoom</span><span class="road-controls-key">Scroll</span></li>
+              <li><span>Open menu</span><span class="road-controls-key">Esc</span></li>
               <li><span>Walk mode</span><span class="road-controls-key">~</span></li>
               <li><span>Road tool</span><span class="road-controls-key">R</span></li>
             </ul>
@@ -160,6 +162,7 @@ export class BuildToolbar {
     this.gameMenu = new GameMenu(root, {
       onTipsPreferenceChange: () => this.syncContextPanels(),
       onOpenChange: handlers.onMenuOpenChange,
+      canOpenFromKeyboard: handlers.canOpenMenuFromKeyboard,
     });
     this.unsubscribeTipsPreference = subscribeTipCardsPreference(() => this.syncContextPanels());
 

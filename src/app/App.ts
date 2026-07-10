@@ -114,6 +114,7 @@ export class App {
       onMenuOpenChange: (open) => {
         cameraController.setInputEnabled(!open && !firstPersonController.isActive());
       },
+      canOpenMenuFromKeyboard: () => !firstPersonController.isActive(),
     });
     const toastManager = new ToastManager(uiRoot);
 

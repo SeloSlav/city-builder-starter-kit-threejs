@@ -1,44 +1,61 @@
 import * as THREE from 'three';
-import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import {
+  abs,
   attribute,
+  cameraPosition,
+  dot,
   float,
   min,
   mix,
+  normalize,
+  normalView,
   positionLocal,
+  positionWorld,
   pow,
+  screenUV,
   sin,
   smoothstep,
+  sub,
   time,
   vec3,
+  viewportSafeUV,
+  viewportSharedTexture,
 } from 'three/tsl';
 
 type TslNode = {
   add(value: TslNode | number): TslNode;
   sub(value: TslNode | number): TslNode;
   mul(value: TslNode | number): TslNode;
+  div(value: TslNode | number): TslNode;
+  pow(value: TslNode | number): TslNode;
   y: TslNode;
   x: TslNode;
   z: TslNode;
+  xy: TslNode;
+  rgb: TslNode;
 };
 
-const WATER_BODY_COLOR = vec3(0.2, 0.44, 0.52) as TslNode;
-const WATER_FOAM_COLOR = vec3(0.84, 0.91, 0.9) as TslNode;
-const WATER_BASE_OPACITY = 0.84;
+const WATER_FOAM_COLOR = vec3(0.86, 0.93, 0.91) as TslNode;
+const MENISCUS_COLOR = vec3(0.93, 0.97, 0.95) as TslNode;
+const SHALLOW_WATER_TINT = vec3(0.24, 0.46, 0.42) as TslNode;
+const DEEP_WATER_TINT = vec3(0.08, 0.17, 0.15) as TslNode;
 const SHORE_LAP_MAX = 0.11;
-const SHORE_FOAM_MAX = 0.68;
+const SHORE_FOAM_MAX = 0.72;
 
 function buildRiverWaterShaderNodes() {
   const foamBaseAttr = attribute('foamBase', 'float') as TslNode;
   const featherAttr = attribute('featherAlpha', 'float') as TslNode;
   const simDeltaAttr = attribute('simDelta', 'float') as TslNode;
   const position = positionLocal as TslNode;
+  const worldPos = positionWorld as TslNode;
   const frameTime = time as TslNode;
 
   const wx = position.x;
   const wz = position.z;
   const shoreMask = pow(foamBaseAttr, float(1.05) as TslNode) as TslNode;
-  const deepWater = pow(foamBaseAttr, float(2.4) as TslNode) as TslNode;
+  const depthFactor = pow(sub(float(1) as TslNode, foamBaseAttr) as TslNode, float(0.88) as TslNode) as TslNode;
+  const shallowFactor = shoreMask;
 
   const lapA = sin(
     frameTime.mul(2.35).add(wx.mul(0.34)).add(wz.mul(0.12)) as TslNode,
@@ -80,8 +97,46 @@ function buildRiverWaterShaderNodes() {
         .add(foamPulse.mul(0.18)) as TslNode,
     ) as TslNode,
   ) as TslNode;
-  const colorNode = (mix(WATER_BODY_COLOR, WATER_FOAM_COLOR, foamStrength) as TslNode).mul(
-    (float(0.9) as TslNode).add(deepWater.mul(0.1) as TslNode) as TslNode,
+
+  const meniscus = (pow(shoreMask, float(2.6) as TslNode) as TslNode).mul(float(0.38) as TslNode) as TslNode;
+  const waterTint = mix(SHALLOW_WATER_TINT, DEEP_WATER_TINT, depthFactor) as TslNode;
+  const bodyColor = mix(waterTint, WATER_FOAM_COLOR, foamStrength) as TslNode;
+  const colorNode = mix(bodyColor, MENISCUS_COLOR, meniscus) as TslNode;
+
+  const viewDir = normalize((cameraPosition as TslNode).sub(worldPos) as TslNode) as TslNode;
+  const viewDotUp = abs(dot(viewDir, vec3(0, 1, 0) as TslNode) as TslNode) as TslNode;
+  const bedNoiseA = (sin(worldPos.x.mul(0.11).add(worldPos.z.mul(0.09)) as TslNode) as TslNode)
+    .mul(0.5)
+    .add(0.5) as TslNode;
+  const bedNoiseB = (sin(worldPos.x.mul(0.23).sub(worldPos.z.mul(0.17)).add(float(2.7) as TslNode) as TslNode) as TslNode)
+    .mul(0.5)
+    .add(0.5) as TslNode;
+  const bedTint = bedNoiseA.mul(0.58).add(bedNoiseB.mul(0.42)) as TslNode;
+  const bedColor = mix(
+    vec3(0.19, 0.14, 0.09) as TslNode,
+    vec3(0.34, 0.26, 0.17) as TslNode,
+    bedTint,
+  ) as TslNode;
+
+  const refractOffset = (normalView as TslNode).xy.mul(float(0.016) as TslNode) as TslNode;
+  const refractUv = viewportSafeUV((screenUV as TslNode).add(refractOffset) as TslNode) as TslNode;
+  const sceneBehind = (viewportSharedTexture(refractUv) as TslNode).rgb as TslNode;
+  const bedVisibility = shallowFactor
+    .mul(pow(viewDotUp, float(0.72) as TslNode) as TslNode)
+    .mul(float(0.86) as TslNode)
+    .add(depthFactor.mul(float(0.14) as TslNode) as TslNode) as TslNode;
+  const backdropNode = mix(sceneBehind, bedColor, bedVisibility) as TslNode;
+  const backdropAlphaNode = mix(
+    float(0.38) as TslNode,
+    float(0.82) as TslNode,
+    shallowFactor.mul(pow(viewDotUp, float(0.65) as TslNode) as TslNode) as TslNode,
+  ) as TslNode;
+
+  const thicknessNode = mix(float(0.05) as TslNode, float(0.78) as TslNode, depthFactor) as TslNode;
+  const specularIntensityNode = mix(
+    float(0.7) as TslNode,
+    float(1.2) as TslNode,
+    pow(shoreMask, float(1.55) as TslNode) as TslNode,
   ) as TslNode;
 
   const edgeWobble = (sin(wx.mul(0.07).add(wz.mul(0.05)).add(frameTime.mul(0.55)) as TslNode) as TslNode)
@@ -91,24 +146,42 @@ function buildRiverWaterShaderNodes() {
     smoothstep(float(0) as TslNode, float(1) as TslNode, featherAttr.add(edgeWobble) as TslNode) as TslNode,
     float(0.92) as TslNode,
   ) as TslNode;
-  const opacityNode = (float(WATER_BASE_OPACITY) as TslNode).mul(animatedFeather) as TslNode;
+  const volumeOpacity = mix(float(0.42) as TslNode, float(0.68) as TslNode, depthFactor) as TslNode;
+  const surfaceFilm = shoreMask.mul(float(0.24) as TslNode) as TslNode;
+  const opacityNode = animatedFeather.mul(
+    min(float(0.9) as TslNode, volumeOpacity.add(surfaceFilm) as TslNode) as TslNode,
+  ) as TslNode;
 
-  return { positionNode, colorNode, opacityNode };
+  return {
+    positionNode,
+    colorNode,
+    opacityNode,
+    backdropNode,
+    backdropAlphaNode,
+    thicknessNode,
+    specularIntensityNode,
+  };
 }
 
-let sharedWaterMaterial: MeshStandardNodeMaterial | null = null;
+let sharedWaterMaterial: MeshPhysicalNodeMaterial | null = null;
 
-export function getSharedRiverWaterMaterial(): MeshStandardNodeMaterial {
+export function getSharedRiverWaterMaterial(): MeshPhysicalNodeMaterial {
   if (sharedWaterMaterial) return sharedWaterMaterial;
 
   const nodes = buildRiverWaterShaderNodes();
-  const material = new MeshStandardNodeMaterial();
+  const material = new MeshPhysicalNodeMaterial();
   material.name = 'RiverWaterMaterial';
   material.color.set(0xffffff);
   material.transparent = true;
   material.opacity = 1;
-  material.roughness = 0.42;
+  material.roughness = 0.06;
   material.metalness = 0;
+  material.ior = 1.33;
+  material.transmission = 1;
+  material.thickness = 0.65;
+  material.attenuationDistance = 1.75;
+  material.attenuationColor = new THREE.Color(0.14, 0.22, 0.12);
+  material.specularIntensity = 1;
   material.depthWrite = false;
   material.depthTest = true;
   material.side = THREE.FrontSide;
@@ -118,6 +191,10 @@ export function getSharedRiverWaterMaterial(): MeshStandardNodeMaterial {
   material.positionNode = nodes.positionNode;
   material.colorNode = nodes.colorNode;
   material.opacityNode = nodes.opacityNode;
+  material.backdropNode = nodes.backdropNode;
+  material.backdropAlphaNode = nodes.backdropAlphaNode;
+  material.thicknessNode = nodes.thicknessNode;
+  material.specularIntensityNode = nodes.specularIntensityNode;
   sharedWaterMaterial = material;
   return sharedWaterMaterial;
 }

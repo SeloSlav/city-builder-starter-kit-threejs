@@ -12,7 +12,7 @@ export type TerrainBounds = {
 export class Terrain {
   readonly size = 1080;
   readonly playableSize = 820;
-  readonly resolution = 385;
+  readonly resolution = 769;
   readonly bounds: TerrainBounds;
   readonly mesh: THREE.Mesh;
   private dirtZoomGateAttr!: THREE.BufferAttribute;
@@ -114,7 +114,6 @@ export class Terrain {
   }
 
   private getTerrainBlendWeights(x: number, z: number): [number, number, number] {
-    // Vertex color channels are blend weights, not tints: R=meadow, G=dense, B=dry.
     const warpX = this.fbm(x * 0.006 + 41.1, z * 0.006 - 17.8, 4) * 22;
     const warpZ = this.fbm(x * 0.006 - 12.5, z * 0.006 + 73.2, 4) * 22;
     const wx = x + warpX;

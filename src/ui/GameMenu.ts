@@ -6,6 +6,8 @@ import {
 type GameMenuOptions = {
   onTipsPreferenceChange: () => void;
   onOpenChange?: (open: boolean) => void;
+  /** When false, Escape will not open the menu (e.g. first-person walk mode). */
+  canOpenFromKeyboard?: () => boolean;
 };
 
 export class GameMenu {
@@ -16,11 +18,13 @@ export class GameMenu {
   private open = false;
   private readonly onTipsPreferenceChange: () => void;
   private readonly onOpenChange?: (open: boolean) => void;
+  private readonly canOpenFromKeyboard?: () => boolean;
   private readonly onKeyDown: (event: KeyboardEvent) => void;
 
   constructor(parent: HTMLElement, options: GameMenuOptions) {
     this.onTipsPreferenceChange = options.onTipsPreferenceChange;
     this.onOpenChange = options.onOpenChange;
+    this.canOpenFromKeyboard = options.canOpenFromKeyboard;
 
     this.menuButton = document.createElement('button');
     this.menuButton.type = 'button';
@@ -66,11 +70,23 @@ export class GameMenu {
     });
 
     this.onKeyDown = (event: KeyboardEvent) => {
-      if (!this.open || event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || this.isTextInputFocused()) return;
+
+      if (this.open) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.close();
+        return;
+      }
+
+      if (this.canOpenFromKeyboard?.() === false) return;
+
       event.preventDefault();
       event.stopPropagation();
-      this.close();
+      this.openMenu();
     };
+
+    window.addEventListener('keydown', this.onKeyDown, true);
   }
 
   isOpen(): boolean {
@@ -79,6 +95,7 @@ export class GameMenu {
 
   dispose(): void {
     this.close();
+    window.removeEventListener('keydown', this.onKeyDown, true);
     this.menuButton.remove();
     this.backdrop.remove();
   }
@@ -93,7 +110,6 @@ export class GameMenu {
     this.tipsCheckbox.checked = areTipCardsDisabled();
     this.backdrop.hidden = false;
     this.menuButton.setAttribute('aria-expanded', 'true');
-    window.addEventListener('keydown', this.onKeyDown, true);
     this.onOpenChange?.(true);
     this.backdrop.querySelector<HTMLButtonElement>('[data-return-button]')?.focus({ preventScroll: true });
   }
@@ -103,7 +119,12 @@ export class GameMenu {
     this.open = false;
     this.backdrop.hidden = true;
     this.menuButton.setAttribute('aria-expanded', 'false');
-    window.removeEventListener('keydown', this.onKeyDown, true);
     this.onOpenChange?.(false);
+  }
+
+  private isTextInputFocused(): boolean {
+    const target = document.activeElement as HTMLElement | null;
+    const tag = target?.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || Boolean(target?.isContentEditable);
   }
 }

@@ -4,7 +4,9 @@ import type { RiverField } from './RiverField.ts';
 import { VirtualPipesWater2D } from './virtualPipesWater.ts';
 import { disposeSharedRiverWaterMaterial, getSharedRiverWaterMaterial } from './RiverWaterMaterial.ts';
 
-const RIVER_WATER_DEPTH = 0.78;
+const RIVER_WATER_DEPTH = 1.05;
+const RIVER_CENTER_DEPTH_BOOST = 0.2;
+const RIVER_SHORE_DEPTH_LIFT = 0.06;
 const WATER_SIM_RENDER_DELTA_SCALE = 0.16;
 const MAX_SIM_CATCHUP_STEPS = 2;
 const WATER_CPU_UPDATE_INTERVAL_SEC = 1 / 20;
@@ -266,7 +268,8 @@ export function createRiverWaterMesh(
       sim.terrain[i] = bed;
       if (wetMask[i]) {
         const shore = 1 - Math.min(1, Math.max(0, organicSigned[i]) / 6);
-        const depth = RIVER_WATER_DEPTH + shore * 0.08;
+        const centerDepth = 1 - shore;
+        const depth = RIVER_WATER_DEPTH + shore * RIVER_SHORE_DEPTH_LIFT + centerDepth * RIVER_CENTER_DEPTH_BOOST;
         baseDepth[i] = depth;
         sim.depth[i] = depth;
       } else {

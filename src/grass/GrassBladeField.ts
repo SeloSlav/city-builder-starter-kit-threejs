@@ -16,12 +16,12 @@ import {
   GRASS_BLADE_CHUNK_SIZE,
   GRASS_BLADE_NEAR_RADIUS,
   GRASS_BLADES_PER_TUFT,
-  GRASS_EDGE_FADE_BAND,
   GRASS_STREAM_CHUNK_RADIUS,
   GRASS_STREAM_FOCUS_DRIFT,
   GRASS_STREAM_SLOTS_PER_FRAME,
   GRASS_TUFT_SCATTER_ATTEMPTS,
   GRASS_TUFTS_PER_CHUNK,
+  grassEdgeFadeFromFocusDistance,
   resolveCloseGroundLod,
 } from './grassLodMath.ts';
 
@@ -390,7 +390,7 @@ function writeChunkInstances(
     if (isGrassNearAnyEdge(x, z, roadEdges)) continue;
 
     const focusDist = Math.hypot(x - focusX, z - focusZ);
-    const edgeFade = edgeFadeFromFocusDistance(focusDist);
+    const edgeFade = grassEdgeFadeFromFocusDistance(focusDist);
     if (edgeFade <= 0.02) continue;
 
     localPlacements.push({ x, z, micro });
@@ -457,15 +457,6 @@ function composeTuftMatrix(
   const heightScale = scale * THREE.MathUtils.lerp(0.96, 1.18, rng());
   scaleVector.set(widthScale, heightScale, widthScale);
   matrix.compose(position, quaternion, scaleVector);
-}
-
-/** 1 near focus, 0 at outer radius — eased so distant tufts fade in gently. */
-function edgeFadeFromFocusDistance(focusDist: number): number {
-  const inner = GRASS_BLADE_NEAR_RADIUS - GRASS_EDGE_FADE_BAND;
-  const outer = GRASS_BLADE_NEAR_RADIUS;
-  const t = THREE.MathUtils.clamp((focusDist - inner) / (outer - inner), 0, 1);
-  const smooth = t * t * (3 - 2 * t);
-  return Math.pow(1 - smooth, 1.35);
 }
 
 function createGrassBladeMaterial(): MeshStandardNodeMaterial {

@@ -86,6 +86,15 @@ export function isGrassBladeZoomActive(cameraDistance: number): boolean {
   return grassBladeRevealOpacity(cameraDistance) > 0.02;
 }
 
+/** 1 near focus, 0 at outer radius — matches streamed grass tuft falloff. */
+export function grassEdgeFadeFromFocusDistance(focusDist: number): number {
+  const inner = GRASS_BLADE_NEAR_RADIUS - GRASS_EDGE_FADE_BAND;
+  const outer = GRASS_BLADE_NEAR_RADIUS;
+  const t = Math.max(0, Math.min(1, (focusDist - inner) / (outer - inner)));
+  const smooth = t * t * (3 - 2 * t);
+  return Math.pow(1 - smooth, 1.35);
+}
+
 function smoothstep(edge0: number, edge1: number, value: number): number {
   const t = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);

@@ -5,7 +5,9 @@ import { RoadMaterialFactory } from './RoadMaterialFactory.ts';
 import type { RoadNetwork } from './RoadNetwork.ts';
 import { trimPathAtEndpoint } from './roadEndpoint.ts';
 
-const CORE_Y_OFFSET = 0.055;
+const CORE_Y_OFFSET = 0.12;
+/** Slightly above core so the transparent shoulder clears the terrain depth buffer. */
+const BLEND_Y_OFFSET = 0.16;
 const CORE_EDGE_JITTER = 0.22;
 /** How far the feathered shoulder extends under the opaque core to avoid visible seams. */
 const BLEND_INNER_OVERLAP = 0.14;
@@ -112,8 +114,8 @@ export class RoadMeshBuilder {
     for (let i = 0; i < path.length; i++) {
       const tangent = tangentAt(path, i);
       const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-      const leftJitter = irregular ? edgeJitter(seed, i, 0) * CORE_EDGE_JITTER : 0;
-      const rightJitter = irregular ? edgeJitter(seed, i, 1) * CORE_EDGE_JITTER : 0;
+      const leftJitter = irregular ? smoothEdgeJitter(seed, i, 0) * CORE_EDGE_JITTER : 0;
+      const rightJitter = irregular ? smoothEdgeJitter(seed, i, 1) * CORE_EDGE_JITTER : 0;
       const leftCore = path[i].clone().addScaledVector(normal, half + leftJitter);
       const rightCore = path[i].clone().addScaledVector(normal, -half + rightJitter);
       leftCore.y = this.terrain.getHeightAt(leftCore.x, leftCore.z) + CORE_Y_OFFSET;
@@ -172,9 +174,9 @@ export class RoadMeshBuilder {
     for (let i = 0; i < path.length; i++) {
       const tangent = tangentAt(path, i);
       const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
-      const jitter = irregular ? edgeJitter(seed, i, 0) * CORE_EDGE_JITTER : 0;
+      const jitter = irregular ? smoothEdgeJitter(seed, i, 0) * CORE_EDGE_JITTER : 0;
       const left = path[i].clone().addScaledVector(normal, half + jitter);
-      const right = path[i].clone().addScaledVector(normal, -half + edgeJitter(seed, i, 1) * (irregular ? CORE_EDGE_JITTER : 0));
+      const right = path[i].clone().addScaledVector(normal, -half + smoothEdgeJitter(seed, i, 1) * (irregular ? CORE_EDGE_JITTER : 0));
       left.y = this.terrain.getHeightAt(left.x, left.z) + yOffset;
       right.y = this.terrain.getHeightAt(right.x, right.z) + yOffset;
       positions.push(left.x, left.y, left.z, right.x, right.y, right.z);
@@ -214,14 +216,14 @@ export class RoadMeshBuilder {
 
     for (let i = 0; i < crossSections.length; i++) {
       const { leftCore, rightCore, normal } = crossSections[i];
-      const leftOuterJitter = edgeJitter(seed, i, 2) * 0.52;
-      const rightOuterJitter = edgeJitter(seed, i, 3) * 0.52;
-      const leftInner = leftCore.clone().addScaledVector(normal, -BLEND_INNER_OVERLAP);
-      const rightInner = rightCore.clone().addScaledVector(normal, BLEND_INNER_OVERLAP);
-      const leftMid = leftCore.clone().addScaledVector(normal, shoulderMid + leftOuterJitter * 0.62);
-      const leftFar = leftCore.clone().addScaledVector(normal, shoulderOuter + leftOuterJitter);
-      const rightMid = rightCore.clone().addScaledVector(normal, -(shoulderMid + rightOuterJitter * 0.62));
-      const rightFar = rightCore.clone().addScaledVector(normal, -(shoulderOuter + rightOuterJitter));
+      const leftOuterJitter = smoothEdgeJitter(seed, i, 2) * 0.52;
+      const rightOuterJitter = smoothEdgeJitter(seed, i, 3) * 0.52;
+      const leftInner = this.blendVertexAt(leftCore, normal, -BLEND_INNER_OVERLAP);
+      const rightInner = this.blendVertexAt(rightCore, normal, BLEND_INNER_OVERLAP);
+      const leftMid = this.blendVertexAt(leftCore, normal, shoulderMid + leftOuterJitter * 0.62);
+      const leftFar = this.blendVertexAt(leftCore, normal, shoulderOuter + leftOuterJitter);
+      const rightMid = this.blendVertexAt(rightCore, normal, -(shoulderMid + rightOuterJitter * 0.62));
+      const rightFar = this.blendVertexAt(rightCore, normal, -(shoulderOuter + rightOuterJitter));
       for (const p of [leftFar, leftMid, leftInner, rightInner, rightMid, rightFar]) {
         positions.push(p.x, p.y, p.z);
       }
@@ -248,6 +250,13 @@ export class RoadMeshBuilder {
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
     return new THREE.Mesh(geometry, this.materials.roadEdge);
+  }
+
+  /** Re-sample terrain height at the shoulder XZ so sloped edges don't intersect the ground mesh. */
+  private blendVertexAt(core: THREE.Vector3, normal: THREE.Vector3, lateralOffset: number): THREE.Vector3 {
+    const point = core.clone().addScaledVector(normal, lateralOffset);
+    point.y = this.terrain.getHeightAt(point.x, point.z) + BLEND_Y_OFFSET;
+    return point;
   }
 }
 
@@ -286,8 +295,13 @@ function edgeJitter(seed: string, index: number, side: number): number {
   return Math.sin(index * 1.734 + side * 11.91 + seedValue * 0.137) * 0.65 + Math.sin(index * 0.431 + seedValue) * 0.35;
 }
 
+function smoothEdgeJitter(seed: string, index: number, side: number): number {
+  return edgeJitter(seed, index - 1, side) * 0.24
+    + edgeJitter(seed, index, side) * 0.52
+    + edgeJitter(seed, index + 1, side) * 0.24;
+}
+
 function smoothFade(distance: number, span: number): number {
   const t = THREE.MathUtils.clamp(distance / Math.max(0.001, span), 0, 1);
   return t * t * (3 - 2 * t);
 }
-

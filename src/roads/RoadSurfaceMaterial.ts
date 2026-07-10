@@ -43,13 +43,11 @@ function buildMuddyBankColorNode(textures: TextureSet): TslNode {
 
 function buildBankOpacityNode(textures: TextureSet): TslNode {
   const uvNode = uv() as TslNode;
-  const radialFade = pow(smoothstep(float(0.12) as TslNode, float(1) as TslNode, uvNode.x), float(0.48) as TslNode);
+  const radialFade = pow(smoothstep(float(0.12) as TslNode, float(1) as TslNode, uvNode.x), float(0.48) as TslNode) as TslNode;
   const edgeMaskSample = textures.edgeMask
     ? (texture(textures.edgeMask, uvNode) as TslNode).r
     : (float(1) as TslNode);
-  return (mix(float(0.03) as TslNode, float(1) as TslNode, radialFade) as TslNode)
-    .mul(edgeMaskSample)
-    .mul(float(0.98) as TslNode);
+  return radialFade.mul(edgeMaskSample).mul(float(0.98) as TslNode);
 }
 
 function buildRiverBankOpacityNode(textures: TextureSet): TslNode {
@@ -67,6 +65,9 @@ export function createRoadCoreMaterial(textures: TextureSet): MeshStandardNodeMa
   material.color.set(0xffffff);
   material.roughness = 0.99;
   material.metalness = 0;
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = -2;
+  material.polygonOffsetUnits = -2;
   material.colorNode = buildRoadColorNode(textures, 0.72, [0.9, 0.9, 0.88]);
   material.normalNode = normalMap(texture(textures.normal, uv()));
   material.roughnessNode = (texture(textures.roughness, uv() as TslNode) as TslNode).r;
@@ -83,6 +84,9 @@ export function createRoadEdgeMaterial(textures: TextureSet): MeshStandardNodeMa
   material.transparent = true;
   material.opacity = 1;
   material.depthWrite = false;
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = -3;
+  material.polygonOffsetUnits = -8;
   if (textures.edgeMask) material.alphaMap = textures.edgeMask;
   material.colorNode = buildRoadColorNode(textures, 0.78, [0.92, 0.91, 0.89]);
   material.normalNode = normalMap(texture(textures.normal, uv()));

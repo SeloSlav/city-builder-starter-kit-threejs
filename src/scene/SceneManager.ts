@@ -157,9 +157,11 @@ export class SceneManager {
     });
     if (GRASS_BLADES_ENABLED) {
       this.grassField = createGrassBladeField(this.terrain, {
-        isBlockedAt: (x, z) => this.riverSystem.isBlockedAt(x, z),
+        isBlockedAt: (x, z) => this.riverSystem.isGrassBlockedAt(x, z),
       });
       this.scene.add(this.grassField.group);
+      // Draw reeds after grass so shoreline cattails stay visible at ground level.
+      this.scene.attach(this.riverSystem.reedsGroup);
     }
 
     this.scene.add(this.forestManager.group);
@@ -190,6 +192,12 @@ export class SceneManager {
     const cameraDistance = orbitDistance ?? this.camera.position.distanceTo(this.cameraTarget);
     updateTerrainZoomBlend(this.terrain, cameraDistance, firstPersonActive);
     this.grassField?.updateCameraState(
+      this.camera.position,
+      this.cameraTarget,
+      cameraDistance,
+      firstPersonActive,
+    );
+    this.riverSystem.updateCameraState(
       this.camera.position,
       this.cameraTarget,
       cameraDistance,
