@@ -145,6 +145,8 @@ export class ResourceInspector {
     this.marker.visible = false;
 
     options.domElement.addEventListener('mousedown', this.onPointerDown, { capture: true });
+    this.panel.addEventListener('mousedown', (event) => event.stopPropagation());
+    this.panel.addEventListener('click', (event) => event.stopPropagation());
     this.demolishButton.addEventListener('click', this.onDemolishPrimaryClick);
     this.demolishSecondaryButton.addEventListener('click', this.onDemolishSecondaryClick);
     this.laborDecrease.addEventListener('click', this.onLaborDecrease);

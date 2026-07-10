@@ -225,10 +225,28 @@ export class SpacetimeGameStore {
     if (serverId === null) {
       throw new Error('Invalid building id.');
     }
-    await this.callReducer('assignBuildingLabor', 'assign_building_labor', {
-      buildingId: serverId,
-      labor: Math.max(0, Math.floor(labor)),
-    });
+    const clampedLabor = Math.max(0, Math.floor(labor));
+    const previous = this.buildings.get(buildingId);
+    if (previous) {
+      this.buildings.set(buildingId, { ...previous, assignedLabor: clampedLabor });
+      this.emit();
+    }
+    try {
+      await this.callReducer('assignBuildingLabor', 'assign_building_labor', {
+        buildingId: serverId,
+        labor: clampedLabor,
+      });
+      const connection = getConnection();
+      if (connection) {
+        this.syncAllFromDb(connection);
+      }
+    } catch (error) {
+      if (previous) {
+        this.buildings.set(buildingId, previous);
+        this.emit();
+      }
+      throw error;
+    }
   }
 
   async demolishBuilding(buildingId: string): Promise<void> {
