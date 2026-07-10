@@ -224,6 +224,8 @@ function addTriangularGableWall(
   thickness: number,
   material: THREE.Material,
   outwardSign: -1 | 0 | 1 = 0,
+  centerX = 0,
+  centerZ = 0,
 ): void {
   const span = halfSpan - (outwardSign === 0 ? 0.06 : 0.14);
   const shape = new THREE.Shape();
@@ -237,9 +239,9 @@ function addTriangularGableWall(
 
   if (axis === 'x') {
     geometry.rotateY(Math.PI * 0.5);
-    geometry.translate(planePos, 0, outwardSign * thickness * 0.5);
+    geometry.translate(planePos + outwardSign * thickness * 0.5, 0, centerZ);
   } else {
-    geometry.translate(0, 0, planePos + outwardSign * thickness * 0.5);
+    geometry.translate(centerX, 0, planePos + outwardSign * thickness * 0.5);
   }
 
   addMesh(group, geometry, material, new THREE.Vector3(0, 0, 0));
@@ -673,23 +675,6 @@ function addQuarryHoistFrame(
 
   addMesh(
     group,
-    new THREE.BoxGeometry(0.12, 0.42, 0.12),
-    timberMaterial('mid'),
-    new THREE.Vector3(hoistX, crossY - 0.21, hoistZ),
-  );
-
-  const pulleyOffset = Math.abs(blockX - hoistX);
-  if (pulleyOffset > 0.08) {
-    addMesh(
-      group,
-      new THREE.BoxGeometry(pulleyOffset, 0.045, 0.045),
-      timberMaterial('mid'),
-      new THREE.Vector3((hoistX + blockX) * 0.5, crossY - 0.08, hoistZ),
-    );
-  }
-
-  addMesh(
-    group,
     new THREE.CylinderGeometry(0.34, 0.34, 0.2, 12),
     metalMaterial('iron'),
     new THREE.Vector3(blockX, pulleyY, hoistZ),
@@ -719,20 +704,6 @@ function addQuarryHoistFrame(
     new THREE.BoxGeometry(0.055, ropeHeight, 0.055),
     timberMaterial('mid'),
     new THREE.Vector3(blockX, ropeBottomY + ropeHeight * 0.5, hoistZ),
-  );
-
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.05, 0.18, 0.05),
-    timberMaterial('mid'),
-    new THREE.Vector3(blockX, pulleyY - 0.04, hoistZ),
-  );
-
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.08, 0.08, 0.22),
-    metalMaterial('iron'),
-    new THREE.Vector3(blockX, hookY + 0.04, hoistZ),
   );
 }
 
@@ -857,13 +828,6 @@ function addQuarryForemanShed(group: THREE.Group, shedX: number, shedZ: number):
     new THREE.Vector3(doorCenterX, shedStoneH + doorHeight * 0.5, frontZ + 0.03),
   );
 
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.16, 0.16, shedD - 0.12),
-    timberMaterial('dark'),
-    new THREE.Vector3(shedX, wallTop + ridgeH, shedZ),
-  );
-
   for (const side of [-1, 1] as const) {
     addMesh(
       group,
@@ -893,6 +857,7 @@ function addQuarryForemanShed(group: THREE.Group, shedX: number, shedZ: number):
       gableThickness,
       timberMaterial('weathered'),
       zSign,
+      shedX,
     );
   }
 }
@@ -973,20 +938,6 @@ export function createStoneQuarryMesh(): THREE.Group {
 
   addQuarryHoistFrame(group, 6.2, -6.4);
   addQuarryForemanShed(group, 7.4, 7.2);
-
-  const fenceH = 0.55;
-  addMesh(
-    group,
-    new THREE.BoxGeometry(3.6, fenceH, 0.14),
-    timberMaterial('weathered'),
-    new THREE.Vector3(3.2, fenceH * 0.5, 1.8),
-  );
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.14, fenceH, 4.2),
-    timberMaterial('weathered'),
-    new THREE.Vector3(1.2, fenceH * 0.5, 3.6),
-  );
 
   return group;
 }
