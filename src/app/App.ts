@@ -26,6 +26,7 @@ import { RoadSelection } from '../roads/RoadSelection.ts';
 import { RoadTool } from '../roads/RoadTool.ts';
 import { GameRuntime } from '../runtime/GameRuntime.ts';
 import { SceneManager } from '../scene/SceneManager.ts';
+import { QuarryMapIcons } from '../map/QuarryMapIcons.ts';
 import { beginStartupTextureLoad } from '../scene/startupTextures.ts';
 import { setActivePlacedBuildingLayout, setActivePreviewBuilding, sampleNaturalTerrainHeight } from '../terrain/TerrainHeight.ts';
 import { updateTerrainBuildingPads } from '../terrain/TerrainBuildingPads.ts';
@@ -51,6 +52,7 @@ export class App {
   private toolbar: BuildToolbar | null = null;
   private toastManager: ToastManager | null = null;
   private resourceInspector: ResourceInspector | null = null;
+  private quarryMapIcons: QuarryMapIcons | null = null;
   private gameState: GameState | null = null;
   private layoutRegistry: WorldLayoutRegistry | null = null;
   private treeRegistry: TreeRegistry | null = null;
@@ -236,6 +238,21 @@ export class App {
     });
     resourceInspector.setStockpile(gameState.stockpile);
 
+    const quarryMapIcons = new QuarryMapIcons({
+      uiRoot,
+      domElement: sceneManager.renderer.domElement,
+      terrain: sceneManager.terrain,
+      registry: layoutRegistry,
+      getCamera: () => sceneManager.camera,
+      getZoomPercent: () => this.cameraController?.getZoomPercent() ?? 100,
+      onQuarrySelect: (quarryId) => resourceInspector.selectQuarry(quarryId),
+      isBlocked: () =>
+        roadTool.isEnabled()
+        || buildingTool.isEnabled()
+        || firstPersonController.isActive()
+        || toolbar.isGameMenuOpen(),
+    });
+
     firstPersonController = new FirstPersonController({
       camera: sceneManager.camera,
       domElement: sceneManager.renderer.domElement,
@@ -272,6 +289,7 @@ export class App {
     this.toolbar = toolbar;
     this.toastManager = toastManager;
     this.resourceInspector = resourceInspector;
+    this.quarryMapIcons = quarryMapIcons;
     this.gameState = gameState;
     this.layoutRegistry = layoutRegistry;
 
@@ -333,6 +351,7 @@ export class App {
     this.buildingMarkers?.dispose();
     this.gameRuntime?.dispose();
     this.resourceInspector?.dispose();
+    this.quarryMapIcons?.dispose();
     this.toastManager?.dispose();
     this.firstPersonController?.dispose();
     this.cameraController?.dispose();
@@ -361,6 +380,7 @@ export class App {
       this.roadTool?.update(dt);
       this.buildingTool?.update();
       this.updateBuildButtonPosition();
+      this.quarryMapIcons?.update();
       this.sceneManager?.render(dt, 12, true);
     } else {
       this.cameraController?.update(dt);
@@ -369,6 +389,7 @@ export class App {
       this.roadTool?.update(dt);
       this.buildingTool?.update();
       this.updateBuildButtonPosition();
+      this.quarryMapIcons?.update();
       this.sceneManager?.render(dt, this.cameraController?.getOrbitDistance());
     }
     this.updateFps(time, dt);

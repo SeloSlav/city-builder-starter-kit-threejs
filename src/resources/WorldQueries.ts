@@ -95,6 +95,16 @@ export class WorldQueries {
     return buildingKindLabel(kind);
   }
 
+  findQuarryTarget(quarryId: string): Extract<InspectableTarget, { kind: 'quarry' }> | null {
+    const definition = this.registry.getDefinition(quarryId);
+    if (!definition || definition.kind !== 'quarry') return null;
+
+    const quarryState = this.getGameState().quarries.get(quarryId);
+    if (!quarryState) return null;
+
+    return { kind: 'quarry', definition, state: quarryState };
+  }
+
   findNearestQuarryWithRemaining(x: number, z: number, radius: number): QuarryNodeState | null {
     const state = this.getGameState();
     let best: QuarryNodeState | null = null;

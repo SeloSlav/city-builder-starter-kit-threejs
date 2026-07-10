@@ -7,6 +7,12 @@ export const CLOSE_GROUND_FULL_ZOOM_PERCENT = 400;
 /** Close ground detail begins fading in above this zoom; below it the map stays meadow. */
 export const CLOSE_GROUND_FADE_START_ZOOM_PERCENT = 160;
 
+/** World quarry map icons appear at this zoom and below. */
+export const MAP_ICON_MAX_ZOOM_PERCENT = 50;
+
+/** Map icons reach full opacity below this zoom. */
+export const MAP_ICON_FADE_START_ZOOM_PERCENT = 45;
+
 /** Dirt is fully active at this zoom and beyond. */
 export const DIRT_REVEAL_ZOOM_PERCENT = CLOSE_GROUND_FULL_ZOOM_PERCENT;
 
@@ -103,6 +109,19 @@ export function isGrassBladeZoomActive(cameraDistance: number): boolean {
 
 export function isReedZoomActive(cameraDistance: number): boolean {
   return reedRevealOpacity(cameraDistance) > 0.02;
+}
+
+/** 0 above 50% zoom → 1 at 45% zoom and below. */
+export function mapIconRevealOpacity(zoomPercent: number): number {
+  if (zoomPercent > MAP_ICON_MAX_ZOOM_PERCENT) return 0;
+  if (zoomPercent <= MAP_ICON_FADE_START_ZOOM_PERCENT) return 1;
+  const t = (MAP_ICON_MAX_ZOOM_PERCENT - zoomPercent)
+    / (MAP_ICON_MAX_ZOOM_PERCENT - MAP_ICON_FADE_START_ZOOM_PERCENT);
+  return t * t * (3 - 2 * t);
+}
+
+export function isMapIconZoomActive(zoomPercent: number): boolean {
+  return mapIconRevealOpacity(zoomPercent) > 0.02;
 }
 
 /** 1 near focus, 0 at outer radius — matches streamed grass tuft falloff. */

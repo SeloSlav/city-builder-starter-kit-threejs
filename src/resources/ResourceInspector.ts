@@ -92,6 +92,12 @@ export class ResourceInspector {
     this.stockpileValues.water.textContent = Math.round(stockpile.water).toString();
   }
 
+  selectQuarry(quarryId: string): void {
+    const target = this.options.worldQueries.findQuarryTarget(quarryId);
+    if (!target) return;
+    this.selectTarget(target);
+  }
+
   refreshSelection(): void {
     if (!this.selectedTarget) return;
     const latest = this.options.worldQueries.findInspectableTarget(this.selectedX, this.selectedZ);
