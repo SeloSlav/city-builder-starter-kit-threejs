@@ -6,6 +6,7 @@ use quarry::generate_quarries;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct EmbeddedTree {
     tree_id: String,
     layout_index: u32,
