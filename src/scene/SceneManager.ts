@@ -55,6 +55,7 @@ export class SceneManager {
   private roadNetworkRef: RoadNetwork | null = null;
   private forestClearanceBuildings: BuildingTerrainSource[] = [];
   private forestClearanceBurgageZones: BurgageZoneState[] = [];
+  private lastForestClearanceSourceSignature = '';
   private readonly riverSystem: RiverSystem;
   private readonly quarrySystem: QuarrySystem;
   readonly worldLayout: WorldLayout;
@@ -322,8 +323,13 @@ export class SceneManager {
     buildings: Iterable<BuildingTerrainSource>,
     burgageZones: Iterable<BurgageZoneState>,
   ): void {
-    this.forestClearanceBuildings = [...buildings];
-    this.forestClearanceBurgageZones = [...burgageZones];
+    const nextBuildings = [...buildings];
+    const nextZones = [...burgageZones];
+    const signature = forestClearanceSourceSignature(nextBuildings, nextZones);
+    if (signature === this.lastForestClearanceSourceSignature) return;
+    this.lastForestClearanceSourceSignature = signature;
+    this.forestClearanceBuildings = nextBuildings;
+    this.forestClearanceBurgageZones = nextZones;
     this.refreshForestClearance();
   }
 
@@ -498,6 +504,26 @@ export class SceneManager {
     this.scene.add(blueFill);
   }
 
+}
+
+function forestClearanceSourceSignature(
+  buildings: BuildingTerrainSource[],
+  burgageZones: BurgageZoneState[],
+): string {
+  const buildingPart = buildings
+    .map((building) => `${building.kind}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
+    .sort()
+    .join('|');
+  const zonePart = burgageZones
+    .map((zone) => (
+      `${zone.id}:${zone.cornerA.x.toFixed(2)},${zone.cornerA.z.toFixed(2)}`
+      + `-${zone.cornerB.x.toFixed(2)},${zone.cornerB.z.toFixed(2)}`
+      + `-${zone.cornerC.x.toFixed(2)},${zone.cornerC.z.toFixed(2)}`
+      + `-${zone.cornerD.x.toFixed(2)},${zone.cornerD.z.toFixed(2)}`
+    ))
+    .sort()
+    .join('|');
+  return `${buildingPart}§${zonePart}`;
 }
 
 function projectPointToPathXZ(

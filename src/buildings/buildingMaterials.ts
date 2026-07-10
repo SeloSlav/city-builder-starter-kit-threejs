@@ -99,7 +99,8 @@ export function addMesh(
   mesh.position.copy(position);
   mesh.rotation.copy(rotation);
   mesh.scale.copy(scale);
-  mesh.castShadow = true;
+  // Detailed building meshes are draw-call heavy; they receive terrain/tree shadows but do not cast.
+  mesh.castShadow = false;
   mesh.receiveShadow = true;
   group.add(mesh);
   return mesh;

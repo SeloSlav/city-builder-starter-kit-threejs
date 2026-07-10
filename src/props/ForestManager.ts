@@ -199,6 +199,8 @@ export class ForestManager {
       }
     }
 
+    if (removedIndexSetsEqual(nextRemoved, this.removedTrees)) return;
+
     this.removedTrees = nextRemoved;
 
     for (let treeIndex = 0; treeIndex < this.placements.length; treeIndex++) {
@@ -451,4 +453,12 @@ function pointWithinBuildingPad(
   const normDist = Math.hypot(localX / params.radiusX, localZ / params.radiusZ);
   const clearOuter = params.outerFade * 1.04 + canopyRadius / Math.min(params.radiusX, params.radiusZ);
   return normDist <= clearOuter;
+}
+
+function removedIndexSetsEqual(a: Set<number>, b: Set<number>): boolean {
+  if (a.size !== b.size) return false;
+  for (const index of a) {
+    if (!b.has(index)) return false;
+  }
+  return true;
 }

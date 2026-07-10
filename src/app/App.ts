@@ -74,6 +74,7 @@ export class App {
   private gameRuntime: GameRuntime | null = null;
   private spacetimeConnected = false;
   private lastPlacedBuildingSignature = '';
+  private lastForestClearanceSignature = '';
   private previousTreePhases = new Map<string, string>();
   private previousTreeGrowth = new Map<string, number>();
   private animationId = 0;
@@ -735,9 +736,16 @@ export class App {
       (x, z) => this.sceneManager?.terrain.getHeightAt(x, z) ?? 0,
     );
 
-    this.syncForestClearance();
+    this.syncForestClearanceIfNeeded(state);
     this.syncResourceUi();
     this.syncToolbar();
+  }
+
+  private syncForestClearanceIfNeeded(state: GameState): void {
+    const signature = this.getForestClearanceSignature(state);
+    if (signature === this.lastForestClearanceSignature) return;
+    this.lastForestClearanceSignature = signature;
+    this.syncForestClearance();
   }
 
   private syncForestClearance(): void {
@@ -792,6 +800,23 @@ export class App {
     return placedSources;
   }
 
+  private getForestClearanceSignature(state: GameState): string {
+    const buildings = [...state.buildings.values()]
+      .map((building) => `${building.id}:${building.kind}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
+      .sort()
+      .join('|');
+    const zones = [...state.burgageZones.values()]
+      .map((zone) => (
+        `${zone.id}:${zone.cornerA.x.toFixed(2)},${zone.cornerA.z.toFixed(2)}`
+        + `-${zone.cornerB.x.toFixed(2)},${zone.cornerB.z.toFixed(2)}`
+        + `-${zone.cornerC.x.toFixed(2)},${zone.cornerC.z.toFixed(2)}`
+        + `-${zone.cornerD.x.toFixed(2)},${zone.cornerD.z.toFixed(2)}`
+      ))
+      .sort()
+      .join('|');
+    return `${buildings}§${zones}`;
+  }
+
   private getPlacedBuildingSignature(buildings: Map<string, BuildingState>): string {
     return [...buildings.values()]
       .map((building) => `${building.id}:${building.kind}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
@@ -840,7 +865,7 @@ export class App {
           this.sceneManager!.syncRoadNetwork(this.roadNetwork!);
           this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
           this.syncPlacedBuildingTerrain({ forceMeshUpdate: true });
-          this.syncForestClearance();
+          this.syncForestClearanceIfNeeded(this.gameState);
           this.forestVisualSync?.syncAll(this.gameState.trees);
           this.roadSelection?.refresh();
           this.syncResourceUi();

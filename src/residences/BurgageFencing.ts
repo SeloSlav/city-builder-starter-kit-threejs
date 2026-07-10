@@ -54,7 +54,7 @@ export class BurgageFencing {
     this.posts.name = 'Fence posts';
     this.posts.count = 0;
     this.posts.frustumCulled = false;
-    this.posts.castShadow = true;
+    this.posts.castShadow = false;
     this.posts.receiveShadow = false;
 
     this.rails = new THREE.InstancedMesh(
@@ -65,7 +65,7 @@ export class BurgageFencing {
     this.rails.name = 'Fence rails';
     this.rails.count = 0;
     this.rails.frustumCulled = false;
-    this.rails.castShadow = true;
+    this.rails.castShadow = false;
     this.rails.receiveShadow = false;
 
     this.root.add(this.posts, this.rails);
