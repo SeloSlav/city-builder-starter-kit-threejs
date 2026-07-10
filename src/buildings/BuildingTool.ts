@@ -67,6 +67,11 @@ export class BuildingTool {
     return this.mode !== 'off';
   }
 
+  shouldBlockCameraInput(event: MouseEvent | WheelEvent): boolean {
+    if (!this.isEnabled() || this.options.isBlocked()) return false;
+    return event instanceof MouseEvent && event.button === 2;
+  }
+
   setMode(mode: BuildingToolMode): void {
     this.mode = mode;
     this.resetPreviewCache();
@@ -148,8 +153,16 @@ export class BuildingTool {
   }
 
   private readonly onPointerDown = (event: MouseEvent): void => {
-    if (event.button !== 0 || this.mode === 'off') return;
-    if (this.options.isBlocked()) return;
+    if (this.mode === 'off' || this.options.isBlocked()) return;
+
+    if (event.button === 2) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.setMode('off');
+      return;
+    }
+
+    if (event.button !== 0) return;
 
     const point = this.options.terrainProjector.pick(event.clientX, event.clientY);
     if (!point) return;

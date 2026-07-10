@@ -210,7 +210,7 @@ export class RoadTool {
   }
 
   shouldBlockCameraInput(event: MouseEvent | WheelEvent): boolean {
-    if (!this.enabled || !this.hasDraft()) return false;
+    if (!this.enabled) return false;
     if (event instanceof WheelEvent) return event.ctrlKey;
     return event.button === 2;
   }
@@ -229,10 +229,10 @@ export class RoadTool {
       this.requestDelete(event);
       return;
     }
-    if (event.button === 2 && this.hasDraft()) {
+    if (event.button === 2) {
       event.preventDefault();
       event.stopPropagation();
-      this.undoLastPoint();
+      this.setEnabled(false);
       return;
     }
     if (event.button !== 0) return;

@@ -142,7 +142,10 @@ export class App {
           ?? this.roadTool?.getCursor()
           ?? null;
       },
-      shouldIgnoreInput: (event) => this.roadTool?.shouldBlockCameraInput(event) ?? false,
+      shouldIgnoreInput: (event) =>
+        (this.roadTool?.shouldBlockCameraInput(event) ?? false)
+        || (this.buildingTool?.shouldBlockCameraInput(event) ?? false)
+        || (this.burgageTool?.shouldBlockCameraInput(event) ?? false),
     });
 
     const roadSelection = new RoadSelection({

@@ -4,7 +4,14 @@ import type { RoadEdge } from './RoadEdge.ts';
 export const ROAD_END_TRIM = 0.5;
 
 export function getEdgePath(edge: RoadEdge): THREE.Vector3[] {
-  return edge.sampledPath.length >= 2 ? edge.sampledPath : edge.controlPoints;
+  const sampled = edge.sampledPath;
+  const control = edge.controlPoints;
+  if (sampled.length >= 2 && control.length >= 2) {
+    return sampled.length >= control.length ? sampled : control;
+  }
+  if (sampled.length >= 2) return sampled;
+  if (control.length >= 2) return control;
+  return sampled.length > 0 ? sampled : control;
 }
 
 export function inwardDirectionAtNode(edge: RoadEdge, nodeId: string): THREE.Vector3 {

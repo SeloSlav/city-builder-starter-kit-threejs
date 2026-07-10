@@ -1,4 +1,5 @@
 import type { RoadNetwork } from './RoadNetwork.ts';
+import { getEdgePath } from './roadEndpoint.ts';
 import { distancePointToPolylineXZ } from '../utils/pathGeometry.ts';
 import type { BuildingState, ResidenceState } from '../resources/types.ts';
 import { BUILDING_ROAD_ACCESS_DISTANCE, BURGAGE_ROAD_FRONTAGE_DISTANCE } from '../generated/gameBalance.ts';
@@ -29,8 +30,9 @@ const ROAD_SURFACE_MARGIN = 0.15;
 /** True when a point lies on paved road surface (not merely near a road). */
 export function isOnRoadSurface(x: number, z: number, network: RoadNetwork): boolean {
   for (const edge of network.edges.values()) {
-    if (edge.sampledPath.length < 2) continue;
-    const distance = distancePointToPolylineXZ(x, z, edge.sampledPath);
+    const path = getEdgePath(edge);
+    if (path.length < 2) continue;
+    const distance = distancePointToPolylineXZ(x, z, path);
     if (distance <= edge.width * 0.5 + ROAD_SURFACE_MARGIN) return true;
   }
 

@@ -105,6 +105,11 @@ export class BurgageTool {
     return 'crosshair';
   }
 
+  shouldBlockCameraInput(event: MouseEvent | WheelEvent): boolean {
+    if (!this.enabled || this.options.isBlocked()) return false;
+    return event instanceof MouseEvent && event.button === 2;
+  }
+
   hasDraft(): boolean {
     return this.placementStage > 0;
   }
@@ -315,7 +320,16 @@ export class BurgageTool {
   }
 
   private readonly onPointerDown = (event: MouseEvent): void => {
-    if (!this.enabled || event.button !== 0 || this.options.isBlocked()) return;
+    if (!this.enabled || this.options.isBlocked()) return;
+
+    if (event.button === 2) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.setEnabled(false);
+      return;
+    }
+
+    if (event.button !== 0) return;
     if (event.altKey) return;
 
     const point = this.pickPoint(event.clientX, event.clientY);

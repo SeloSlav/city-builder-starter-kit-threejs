@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { RoadEdge } from './RoadEdge.ts';
 import type { RoadNode } from './RoadNode.ts';
+import { getEdgePath } from './roadEndpoint.ts';
 import { distancePointToPolylineXZ } from '../utils/pathGeometry.ts';
 
 const CELL_SIZE = 24;
@@ -131,14 +132,13 @@ export class RoadSpatialIndex {
   }
 
   private insertEdge(edge: RoadEdge): void {
-    const useControlPoints = edge.controlPoints.length >= 2;
-    const path = useControlPoints ? edge.controlPoints : edge.sampledPath;
+    const path = getEdgePath(edge);
     if (path.length < 2) return;
 
     const indexed: IndexedRoadEdge = {
       edgeId: edge.id,
       path,
-      useControlPoints,
+      useControlPoints: path === edge.controlPoints,
     };
     const bounds = computePathBounds(path, 0);
     for (const key of cellKeysForBounds(bounds)) {

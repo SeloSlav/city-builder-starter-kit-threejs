@@ -27,7 +27,9 @@ const PAD_PARAMS: Record<BuildingKind, BuildingPadParams> = {
   stone_quarry: { radiusX: 10.5, radiusZ: 10.5, innerFade: 0.82, outerFade: 1.42 },
 };
 
-const FOOTPRINT_SAMPLE_FRACTIONS = [0, 0.55, 0.82] as const;
+const FOOTPRINT_SAMPLE_FRACTIONS = [0, 0.55, 0.82, 1] as const;
+/** Matches placement preview silhouette scale in BuildingPlacementPreview. */
+const FOOTPRINT_PREVIEW_SCALE = 0.92;
 
 export class BuildingTerrainLayout {
   readonly sites: BuildingPadSite[];
@@ -93,11 +95,12 @@ export function sampleBuildingFootprintPoints(
   const points: Array<{ x: number; z: number }> = [];
 
   for (const fraction of FOOTPRINT_SAMPLE_FRACTIONS) {
+    const sampleFraction = fraction === 1 ? FOOTPRINT_PREVIEW_SCALE : fraction;
     for (const sx of [-1, 0, 1] as const) {
       for (const sz of [-1, 0, 1] as const) {
         if (fraction === 0 && (sx !== 0 || sz !== 0)) continue;
-        const localX = sx * params.radiusX * params.innerFade * fraction;
-        const localZ = sz * params.radiusZ * params.innerFade * fraction;
+        const localX = sx * params.radiusX * params.innerFade * sampleFraction;
+        const localZ = sz * params.radiusZ * params.innerFade * sampleFraction;
         points.push({
           x: x + localX * cos - localZ * sin,
           z: z + localX * sin + localZ * cos,
