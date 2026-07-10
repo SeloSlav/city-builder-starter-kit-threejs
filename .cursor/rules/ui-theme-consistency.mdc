@@ -1,0 +1,32 @@
+---
+description: Enforce shared UI theme usage across frontend
+alwaysApply: false
+---
+
+# Shared UI Theme Consistency
+
+Use the shared theme files as the single source of truth for frontend styling:
+
+- TypeScript tokens: `client/src/theme/uiTheme.ts`
+- CSS custom properties: `client/src/theme/uiTheme.css`
+
+## Rules
+
+- Do not hardcode new color/typography/shadow tokens in component files.
+- Import theme tokens from `uiTheme.ts` for TS/TSX inline styles.
+- Use CSS variables from `uiTheme.css` for `.css` / `.module.css` files.
+- If a needed token does not exist, add it to the shared theme files first, then consume it.
+- Keep naming semantic (`THEME_ACCENT`, `THEME_TEXT_DIM`) rather than context-specific (`inventoryBlue`).
+
+## Implementation Pattern
+
+- TSX:
+  - `import { THEME_ACCENT, UI_FONT_MONO } from '../theme/uiTheme';`
+  - Use these constants in inline styles and dynamic states.
+- CSS:
+  - Use `var(--ui-accent)`, `var(--ui-text-primary)`, etc.
+
+## Avoid
+
+- Duplicating equivalent constants in components (e.g. multiple `#3a8fb5` declarations).
+- Mixing unrelated palettes in the same feature unless explicitly requested.

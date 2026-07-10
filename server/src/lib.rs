@@ -117,14 +117,14 @@ pub fn init(ctx: &ReducerContext) {
         next_building_id: 1,
         sim_tick: 0,
     });
-    seed_world_entities(ctx, DEFAULT_WORLD_SEED);
+    seed_world_entities(ctx);
     ensure_sim_schedule(ctx);
     log::info!("Medieval Road System module initialized (seed={DEFAULT_WORLD_SEED})");
 }
 
-fn seed_world_entities(ctx: &ReducerContext, seed: u64) {
+fn seed_world_entities(ctx: &ReducerContext) {
     if ctx.db.quarry().iter().count() == 0 {
-        for quarry in world_gen::bootstrap_quarry_rows(seed) {
+        for quarry in world_gen::bootstrap_quarry_rows() {
             ctx.db.quarry().insert(Quarry {
                 quarry_id: quarry.quarry_id,
                 x: quarry.x,
@@ -215,13 +215,7 @@ pub fn bootstrap_quarries(ctx: &ReducerContext, quarries: Vec<QuarryBootstrap>) 
         return Ok(());
     }
 
-    let config = ctx
-        .db
-        .world_config()
-        .id()
-        .find(&0)
-        .ok_or_else(|| "World not initialized.".to_string())?;
-    seed_world_entities(ctx, config.seed);
+    seed_world_entities(ctx);
     Ok(())
 }
 
@@ -252,7 +246,7 @@ pub fn bootstrap_trees(ctx: &ReducerContext, trees: Vec<TreeBootstrap>) -> Resul
         return Ok(());
     }
 
-    seed_world_entities(ctx, DEFAULT_WORLD_SEED);
+    seed_world_entities(ctx);
     Ok(())
 }
 

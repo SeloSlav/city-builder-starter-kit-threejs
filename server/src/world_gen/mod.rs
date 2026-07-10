@@ -1,7 +1,3 @@
-mod math;
-mod quarry;
-mod river;
-
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -61,7 +57,7 @@ fn parse_embedded_quarries() -> Vec<EmbeddedQuarry> {
     file.quarries
 }
 
-pub fn bootstrap_quarry_rows(_seed: u64) -> Vec<WorldBootstrapQuarry> {
+pub fn bootstrap_quarry_rows() -> Vec<WorldBootstrapQuarry> {
     parse_embedded_quarries()
         .into_iter()
         .map(|quarry| WorldBootstrapQuarry {

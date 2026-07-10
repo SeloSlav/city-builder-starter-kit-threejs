@@ -1,0 +1,27 @@
+---
+description: enforce core software engineering principles (clean, maintainable, scalable code)
+alwaysApply: false
+---
+
+Apply senior-level engineering rigor to every change.
+
+Priorities (in order):
+- **Abstraction + simplicity**: choose the simplest correct design, avoid cleverness.
+- **DRY**: don’t duplicate logic or constants, reuse utilities where it actually reduces complexity.
+- **Separation of concerns**: keep UI, domain logic, data access, and side effects cleanly separated.
+- **Modularity + composability**: build small pieces that combine cleanly.
+- **Encapsulation**: hide internals, expose minimal stable APIs.
+- **Single Responsibility**: each module/function does one job and does it well.
+- **Dependency injection**: pass dependencies in (don’t hardcode globals), make code swappable and testable.
+- **Immutability by default**: avoid mutation unless there’s a clear perf reason.
+- **Idempotency**: retries should be safe; repeated calls shouldn’t create weird state.
+- **Testability**: write code that’s easy to unit test (pure functions, small surfaces, predictable IO).
+- **Readability**: clear naming, straightforward control flow, minimal nesting.
+- **Scalability**: consider growth in data, users, and features without premature over-engineering.
+- **Performance awareness**: avoid obvious hot-path waste; measure before major optimizations.
+- **Error handling**: validate inputs, fail loudly with useful context, don’t swallow errors.
+
+When modifying existing code:
+- Preserve behavior unless the change explicitly requires otherwise.
+- Keep diffs small and localized.
+- Prefer refactors that reduce complexity and improve clarity.

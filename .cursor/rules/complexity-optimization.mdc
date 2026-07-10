@@ -1,0 +1,60 @@
+---
+description: Optimize O(n) complexity when it appears in hot paths or user-triggered code
+globs: client/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Complexity Optimization
+
+When writing or reviewing code, identify and fix O(n) scans that run frequently or on large collections.
+
+## When to Optimize
+
+- **Hot paths**: Code that runs every frame, on every store update, or in frequently-called callbacks
+- **Large collections**: Loops over `people`, `buildings`, `trees`, `stones`, or other world data
+- **Repeated work**: Building the same Map/Set inside a callback instead of once via `useMemo`
+
+## Patterns
+
+### Prefer lookup over scan
+
+```typescript
+// ❌ O(n) on every recall
+const recallGroup = () => {
+  const peopleById = new Map(people.map((p) => [String(p.id), p]));
+  for (const ref of refs) {
+    const person = peopleById.get(ref.id);
+    // ...
+  }
+};
+
+// ✅ O(1) lookup; parent memoizes peopleById
+const peopleById = useMemo(
+  () => new Map(people.map((p) => [String(p.id), p])),
+  [people]
+);
+const getPersonById = useCallback((id: string) => peopleById.get(id), [peopleById]);
+```
+
+### Memoize expensive derivations
+
+```typescript
+// ❌ Rebuilds on every render
+const itemsById = new Map(items.map((i) => [i.id, i]));
+
+// ✅ Rebuild only when items change
+const itemsById = useMemo(
+  () => new Map(items.map((i) => [i.id, i])),
+  [items]
+);
+```
+
+### Defer non-critical work
+
+Use `useDeferredValue` or `requestIdleCallback` for updates that don't need immediate sync (e.g. harvest ticks, world data sync).
+
+## Apply Intelligently
+
+- User-triggered, infrequent actions (e.g. keypress recall): O(n) may be acceptable
+- Per-frame or per-tick: prefer O(1) or O(log n) lookups
+- When in doubt: add a lookup/cache if the collection is large (>100 items) or the code runs often
