@@ -126,17 +126,17 @@ export class BurgageTool {
       return 'Click the second corner along the road';
     }
     if (this.placementStage === 2) {
-      return 'Click the third corner to set zone depth';
+      return 'Click the third corner to set plot depth';
     }
     if (this.placementStage === 3) {
       return 'Click the fourth corner to close the rectangle';
     }
     const validation = this.getValidation();
     if (!validation.ok) {
-      if (validation.reason === 'too_small') return 'Draw the zone deeper behind the road (~14m minimum)';
+      if (validation.reason === 'too_small') return 'Draw the plot deeper behind the road (~14m minimum)';
       if (validation.reason === 'no_fit') return 'Too many plots — press − to reduce plot count';
       if (validation.reason === 'insufficient_resources') return 'Not enough timber or stone';
-      return 'Adjust zone or plot count';
+      return 'Adjust plot shape or plot count';
     }
     const count = validation.layout.residences.length;
     const cost = validation.layout.totalCost;

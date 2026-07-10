@@ -211,10 +211,10 @@ function addCircularSaw(group: THREE.Group, x: number, z: number, floorY: number
   group.add(saw);
 }
 
-type GableAxis = 'x' | 'z';
+export type GableAxis = 'x' | 'z';
 
 /** Solid triangular infill closing the gable void between the wall plate and ridge. */
-function addTriangularGableWall(
+export function addTriangularGableWall(
   group: THREE.Group,
   axis: GableAxis,
   planePos: number,

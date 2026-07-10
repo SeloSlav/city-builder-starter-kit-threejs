@@ -51,7 +51,7 @@ export function renderWoodcuttersLodgeInspector(
     statusText = `Pulling timber from ${millsWithTimber} road-linked mill${millsWithTimber === 1 ? '' : 's'}`;
     statusState = 'active';
   } else {
-    statusText = `Processing and delivering to ${connectedResidences.length} road-linked cottage${connectedResidences.length === 1 ? '' : 's'}`;
+    statusText = `Processing and delivering to ${connectedResidences.length} road-linked residence${connectedResidences.length === 1 ? '' : 's'}`;
     statusState = active ? 'active' : 'idle';
   }
 
@@ -71,7 +71,7 @@ export function renderWoodcuttersLodgeInspector(
       ${buildingCostRows(building.kind, cost)}
       ${buildingRoadAccessRow(context.worldQueries, building)}
       <li><span>Road-linked mills</span><span>${millSummary}</span></li>
-      <li><span>Road-linked cottages</span><span>${residenceSummary}</span></li>
+      <li><span>Road-linked residences</span><span>${residenceSummary}</span></li>
       <li><span>Process interval</span><span>${definition.harvestInterval}s</span></li>
       ${buildingStorageRows(building, building.kind)}
     `,

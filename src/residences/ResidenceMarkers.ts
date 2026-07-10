@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { addTriangularGableWall } from '../buildings/BuildingMeshes.ts';
 import { addMesh, shingleMaterial, stoneMaterial, timberMaterial } from '../buildings/buildingMaterials.ts';
 import { MAIN_HOUSE_DEPTH, MAIN_HOUSE_WIDTH } from './burgageLayout.ts';
 
@@ -9,28 +10,6 @@ const WINDOW_MATERIAL = new THREE.MeshStandardMaterial({
   emissive: 0x1a2530,
   emissiveIntensity: 0.15,
 });
-
-function addGableWall(
-  group: THREE.Group,
-  planeZ: number,
-  halfSpan: number,
-  wallTop: number,
-  ridgeHeight: number,
-  material: THREE.Material,
-  faceSign: 1 | -1,
-): void {
-  const span = halfSpan - 0.08;
-  const shape = new THREE.Shape();
-  shape.moveTo(-span, 0);
-  shape.lineTo(span, 0);
-  shape.lineTo(0, ridgeHeight);
-  shape.closePath();
-
-  const geometry = new THREE.ExtrudeGeometry(shape, { depth: 0.18, bevelEnabled: false });
-  geometry.translate(0, wallTop, faceSign > 0 ? planeZ : planeZ - 0.18);
-  if (faceSign < 0) geometry.rotateY(Math.PI);
-  addMesh(group, geometry, material, new THREE.Vector3(0, 0, 0));
-}
 
 function addWindow(
   group: THREE.Group,
@@ -156,8 +135,19 @@ export function createResidenceMesh(): THREE.Group {
     );
   }
 
-  addGableWall(group, halfD - 0.08, halfW, wallTop, ridgeHeight, timberMaterial('mid'), 1);
-  addGableWall(group, -halfD + 0.08, halfW, wallTop, ridgeHeight, timberMaterial('mid'), -1);
+  const gableWallThickness = 0.18;
+  for (const zSign of [-1, 1] as const) {
+    addTriangularGableWall(
+      group,
+      'z',
+      zSign * (halfD - 0.08),
+      halfW,
+      wallTop,
+      ridgeHeight,
+      gableWallThickness,
+      timberMaterial('mid'),
+    );
+  }
 
   addMesh(
     group,
@@ -173,6 +163,27 @@ export function createResidenceMesh(): THREE.Group {
   );
 
   return group;
+}
+
+const PREVIEW_OPACITY = 0.72;
+
+export function createResidencePreviewMesh(): THREE.Group {
+  const mesh = createResidenceMesh();
+  mesh.traverse((child) => {
+    if (!(child instanceof THREE.Mesh)) return;
+    const source = child.material;
+    if (Array.isArray(source)) return;
+    const material = source.clone();
+    if (material instanceof THREE.MeshStandardMaterial) {
+      material.transparent = true;
+      material.opacity = PREVIEW_OPACITY;
+      material.depthWrite = false;
+    }
+    child.material = material;
+    child.renderOrder = 15;
+  });
+  mesh.frustumCulled = false;
+  return mesh;
 }
 
 export class ResidenceMarkers {

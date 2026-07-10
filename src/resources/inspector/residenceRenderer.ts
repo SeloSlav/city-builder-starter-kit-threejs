@@ -24,15 +24,15 @@ export function renderResidenceInspector(
   return {
     eyebrow: 'Residence',
     title: residence.abandoned
-      ? 'Abandoned cottage'
+      ? 'Abandoned residence'
       : residenceCount === 1
-        ? 'Burgage cottage'
-        : `Burgage zone (${residenceCount} cottages)`,
+        ? 'Residence'
+        : `Residence plot (${residenceCount} residences)`,
     statusText: needs.label,
     statusState: needs.state,
     detailsHtml: `
-      <li><span>Zone plots</span><span>${zone.plotCount}</span></li>
-      <li><span>Cottages</span><span>${residenceCount}</span></li>
+      <li><span>Plots</span><span>${zone.plotCount}</span></li>
+      <li><span>Residences</span><span>${residenceCount}</span></li>
       <li><span>Parcel</span><span>#${residence.parcelIndex + 1}</span></li>
       <li><span>Population</span><span>${residence.abandoned ? 0 : residence.population}</span></li>
       <li><span>Firewood stock</span><span>${Math.round(residence.firewoodStock)} / ${RESIDENCE_FIREWOOD_CAPACITY}</span></li>
@@ -42,7 +42,7 @@ export function renderResidenceInspector(
     `,
     demolish: {
       visible: true,
-      hint: `Removes the whole zone and salvages about ${refund.timber} timber and ${refund.stone} stone (${Math.round(STONE_SALVAGE_FRACTION * 100)}% stone, ${Math.round(TIMBER_SALVAGE_FRACTION * 100)}% timber of ${formatBuildingCost(cost)}).`,
+      hint: `Removes all residences on this plot and salvages about ${refund.timber} timber and ${refund.stone} stone (${Math.round(STONE_SALVAGE_FRACTION * 100)}% stone, ${Math.round(TIMBER_SALVAGE_FRACTION * 100)}% timber of ${formatBuildingCost(cost)}).`,
     },
     labor: hiddenLabor(),
   };

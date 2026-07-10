@@ -127,7 +127,8 @@ export function computeBurgageLayout(
       x: frontMid.x + inward.x * (HOUSE_SETBACK + MAIN_HOUSE_DEPTH * 0.5),
       z: frontMid.z + inward.z * (HOUSE_SETBACK + MAIN_HOUSE_DEPTH * 0.5),
     };
-    const yaw = Math.atan2(frontDir.x, frontDir.z);
+    // Mesh door sits on local +Z; rotate so +Z points toward the road (-inward).
+    const yaw = Math.atan2(inward.x, -inward.z);
     if (!footprintFits(houseCenter, yaw, polygon)) continue;
 
     const houseArea = MAIN_HOUSE_WIDTH * MAIN_HOUSE_DEPTH;

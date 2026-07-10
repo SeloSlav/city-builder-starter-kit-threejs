@@ -129,7 +129,8 @@ pub fn compute_burgage_layout(
             x: front_mid.x + inward.x * (HOUSE_SETBACK + MAIN_HOUSE_DEPTH * 0.5),
             z: front_mid.z + inward.z * (HOUSE_SETBACK + MAIN_HOUSE_DEPTH * 0.5),
         };
-        let yaw = front_dir.x.atan2(front_dir.z);
+        // Mesh door sits on local +Z; rotate so +Z points toward the road (-inward).
+        let yaw = inward.x.atan2(-inward.z);
         if !footprint_fits(&house_center, yaw, &polygon) {
             continue;
         }

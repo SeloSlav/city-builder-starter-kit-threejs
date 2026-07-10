@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { BurgageLayoutResult } from './burgageLayout.ts';
-import { getParcelDividerSegments, MAIN_HOUSE_DEPTH, MAIN_HOUSE_WIDTH } from './burgageLayout.ts';
+import { getParcelDividerSegments } from './burgageLayout.ts';
+import { createResidencePreviewMesh } from './ResidenceMarkers.ts';
 
 const VALID_ZONE_COLOR = 0x8ec07c;
 const INVALID_ZONE_COLOR = 0xd45d4a;
@@ -11,7 +12,6 @@ const PLACING_CORNER_COLOR = 0xffffff;
 const PARCEL_FILL_COLOR = 0xc9b07f;
 const PARCEL_LINE_COLOR = 0xe8d4a8;
 const DIVIDER_LINE_COLOR = 0xf2e3b7;
-const HOUSE_PREVIEW_COLOR = 0xd7b463;
 const MAX_PARCEL_FILLS = 12;
 const MAX_HOUSE_PREVIEWS = 12;
 const DASH_LENGTH = 1.8;
@@ -152,13 +152,9 @@ export class BurgagePreview {
   private readonly dividerLines: THREE.LineSegments;
   private readonly cornerMarkers: THREE.InstancedMesh;
   private readonly hoverMarker: THREE.Mesh;
-  private readonly houseMeshes: THREE.InstancedMesh;
+  private readonly housePreviewMeshes: THREE.Group[];
   private lastSignature = '';
   private readonly cornerMatrix = new THREE.Matrix4();
-  private readonly houseMatrix = new THREE.Matrix4();
-  private readonly houseScale = new THREE.Vector3(MAIN_HOUSE_WIDTH, 5.4, MAIN_HOUSE_DEPTH);
-  private readonly housePosition = new THREE.Vector3();
-  private readonly houseQuaternion = new THREE.Quaternion();
 
   constructor() {
     this.group.name = 'Residence preview';
@@ -284,23 +280,13 @@ export class BurgagePreview {
     this.hoverMarker.visible = false;
     this.group.add(this.hoverMarker);
 
-    const houseGeometry = new THREE.BoxGeometry(1, 1, 1);
-    this.houseMeshes = new THREE.InstancedMesh(
-      houseGeometry,
-      new THREE.MeshBasicMaterial({
-        color: HOUSE_PREVIEW_COLOR,
-        transparent: true,
-        opacity: 0.72,
-        depthWrite: false,
-        depthTest: false,
-      }),
-      MAX_HOUSE_PREVIEWS,
-    );
-    this.houseMeshes.renderOrder = 15;
-    this.houseMeshes.frustumCulled = false;
-    this.houseMeshes.count = 0;
-    this.houseMeshes.visible = false;
-    this.group.add(this.houseMeshes);
+    this.housePreviewMeshes = [];
+    for (let i = 0; i < MAX_HOUSE_PREVIEWS; i++) {
+      const mesh = createResidencePreviewMesh();
+      mesh.visible = false;
+      this.housePreviewMeshes.push(mesh);
+      this.group.add(mesh);
+    }
   }
 
   update(
@@ -416,17 +402,17 @@ export class BurgagePreview {
     assignLineSegments(this.dividerLines, dividerPositions);
 
     const houseCount = layout?.residences.length ?? 0;
-    this.houseMeshes.count = houseCount;
-    this.houseMeshes.visible = houseCount > 0;
     for (let i = 0; i < houseCount; i++) {
       const residence = layout!.residences[i];
-      const y = getHeightAt(residence.x, residence.z) + this.houseScale.y * 0.5;
-      this.houseQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), residence.yaw);
-      this.housePosition.set(residence.x, y, residence.z);
-      this.houseMatrix.compose(this.housePosition, this.houseQuaternion, this.houseScale);
-      this.houseMeshes.setMatrixAt(i, this.houseMatrix);
+      const mesh = this.housePreviewMeshes[i];
+      const y = getHeightAt(residence.x, residence.z);
+      mesh.position.set(residence.x, y, residence.z);
+      mesh.rotation.y = residence.yaw;
+      mesh.visible = true;
     }
-    this.houseMeshes.instanceMatrix.needsUpdate = houseCount > 0;
+    for (let i = houseCount; i < MAX_HOUSE_PREVIEWS; i++) {
+      this.housePreviewMeshes[i].visible = false;
+    }
   }
 
   clear(): void {
@@ -440,9 +426,9 @@ export class BurgagePreview {
     this.zoneOutline.visible = false;
     replaceGeometry(this.zoneFill);
     this.zoneFill.visible = false;
-    this.houseMeshes.count = 0;
-    this.houseMeshes.visible = false;
-    this.houseMeshes.instanceMatrix.needsUpdate = true;
+    for (const mesh of this.housePreviewMeshes) {
+      mesh.visible = false;
+    }
     replaceGeometry(this.parcelLines);
     this.parcelLines.visible = false;
     replaceGeometry(this.dividerLines);
@@ -471,8 +457,16 @@ export class BurgagePreview {
     (this.cornerMarkers.material as THREE.Material).dispose();
     this.hoverMarker.geometry.dispose();
     (this.hoverMarker.material as THREE.Material).dispose();
-    this.houseMeshes.geometry.dispose();
-    (this.houseMeshes.material as THREE.Material).dispose();
+    for (const mesh of this.housePreviewMeshes) {
+      mesh.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          const material = child.material;
+          if (Array.isArray(material)) material.forEach((entry) => entry.dispose());
+          else material.dispose();
+        }
+      });
+    }
     this.group.clear();
   }
 }

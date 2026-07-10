@@ -20,7 +20,7 @@ export const TOAST_MESSAGES = {
   'burgage.placement.water': 'Cannot place residences on water',
   'burgage.placement.too_steep': 'The slope is too steep here',
   'burgage.placement.invalid_shape': 'Invalid residence plot shape',
-  'burgage.placement.too_small': 'Zone is too shallow — pull the back edge farther from the road',
+  'burgage.placement.too_small': 'Plot is too shallow — pull the back edge farther from the road',
   'burgage.placement.no_road_frontage': 'Frontage must face a road',
   'burgage.placement.overlaps_existing': 'Overlaps an existing residence plot',
   'burgage.placement.overlaps_building': 'Overlaps an existing building',

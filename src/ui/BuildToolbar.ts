@@ -425,7 +425,7 @@ export class BuildToolbar {
           <li><span>Close rectangle</span><span class="road-controls-key">4th click</span></li>
           <li><span>Change plot count</span><span class="road-controls-key">+ / −</span></li>
           <li><span>Rotate frontage</span><span class="road-controls-key">F</span></li>
-          <li><span>Build zone</span><span class="road-controls-key">Hammer or Enter</span></li>
+          <li><span>Place residences</span><span class="road-controls-key">Hammer or Enter</span></li>
           <li><span>Cancel / exit</span><span class="road-controls-key">Esc</span></li>
         `;
       case 'lumber_mill':
