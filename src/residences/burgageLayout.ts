@@ -1,4 +1,4 @@
-import type { Point2 } from '../utils/polygonGeometry.ts';
+import { orientedRectCorners2, type Point2 } from '../utils/polygonGeometry.ts';
 import { residenceZoneCost } from '../resources/buildingEconomy.ts';
 
 export type BurgageZoneCorners = {
@@ -46,6 +46,11 @@ export const MIN_ZONE_DEPTH = MIN_PARCEL_DEPTH;
 export const MAX_BACKYARD_DEPTH = 12;
 export const MAX_ZONE_DEPTH = MAIN_HOUSE_DEPTH + HOUSE_SETBACK + MAX_BACKYARD_DEPTH;
 export const MAX_ROAD_FRONTAGE_DISTANCE = 16;
+
+/** Y rotation so mesh local +Z (front door) points toward the road. */
+export function residenceDoorYaw(inward: Point2): number {
+  return Math.atan2(-inward.x, -inward.z);
+}
 
 const CORNER_KEYS = ['a', 'b', 'c', 'd'] as const;
 const EDGE_PAIRS: ReadonlyArray<readonly [keyof BurgageZoneCorners, keyof BurgageZoneCorners]> = [
@@ -131,7 +136,7 @@ export function computeBurgageLayout(
       z: frontMid.z + inward.z * (HOUSE_SETBACK + MAIN_HOUSE_DEPTH * 0.5),
     };
     // Mesh door sits on local +Z; rotate so +Z points toward the road (-inward).
-    const yaw = Math.atan2(inward.x, -inward.z);
+    const yaw = residenceDoorYaw(inward);
     if (!footprintFits(houseCenter, yaw, polygon)) continue;
 
     const houseArea = MAIN_HOUSE_WIDTH * MAIN_HOUSE_DEPTH;
@@ -270,23 +275,13 @@ function isPointInPolygon(point: Point2, polygon: Point2[]): boolean {
 }
 
 function footprintFits(center: Point2, yaw: number, polygon: Point2[]): boolean {
-  const cos = Math.cos(yaw);
-  const sin = Math.sin(yaw);
-  const halfW = MAIN_HOUSE_WIDTH * 0.5;
-  const halfD = MAIN_HOUSE_DEPTH * 0.5;
-  const locals = [
-    { x: -halfW, z: -halfD },
-    { x: halfW, z: -halfD },
-    { x: halfW, z: halfD },
-    { x: -halfW, z: halfD },
-  ];
-  return locals.every((local) => {
-    const world = {
-      x: center.x + local.x * cos - local.z * sin,
-      z: center.z + local.x * sin + local.z * cos,
-    };
-    return isPointInPolygon(world, polygon);
-  });
+  const corners = orientedRectCorners2(
+    center,
+    yaw,
+    MAIN_HOUSE_WIDTH * 0.5,
+    MAIN_HOUSE_DEPTH * 0.5,
+  );
+  return corners.every((corner) => isPointInPolygon(corner, polygon));
 }
 
 export function autoFrontageEdge(

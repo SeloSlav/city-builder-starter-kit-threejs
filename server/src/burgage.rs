@@ -152,7 +152,7 @@ pub fn compute_burgage_layout(
             z: front_mid.z + inward.z * (HOUSE_SETBACK + MAIN_HOUSE_DEPTH * 0.5),
         };
         // Mesh door sits on local +Z; rotate so +Z points toward the road (-inward).
-        let yaw = inward.x.atan2(-inward.z);
+        let yaw = (-inward.x).atan2(-inward.z);
         if !footprint_fits(&house_center, yaw, &polygon) {
             continue;
         }
@@ -300,8 +300,8 @@ fn footprint_fits(center: &Point2, yaw: f64, polygon: &[Point2]) -> bool {
     ];
     locals.iter().all(|(lx, lz)| {
         let world = Point2 {
-            x: center.x + lx * cos - lz * sin,
-            z: center.z + lx * sin + lz * cos,
+            x: center.x + lx * cos + lz * sin,
+            z: center.z - lx * sin + lz * cos,
         };
         is_point_in_polygon(&world, polygon)
     })

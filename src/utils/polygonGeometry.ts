@@ -190,8 +190,8 @@ export function orientedRectCorners2(
     { x: halfWidth, z: halfDepth },
     { x: -halfWidth, z: halfDepth },
   ].map((local) => ({
-    x: center.x + local.x * cos - local.z * sin,
-    z: center.z + local.x * sin + local.z * cos,
+    x: center.x + local.x * cos + local.z * sin,
+    z: center.z - local.x * sin + local.z * cos,
   }));
 }
 
