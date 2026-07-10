@@ -17,7 +17,22 @@ export function createBuildingPreviewMesh(kind: BuildingKind): THREE.Group {
 }
 
 export function updateBuildingPreviewAppearance(group: THREE.Group, valid: boolean): void {
-  tintPreviewGroupInPlace(group, valid ? PREVIEW_COLORS.valid : PREVIEW_COLORS.invalid, PREVIEW_OPACITY);
+  setPreviewGroupColor(group, valid ? PREVIEW_COLORS.valid : PREVIEW_COLORS.invalid, PREVIEW_OPACITY);
+}
+
+function setPreviewGroupColor(group: THREE.Object3D, colorHex: number, opacity: number): void {
+  const color = new THREE.Color(colorHex);
+  group.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh) return;
+
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of materials) {
+      if (!(material instanceof THREE.MeshBasicMaterial)) continue;
+      material.color.copy(color);
+      material.opacity = opacity;
+    }
+  });
 }
 
 function tintPreviewGroup(source: THREE.Group, colorHex: number, opacity: number): THREE.Group {

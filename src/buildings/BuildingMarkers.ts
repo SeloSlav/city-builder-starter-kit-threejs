@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { disposeObject3D } from '../utils/dispose.ts';
 import type { BuildingKind, BuildingState } from '../resources/types.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
+import { buildingPlacementYaw } from './buildingPlacement.ts';
 import { createBuildingMesh } from './BuildingMeshes.ts';
 import {
   createBuildingPreviewMesh,
@@ -22,6 +23,7 @@ export class BuildingMarkers {
   private previewMesh: THREE.Mesh | null = null;
   private previewBuilding: THREE.Group | null = null;
   private previewKind: BuildingKind | null = null;
+  private previewValid: boolean | null = null;
 
   constructor(options: BuildingMarkersOptions) {
     this.terrain = options.terrain;
@@ -45,6 +47,7 @@ export class BuildingMarkers {
   clearPlacementPreview(): void {
     if (this.previewMesh) this.previewMesh.visible = false;
     if (this.previewBuilding) this.previewBuilding.visible = false;
+    this.previewValid = null;
   }
 
   setPlacementPreview(
@@ -65,7 +68,7 @@ export class BuildingMarkers {
     if (!this.previewMesh) {
       this.previewMesh = createRadiusRing(ringColor, 0.22);
       this.group.add(this.previewMesh);
-    } else {
+    } else if (this.previewValid !== valid) {
       (this.previewMesh.material as THREE.MeshBasicMaterial).color.setHex(ringColor);
     }
 
@@ -76,19 +79,22 @@ export class BuildingMarkers {
       }
       this.previewBuilding = createBuildingPreviewMesh(kind);
       this.previewKind = kind;
+      this.previewValid = valid;
       this.previewBuilding.rotation.y = buildingPlacementYaw(x, z);
       this.group.add(this.previewBuilding);
-    } else {
+    } else if (this.previewValid !== valid) {
       updateBuildingPreviewAppearance(this.previewBuilding, valid);
+      this.previewValid = valid;
     }
 
     const y = this.terrain.getHeightAt(x, z);
+    const yaw = buildingPlacementYaw(x, z);
     this.previewMesh.visible = true;
     this.previewMesh.position.set(x, y + 0.2, z);
     this.previewMesh.scale.set(radius, 1, radius);
 
     this.previewBuilding.visible = true;
-    this.previewBuilding.rotation.y = buildingPlacementYaw(x, z);
+    this.previewBuilding.rotation.y = yaw;
     this.previewBuilding.position.set(x, y, z);
   }
 
@@ -158,10 +164,6 @@ function buildingRadiusColor(kind: BuildingState['kind']): number {
       return unreachable;
     }
   }
-}
-
-function buildingPlacementYaw(x: number, z: number): number {
-  return (Math.abs(Math.floor(Math.sin(x * 0.017 + z * 0.013) * 6283)) % 360) * (Math.PI / 180);
 }
 
 function createRadiusRing(color: number, opacity: number): THREE.Mesh {

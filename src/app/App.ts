@@ -1,6 +1,8 @@
 ﻿import { CameraController } from '../camera/CameraController.ts';
 import { FirstPersonController } from '../camera/FirstPersonController.ts';
 import { BuildingMarkers } from '../buildings/BuildingMarkers.ts';
+import { BuildingTerrainLayout } from '../buildings/BuildingTerrainLayout.ts';
+import type { BuildingTerrainSource } from '../buildings/BuildingTerrainLayout.ts';
 import { BuildingTool } from '../buildings/BuildingTool.ts';
 import { SpacetimeGameStore } from '../data/spacetimeGameStore.ts';
 import { InputManager } from '../input/InputManager.ts';
@@ -25,6 +27,8 @@ import { RoadTool } from '../roads/RoadTool.ts';
 import { GameRuntime } from '../runtime/GameRuntime.ts';
 import { SceneManager } from '../scene/SceneManager.ts';
 import { beginStartupTextureLoad } from '../scene/startupTextures.ts';
+import { setActiveBuildingLayout, sampleNaturalTerrainHeight } from '../terrain/TerrainHeight.ts';
+import { updateTerrainBuildingPads } from '../terrain/TerrainBuildingPads.ts';
 import { BuildToolbar, type ToolbarStats } from '../ui/BuildToolbar.ts';
 import { LoadingScreen } from '../ui/LoadingScreen.ts';
 import { ToastManager } from '../ui/ToastManager.ts';
@@ -54,6 +58,9 @@ export class App {
   private spacetimeStore: SpacetimeGameStore | null = null;
   private gameRuntime: GameRuntime | null = null;
   private spacetimeConnected = false;
+  private buildingTerrainPreview: BuildingTerrainSource | null = null;
+  private lastBuildingTerrainMeshKey = '';
+  private readonly buildingTerrainMeshMoveThreshold = 0.4;
   private previousTreePhases = new Map<string, string>();
   private previousTreeGrowth = new Map<string, number>();
   private animationId = 0;
@@ -169,7 +176,11 @@ export class App {
         await this.spacetimeStore.placeBuilding(kind, x, z);
       },
       isWaterAt: (x, z) => sceneManager.riverField.isRenderedWetAt(x, z),
-      getHeightAt: (x, z) => sceneManager.terrain.getHeightAt(x, z),
+      getNaturalHeightAt: (x, z) => sampleNaturalTerrainHeight(x, z),
+      onPreviewChange: (preview) => {
+        this.buildingTerrainPreview = preview;
+        this.syncBuildingTerrain();
+      },
       onModeChanged: () => this.syncToolbar(),
       onPlacementRejected: (reason) => {
         this.toastManager?.showMessageId(buildingPlacementReasonToToastId(reason), { variant: 'error' });
@@ -373,6 +384,7 @@ export class App {
     this.treeRegistry = TreeRegistry.fromForestManager(forestManager);
     this.forestVisualSync = new ForestVisualSync(forestManager);
     this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
+    this.syncBuildingTerrain({ forceMeshUpdate: true });
     this.syncResourceUi();
     this.exposeDevHandles();
   }
@@ -456,8 +468,68 @@ export class App {
     }
 
     this.buildingMarkers?.syncBuildings(state.buildings.values());
+    this.syncBuildingTerrain({ forceMeshUpdate: true });
     this.syncResourceUi();
     this.syncToolbar();
+  }
+
+  private syncBuildingTerrain(options?: { forceMeshUpdate?: boolean }): void {
+    if (!this.sceneManager) return;
+
+    const sources: BuildingTerrainSource[] = [];
+    if (this.gameState) {
+      for (const building of this.gameState.buildings.values()) {
+        sources.push({ kind: building.kind, x: building.x, z: building.z });
+      }
+    }
+    if (this.buildingTerrainPreview) {
+      sources.push(this.buildingTerrainPreview);
+    }
+
+    const layout = BuildingTerrainLayout.fromBuildings(sources, sampleNaturalTerrainHeight);
+    setActiveBuildingLayout(layout);
+
+    const meshKey = sources
+      .map((source) => `${source.kind}:${source.x.toFixed(2)}:${source.z.toFixed(2)}`)
+      .join('|');
+    const shouldUpdateMesh = options?.forceMeshUpdate === true
+      || this.buildingTerrainPreview !== null
+      || !this.meshKeyWithinThreshold(meshKey, this.lastBuildingTerrainMeshKey);
+
+    if (shouldUpdateMesh) {
+      updateTerrainBuildingPads(this.sceneManager.terrain, layout);
+      this.lastBuildingTerrainMeshKey = meshKey;
+    }
+
+    this.buildingMarkers?.syncBuildings(this.gameState?.buildings.values() ?? []);
+  }
+
+  private meshKeyWithinThreshold(nextKey: string, previousKey: string): boolean {
+    if (!previousKey) return false;
+    const next = this.parseBuildingTerrainMeshKey(nextKey);
+    const previous = this.parseBuildingTerrainMeshKey(previousKey);
+    if (next.length !== previous.length) return false;
+
+    for (let i = 0; i < next.length; i++) {
+      const a = next[i];
+      const b = previous[i];
+      if (a.kind !== b.kind) return false;
+      if (Math.hypot(a.x - b.x, a.z - b.z) >= this.buildingTerrainMeshMoveThreshold) return false;
+    }
+
+    return true;
+  }
+
+  private parseBuildingTerrainMeshKey(key: string): BuildingTerrainSource[] {
+    if (!key) return [];
+    return key.split('|').map((entry) => {
+      const [kind, x, z] = entry.split(':');
+      return {
+        kind: kind as BuildingTerrainSource['kind'],
+        x: Number(x),
+        z: Number(z),
+      };
+    });
   }
 
   private syncResourceUi(): void {
@@ -497,6 +569,7 @@ export class App {
           this.roadNetwork!.restore(snapshot.roads);
           this.sceneManager!.syncRoadNetwork(this.roadNetwork!);
           this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
+          this.syncBuildingTerrain({ forceMeshUpdate: true });
           this.forestVisualSync?.syncAll(this.gameState.trees);
           this.roadSelection?.refresh();
           this.syncResourceUi();
@@ -530,6 +603,7 @@ export class App {
         this.roadNetwork!.restore(snapshot.roads);
         this.sceneManager?.syncRoadNetwork(this.roadNetwork!);
         this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
+        this.syncBuildingTerrain({ forceMeshUpdate: true });
         this.forestVisualSync?.syncAll(this.gameState.trees);
         this.roadSelection?.refresh();
         this.syncResourceUi();

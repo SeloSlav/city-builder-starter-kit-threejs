@@ -1,3 +1,4 @@
+import type { BuildingTerrainLayout } from '../buildings/BuildingTerrainLayout.ts';
 import type { RiverLayout } from '../rivers/RiverLayout.ts';
 import type { QuarryLayout } from '../quarries/QuarryLayout.ts';
 
@@ -6,6 +7,7 @@ const TERRAIN_SIZE = 1080;
 
 let activeRiverLayout: RiverLayout | null = null;
 let activeQuarryLayout: QuarryLayout | null = null;
+let activeBuildingLayout: BuildingTerrainLayout | null = null;
 
 export function setActiveRiverLayout(layout: RiverLayout | null): void {
   activeRiverLayout = layout;
@@ -21,6 +23,14 @@ export function setActiveQuarryLayout(layout: QuarryLayout | null): void {
 
 export function getActiveQuarryLayout(): QuarryLayout | null {
   return activeQuarryLayout;
+}
+
+export function setActiveBuildingLayout(layout: BuildingTerrainLayout | null): void {
+  activeBuildingLayout = layout;
+}
+
+export function getActiveBuildingLayout(): BuildingTerrainLayout | null {
+  return activeBuildingLayout;
 }
 
 function smoothstep(edge0: number, edge1: number, value: number): number {
@@ -119,7 +129,7 @@ export function sampleRawTerrainHeight(x: number, z: number): number {
   return n1 + n2 + broad + basin + getMacroDrainage(x, z) + getEdgeHillHeight(x, z);
 }
 
-export function sampleBaseTerrainHeight(x: number, z: number): number {
+export function sampleNaturalTerrainHeight(x: number, z: number): number {
   const raw = sampleRawTerrainHeight(x, z);
   const riverLayout = activeRiverLayout;
   const quarryLayout = activeQuarryLayout;
@@ -127,4 +137,11 @@ export function sampleBaseTerrainHeight(x: number, z: number): number {
   if (riverLayout) height -= riverLayout.getValleyDepression(x, z);
   if (quarryLayout) height -= quarryLayout.getPitDepression(x, z);
   return height;
+}
+
+export function sampleBaseTerrainHeight(x: number, z: number): number {
+  const natural = sampleNaturalTerrainHeight(x, z);
+  const buildingLayout = activeBuildingLayout;
+  if (!buildingLayout || buildingLayout.sites.length === 0) return natural;
+  return natural + buildingLayout.getPlatformRaise(x, z, natural);
 }

@@ -1,9 +1,10 @@
 import type { TerrainProjector } from '../terrain/TerrainProjector.ts';
 import type { BuildingKind, GameState } from '../resources/types.ts';
 import { getBuildingDefinition } from '../resources/buildings.ts';
-import type { BuildingPlacementFailureReason } from './BuildingPlacementValidation.ts';
+import type { BuildingPlacementFailureReason, BuildingPlacementResult } from './BuildingPlacementValidation.ts';
 import { validateBuildingPlacement } from './BuildingPlacementValidation.ts';
 import type { BuildingMarkers } from './BuildingMarkers.ts';
+import type { BuildingTerrainSource } from './BuildingTerrainLayout.ts';
 
 export type BuildingToolMode = BuildingKind | 'off';
 
@@ -14,7 +15,8 @@ type BuildingToolOptions = {
   getState: () => GameState;
   onPlaceBuilding: (kind: BuildingKind, x: number, z: number) => void | Promise<void>;
   isWaterAt: (x: number, z: number) => boolean;
-  getHeightAt: (x: number, z: number) => number;
+  getNaturalHeightAt: (x: number, z: number) => number;
+  onPreviewChange?: (preview: BuildingTerrainSource | null) => void;
   onModeChanged: () => void;
   onPlacementRejected?: (reason: BuildingPlacementFailureReason) => void;
   onPlacementFailed?: (message: string) => void;
@@ -27,6 +29,9 @@ export class BuildingTool {
   private pointerX = 0;
   private pointerY = 0;
   private pointerInside = false;
+  private lastPreviewX = Number.NaN;
+  private lastPreviewZ = Number.NaN;
+  private lastPreviewValidation: BuildingPlacementResult | null = null;
 
   constructor(options: BuildingToolOptions) {
     this.options = options;
@@ -46,8 +51,10 @@ export class BuildingTool {
 
   setMode(mode: BuildingToolMode): void {
     this.mode = mode;
+    this.resetPreviewCache();
     if (mode === 'off') {
       this.clearPreview();
+      this.options.onPreviewChange?.(null);
     } else {
       this.refreshPreview();
     }
@@ -77,13 +84,12 @@ export class BuildingTool {
   private readonly onPointerLeave = (): void => {
     this.pointerInside = false;
     this.clearPreview();
+    this.options.onPreviewChange?.(null);
   };
 
   private readonly onPointerMove = (event: MouseEvent): void => {
     this.pointerX = event.clientX;
     this.pointerY = event.clientY;
-    if (this.mode === 'off') return;
-    this.refreshPreview();
   };
 
   private readonly onPointerDown = (event: MouseEvent): void => {
@@ -121,17 +127,20 @@ export class BuildingTool {
   private refreshPreview(): void {
     if (this.mode === 'off' || this.options.isBlocked()) {
       this.clearPreview();
+      this.options.onPreviewChange?.(null);
       return;
     }
 
     const point = this.options.terrainProjector.pick(this.pointerX, this.pointerY);
     if (!point) {
       this.clearPreview();
+      this.options.onPreviewChange?.(null);
       return;
     }
 
     const definition = getBuildingDefinition(this.mode);
-    const validation = this.validate(this.mode, point.x, point.z);
+    const validation = this.validateAt(point.x, point.z);
+    this.options.onPreviewChange?.({ kind: this.mode, x: point.x, z: point.z });
     this.options.markers.setPlacementPreview(
       this.mode,
       point.x,
@@ -142,15 +151,36 @@ export class BuildingTool {
     );
   }
 
+  private validateAt(x: number, z: number): BuildingPlacementResult {
+    const dx = x - this.lastPreviewX;
+    const dz = z - this.lastPreviewZ;
+    if (this.lastPreviewValidation && Number.isFinite(this.lastPreviewX) && Math.hypot(dx, dz) < 0.02) {
+      return this.lastPreviewValidation;
+    }
+
+    const result = this.validate(this.mode as BuildingKind, x, z);
+    this.lastPreviewX = x;
+    this.lastPreviewZ = z;
+    this.lastPreviewValidation = result;
+    return result;
+  }
+
+  private resetPreviewCache(): void {
+    this.lastPreviewX = Number.NaN;
+    this.lastPreviewZ = Number.NaN;
+    this.lastPreviewValidation = null;
+  }
+
   private validate(kind: BuildingKind, x: number, z: number) {
     return validateBuildingPlacement(kind, x, z, {
       buildings: this.options.getState().buildings.values(),
       isWaterAt: this.options.isWaterAt,
-      getHeightAt: this.options.getHeightAt,
+      getNaturalHeightAt: this.options.getNaturalHeightAt,
     });
   }
 
   private clearPreview(): void {
+    this.resetPreviewCache();
     this.options.markers.clearPlacementPreview();
   }
 }

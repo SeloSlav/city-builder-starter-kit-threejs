@@ -37,72 +37,110 @@ function addLogPile(
   }
 }
 
+/** Two large logs on the bottom, one centered on top — oriented along the building length. */
+function addLargeLogPyramid(
+  group: THREE.Group,
+  centerX: number,
+  baseZ: number,
+  floorY: number,
+  logLength: number,
+  logRadius: number,
+): void {
+  const logSpacing = logRadius * 1.74;
+  const rowSpacing = logRadius * 1.88;
+  const bottomY = floorY + logRadius;
+
+  for (const [col, zOffset] of [[0, -0.5], [1, 0.5]] as const) {
+    addMesh(
+      group,
+      new THREE.CylinderGeometry(logRadius * 0.94, logRadius * 1.08, logLength, 10),
+      col === 0 ? timberMaterial('weathered') : timberMaterial('mid'),
+      new THREE.Vector3(centerX, bottomY, baseZ + zOffset * logSpacing),
+      new THREE.Euler(0, 0, Math.PI * 0.5),
+    );
+  }
+
+  addMesh(
+    group,
+    new THREE.CylinderGeometry(logRadius * 0.92, logRadius * 1.06, logLength, 10),
+    timberMaterial('light'),
+    new THREE.Vector3(centerX, bottomY + rowSpacing, baseZ),
+    new THREE.Euler(0, 0, Math.PI * 0.5),
+  );
+}
+
 function addCircularSaw(group: THREE.Group, x: number, z: number, floorY: number): void {
+  const saw = new THREE.Group();
+  saw.position.set(x, floorY, z);
+  saw.rotation.y = Math.PI * 0.5;
+
   const bladeRadius = 1.35;
-  const tableY = floorY + 0.25;
+  const tableY = 0.25;
 
   // Heavy timber bed and cast-iron table top.
   addMesh(
-    group,
+    saw,
     new THREE.BoxGeometry(3.8, 0.24, 1.9),
     timberMaterial('dark'),
-    new THREE.Vector3(x, floorY + 0.12, z),
+    new THREE.Vector3(0, 0.12, 0),
   );
   addMesh(
-    group,
+    saw,
     new THREE.BoxGeometry(3.55, 0.07, 1.72),
     metalMaterial('iron'),
-    new THREE.Vector3(x, tableY, z),
+    new THREE.Vector3(0, tableY, 0),
   );
 
-  // Vertical blade facing the log intake bay.
+  // Vertical blade — local +X becomes world +Z after the 90° yaw.
   addMesh(
-    group,
+    saw,
     new THREE.CylinderGeometry(bladeRadius, bladeRadius, 0.05, 28),
     metalMaterial('steel'),
-    new THREE.Vector3(x + 0.18, tableY + bladeRadius * 0.82, z),
+    new THREE.Vector3(0.18, tableY + bladeRadius * 0.82, 0),
     new THREE.Euler(0, 0, Math.PI * 0.5),
   );
 
   // Timber guard frame over the upper blade arc.
-  const guardX = x + 0.18;
+  const guardX = 0.18;
   const guardBaseY = tableY + bladeRadius * 0.15;
   const guardTopY = tableY + bladeRadius * 1.75;
   for (const zSign of [-1, 1] as const) {
     addMesh(
-      group,
+      saw,
       new THREE.BoxGeometry(0.14, guardTopY - guardBaseY, 0.14),
       timberMaterial('dark'),
-      new THREE.Vector3(guardX, (guardBaseY + guardTopY) * 0.5, z + zSign * bladeRadius * 0.62),
+      new THREE.Vector3(guardX, (guardBaseY + guardTopY) * 0.5, zSign * bladeRadius * 0.62),
     );
   }
   addMesh(
-    group,
+    saw,
     new THREE.BoxGeometry(0.14, 0.14, bladeRadius * 1.32),
     timberMaterial('dark'),
-    new THREE.Vector3(guardX, guardTopY, z),
+    new THREE.Vector3(guardX, guardTopY, 0),
   );
 
   // Drive pulley and crank wheel beside the table.
   addMesh(
-    group,
+    saw,
     new THREE.CylinderGeometry(0.62, 0.62, 0.14, 18),
     metalMaterial('iron'),
-    new THREE.Vector3(x - 1.25, floorY + 0.62, z - 0.75),
+    new THREE.Vector3(-1.25, 0.62, -0.75),
     new THREE.Euler(Math.PI * 0.5, 0, 0),
   );
   addMesh(
-    group,
+    saw,
     new THREE.BoxGeometry(0.12, 0.85, 0.12),
     timberMaterial('mid'),
-    new THREE.Vector3(x - 1.25, floorY + 0.62, z - 0.75),
+    new THREE.Vector3(-1.25, 0.62, -0.75),
   );
   addMesh(
-    group,
+    saw,
     new THREE.BoxGeometry(0.55, 0.1, 0.1),
     timberMaterial('light'),
-    new THREE.Vector3(x - 1.25, floorY + 1.02, z - 0.75),
+    new THREE.Vector3(-1.25, 1.02, -0.75),
   );
+
+  group.add(saw);
 }
 
 type GableAxis = 'x' | 'z';
@@ -303,6 +341,15 @@ export function createLumberMillMesh(): THREE.Group {
 
   // Triangular log pile beside the mill — stacked rows tapering to a point.
   addLogPile(group, halfL - 1.8, halfW + 1.6, 0, 5, 3.0, 0.26);
+
+  // Large-log pyramids along the opposite long wall — 2 bottom, 1 top per stack.
+  const sideLogRadius = 0.44;
+  const sideLogLength = 4.4;
+  const sidePileZ = -halfW - 1.55;
+  const pyramidSpacing = 3.6;
+  for (let x = -halfL + 2.8; x <= halfL - 3.2; x += pyramidSpacing) {
+    addLargeLogPyramid(group, x, sidePileZ, 0, sideLogLength, sideLogRadius);
+  }
 
   return group;
 }

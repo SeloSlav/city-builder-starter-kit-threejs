@@ -6,7 +6,7 @@ import { updateTerrainZoomBlend } from '../grass/GrassLodConfig.ts';
 import { createRiverSystem, type RiverSystem } from '../rivers/RiverSystem.ts';
 import { updateTerrainRoadWear } from '../terrain/TerrainRoadWear.ts';
 import { RiverField } from '../rivers/RiverField.ts';
-import { setActiveRiverLayout, setActiveQuarryLayout } from '../terrain/TerrainHeight.ts';
+import { setActiveRiverLayout, setActiveQuarryLayout, getActiveBuildingLayout } from '../terrain/TerrainHeight.ts';
 import { createQuarrySystem, type QuarrySystem } from '../quarries/QuarrySystem.ts';
 import { createWorldLayout, type WorldLayout } from '../resources/WorldLayout.ts';
 import type { RoadEdge } from '../roads/RoadEdge.ts';
@@ -189,7 +189,10 @@ export class SceneManager {
     });
     if (GRASS_BLADES_ENABLED) {
       this.grassField = createGrassBladeField(this.terrain, {
-        isBlockedAt: (x, z) => this.riverSystem.isGrassBlockedAt(x, z) || this.quarrySystem.isGrassBlockedAt(x, z),
+        isBlockedAt: (x, z) =>
+          this.riverSystem.isGrassBlockedAt(x, z)
+          || this.quarrySystem.isGrassBlockedAt(x, z)
+          || (getActiveBuildingLayout()?.isBlockedForGrass(x, z) ?? false),
       });
       this.scene.add(this.grassField.group);
       // Draw reeds after grass so shoreline cattails stay visible at ground level.

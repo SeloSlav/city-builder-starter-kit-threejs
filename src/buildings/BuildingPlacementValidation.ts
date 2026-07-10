@@ -1,5 +1,6 @@
 import type { BuildingKind, BuildingState } from '../resources/types.ts';
 import { getBuildingDefinition } from '../resources/buildings.ts';
+import { sampleBuildingFootprintHeights } from './BuildingTerrainLayout.ts';
 
 export type BuildingPlacementFailureReason = 'water' | 'too_steep' | 'too_close';
 
@@ -7,13 +8,12 @@ export type BuildingPlacementResult =
   | { ok: true }
   | { ok: false; reason: BuildingPlacementFailureReason };
 
-const MAX_SLOPE = 0.42;
-const SLOPE_SAMPLE_RADIUS = 4.5;
+const MAX_FOOTPRINT_HEIGHT_DELTA = 9.5;
 
 type BuildingPlacementContext = {
   buildings: Iterable<BuildingState>;
   isWaterAt: (x: number, z: number) => boolean;
-  getHeightAt: (x: number, z: number) => number;
+  getNaturalHeightAt: (x: number, z: number) => number;
 };
 
 export function validateBuildingPlacement(
@@ -26,7 +26,7 @@ export function validateBuildingPlacement(
     return { ok: false, reason: 'water' };
   }
 
-  if (isTooSteep(x, z, context.getHeightAt)) {
+  if (isFootprintTooUneven(kind, x, z, context.getNaturalHeightAt)) {
     return { ok: false, reason: 'too_steep' };
   }
 
@@ -53,19 +53,18 @@ export function isBuildingPlacementValid(
   return validateBuildingPlacement(kind, x, z, context).ok;
 }
 
-function isTooSteep(x: number, z: number, getHeightAt: (x: number, z: number) => number): boolean {
-  const centerY = getHeightAt(x, z);
-  const offsets = [
-    [SLOPE_SAMPLE_RADIUS, 0],
-    [-SLOPE_SAMPLE_RADIUS, 0],
-    [0, SLOPE_SAMPLE_RADIUS],
-    [0, -SLOPE_SAMPLE_RADIUS],
-  ] as const;
-
-  for (const [dx, dz] of offsets) {
-    const dy = Math.abs(getHeightAt(x + dx, z + dz) - centerY);
-    if (dy / SLOPE_SAMPLE_RADIUS > MAX_SLOPE) return true;
+function isFootprintTooUneven(
+  kind: BuildingKind,
+  x: number,
+  z: number,
+  getNaturalHeightAt: (x: number, z: number) => number,
+): boolean {
+  const heights = sampleBuildingFootprintHeights(kind, x, z, getNaturalHeightAt);
+  let minHeight = Number.POSITIVE_INFINITY;
+  let maxHeight = Number.NEGATIVE_INFINITY;
+  for (const height of heights) {
+    minHeight = Math.min(minHeight, height);
+    maxHeight = Math.max(maxHeight, height);
   }
-
-  return false;
+  return maxHeight - minHeight > MAX_FOOTPRINT_HEIGHT_DELTA;
 }
