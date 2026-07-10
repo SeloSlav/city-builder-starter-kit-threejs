@@ -28,7 +28,7 @@ export const BUILDING_DEFINITIONS: Record<BuildingKind, BuildingDefinition> = {
   },
   stone_quarry: {
     kind: 'stone_quarry',
-    label: 'Stone quarry',
+    label: "Stonecutter's camp",
     workRadius: 55,
     pickRadius: 10,
     harvestInterval: 4,

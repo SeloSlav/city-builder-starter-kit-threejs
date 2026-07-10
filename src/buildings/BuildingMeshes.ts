@@ -239,9 +239,9 @@ function addTriangularGableWall(
 
   if (axis === 'x') {
     geometry.rotateY(Math.PI * 0.5);
-    geometry.translate(planePos + outwardSign * thickness * 0.5, 0, centerZ);
+    geometry.translate(centerX + planePos + outwardSign * thickness * 0.5, 0, centerZ);
   } else {
-    geometry.translate(centerX, 0, planePos + outwardSign * thickness * 0.5);
+    geometry.translate(centerX, 0, centerZ + planePos + outwardSign * thickness * 0.5);
   }
 
   addMesh(group, geometry, material, new THREE.Vector3(0, 0, 0));
@@ -650,12 +650,16 @@ function addQuarryHoistFrame(
   const frameSpan = 2.6;
   const frameHeight = 5.4;
   const legW = 0.32;
-  const crossY = frameHeight - 0.12;
-  const pulleyY = frameHeight - 0.55;
+  const crossbarH = 0.24;
+  const crossY = frameHeight - crossbarH * 0.5;
+  const crossBottomY = crossY - crossbarH * 0.5;
+  const pulleyRadius = 0.34;
+  const pulleyThickness = 0.18;
   const blockW = 0.85;
   const blockH = 0.5;
   const blockX = hoistX - 0.55;
   const blockTopY = blockH;
+  const pulleyX = blockX;
 
   for (const z of [-frameSpan, frameSpan] as const) {
     addMesh(
@@ -668,16 +672,24 @@ function addQuarryHoistFrame(
 
   addMesh(
     group,
-    new THREE.BoxGeometry(0.24, 0.24, frameSpan * 2 + 0.42),
+    new THREE.BoxGeometry(0.24, crossbarH, frameSpan * 2 + 0.42),
     timberMaterial('weathered'),
     new THREE.Vector3(hoistX, crossY, hoistZ),
   );
 
+  const pulleyY = crossBottomY - pulleyRadius;
   addMesh(
     group,
-    new THREE.CylinderGeometry(0.34, 0.34, 0.2, 12),
+    new THREE.BoxGeometry(0.12, crossBottomY - pulleyY, 0.16),
+    timberMaterial('dark'),
+    new THREE.Vector3(pulleyX, (crossBottomY + pulleyY) * 0.5, hoistZ),
+  );
+
+  addMesh(
+    group,
+    new THREE.CylinderGeometry(pulleyRadius, pulleyRadius, pulleyThickness, 12),
     metalMaterial('iron'),
-    new THREE.Vector3(blockX, pulleyY, hoistZ),
+    new THREE.Vector3(pulleyX, pulleyY, hoistZ),
     new THREE.Euler(Math.PI * 0.5, 0, 0),
   );
 
@@ -696,8 +708,8 @@ function addQuarryHoistFrame(
     new THREE.Vector3(blockX, hookY, hoistZ),
   );
 
-  const ropeTopY = pulleyY - 0.1;
-  const ropeBottomY = hookY;
+  const ropeTopY = pulleyY - pulleyRadius;
+  const ropeBottomY = hookY + 0.06;
   const ropeHeight = ropeTopY - ropeBottomY;
   addMesh(
     group,
@@ -846,26 +858,27 @@ function addQuarryForemanShed(group: THREE.Group, shedX: number, shedZ: number):
   );
 
   const gableThickness = 0.16;
-  for (const zSign of [-1, 1] as const) {
+  for (const xSign of [-1, 1] as const) {
     addTriangularGableWall(
       group,
-      'z',
-      shedZ + zSign * (halfD - wallInset),
-      halfW,
+      'x',
+      xSign * (halfW - wallInset),
+      halfD,
       wallTop,
       ridgeH,
       gableThickness,
       timberMaterial('weathered'),
-      zSign,
+      0,
       shedX,
+      shedZ,
     );
   }
 }
 
-/** Open-pit stone quarry — separated pit basin, block stacks, hoist, and foreman's shed. */
+/** Stonecutter's camp — work yard with block stacks, hoist, and foreman's shed. */
 export function createStoneQuarryMesh(): THREE.Group {
   const group = new THREE.Group();
-  group.name = 'Stone quarry';
+  group.name = "Stonecutter's camp";
 
   const pitX = 0;
   const pitZ = -2.8;

@@ -29,7 +29,7 @@ A real-time Three.js sandbox for building a medieval settlement on a procedural 
 - **Stockpile** — per-player wood, stone, and water tracked in SpacetimeDB and shown in a live HUD.
 - **Lumber mill** — harvests the nearest mature tree within a 42 m work radius every 3.5 s, converting it to a stump and crediting wood to your stockpile.
 - **Reforester** — regrows stumps within a 38 m radius through `stump → growing → mature` phases; growing trees render as animated saplings.
-- **Stone quarry (building)** — extracts 10 stone per harvest from the nearest procedural quarry site within 55 m, every 4 s, until the site is depleted.
+- **Stonecutter's camp (building)** — extracts 10 stone per harvest from the nearest procedural quarry site within 55 m, every 4 s, until the site is depleted.
 - Server-authoritative simulation tick (200 ms) in the Rust module — buildings, tree phases, and quarry yields all run server-side.
 - Building placement tool with terrain-following preview, work-radius rings, and validation (no water, slope, or overlap).
 - Click-to-inspect resource panel for quarries, placed buildings, and river access — shows yields, tree counts, and remaining stone.
@@ -90,7 +90,7 @@ A real-time Three.js sandbox for building a medieval settlement on a procedural 
 | Cancel active road preview | `Escape` (road mode) |
 | Toggle lumber mill placement | Click **Lumber mill** in the build toolbar |
 | Toggle reforester placement | Click **Reforester** |
-| Toggle stone quarry placement | Click **Stone quarry** |
+| Toggle stonecutter's camp placement | Click **Stonecutter's camp** |
 | Place building | Left-click on terrain (building tool active) |
 | Inspect quarry / building / river | Left-click on terrain (no tool active) |
 | Pan camera | Right-click drag, `WASD`, or arrow keys |
@@ -183,7 +183,7 @@ When real auth is added later, swap the token source in `src/network/identityPer
 | Data | Server table | Notes |
 | --- | --- | --- |
 | Wood / stone / water | `player_resources` | Per anonymous identity |
-| Lumber mill, reforester, stone quarry | `building` | Server tick harvests/regrows |
+| Lumber mill, reforester, stonecutter's camp | `building` | Server tick harvests/regrows |
 | Tree stump / growing / mature | `tree_entity` | Bootstrapped after forest load |
 | Quarry remaining yield | `quarry` | Global world sites (1 large + 2 small) |
 | Roads + bridges | `road_network_state` | Full `RoadNetworkSnapshot` JSON per player |
