@@ -174,6 +174,26 @@ export class ForestManager {
     this.commitTreeInstanceUpdates();
   }
 
+  setTreeShadowsEnabled(enabled: boolean): void {
+    this.trunkMesh.castShadow = enabled;
+    this.coniferShadowMesh.castShadow = enabled;
+    this.broadleafShadowMesh.castShadow = enabled;
+    this.saplingMesh.castShadow = enabled;
+    this.stumpMesh.castShadow = enabled;
+    this.harvestStumpMesh.castShadow = enabled;
+    if (this.undergrowth) {
+      this.undergrowth.bushShadowMesh.castShadow = enabled;
+      this.undergrowth.fernShadowMesh.castShadow = enabled;
+    }
+    this.group.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (mesh.name.toLowerCase().includes('shadow')) {
+        mesh.castShadow = enabled;
+      }
+    });
+  }
+
   syncRoadClearance(network: RoadNetwork): void {
     this.syncPlacementClearance({ roadNetwork: network });
   }

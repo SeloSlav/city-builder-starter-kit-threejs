@@ -26,9 +26,11 @@ export function renderReforesterInspector(
     title: label,
     statusText: building.assignedLabor === 0
       ? 'Idle — assign a forester to regrow stumps'
-      : stumpTrees + growingTrees > 0
-        ? `Reforesting — ${stumpTrees} stumps, ${growingTrees} growing`
-        : 'Idle — no stumps in range',
+      : growingTrees > 0
+        ? `Reforesting — ${growingTrees} saplings growing${stumpTrees > 0 ? `, ${stumpTrees} stumps queued` : ''}`
+        : stumpTrees > 0
+          ? `Reforesting — ${stumpTrees} stumps in range`
+          : 'Idle — no stumps in range',
     statusState: regrowing ? 'active' : building.assignedLabor === 0 ? 'idle' : 'draft',
     detailsHtml: `
       ${buildingCostRows(building.kind, cost)}

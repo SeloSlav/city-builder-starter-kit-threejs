@@ -349,6 +349,9 @@ export class App {
       onMenuOpenChange: (open) => {
         cameraController.setInputEnabled(!open && !firstPersonController.isActive());
       },
+      onShadowPreferenceChange: () => {
+        sceneManager.applyShadowPreferences();
+      },
       canOpenMenuFromKeyboard: () =>
         !firstPersonController.isActive()
         && !roadTool.isEnabled()

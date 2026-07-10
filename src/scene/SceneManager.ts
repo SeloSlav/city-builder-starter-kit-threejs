@@ -28,7 +28,9 @@ import { yieldToMain } from '../utils/yieldToMain.ts';
 import { createPostProcessor, type ScenePostProcessor } from './PostProcessing.ts';
 import { fitDirectionalLightShadow, computeViewShadowBounds, intersectTerrainBounds } from './fitDirectionalShadow.ts';
 import { createPreferredRenderer, type RendererBackend, type RendererBackendKind, type SupportedRenderer } from './RendererBackend.ts';
+import { applyShadowPreferences as syncShadowCasters } from './applyShadowPreferences.ts';
 import { TREE_SHADOW_CAST_LAYER } from './SceneLayers.ts';
+import { subscribeShadowPreferences } from './shadowPreference.ts';
 import { applyMaxAnisotropy, beginStartupTextureLoad, type SceneStartupTextures } from './startupTextures.ts';
 
 export class SceneManager {
@@ -72,6 +74,7 @@ export class SceneManager {
   private lastShadowTargetX = Number.NaN;
   private lastShadowTargetZ = Number.NaN;
   private lastShadowDistance = Number.NaN;
+  private unsubscribeShadowPreferences: (() => void) | null = null;
 
   private constructor(
     container: HTMLElement,
@@ -135,6 +138,7 @@ export class SceneManager {
     );
     this.addLighting();
     this.postProcessor = createPostProcessor(backend, this.scene, this.camera);
+    this.unsubscribeShadowPreferences = subscribeShadowPreferences(() => this.applyShadowPreferences());
   }
 
   static async create(
@@ -219,6 +223,19 @@ export class SceneManager {
       this.grassField?.syncRoadClearance(this.roadNetworkRef);
       this.refreshShadowMap();
     }
+
+    this.applyShadowPreferences();
+  }
+
+  applyShadowPreferences(): void {
+    if (!this.sunLight) return;
+    syncShadowCasters({
+      sunLight: this.sunLight,
+      forestManager: this.forestManager,
+      propGroups: [this.riverSystem.group, this.quarrySystem.group],
+      buildingRoot: this.selectionGroup,
+    });
+    this.refreshShadowMap();
   }
 
   resize(): void {
@@ -429,6 +446,8 @@ export class SceneManager {
   }
 
   dispose(): void {
+    this.unsubscribeShadowPreferences?.();
+    this.unsubscribeShadowPreferences = null;
     for (const visual of this.edgeVisuals.values()) disposeObject3D(visual.group);
     this.edgeVisuals.clear();
     if (this.forestManager) {

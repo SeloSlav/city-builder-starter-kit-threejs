@@ -1,6 +1,6 @@
 import { getBuildingCost } from '../buildingEconomy.ts';
 import { getBuildingDefinition } from '../buildings.ts';
-import { laborScaledInterval } from '../resourceTotals.ts';
+import { buildingStorageCaps, laborScaledInterval } from '../resourceTotals.ts';
 import type { InspectableTarget } from '../types.ts';
 import {
   buildingCostRows,
@@ -21,7 +21,9 @@ export function renderLumberMillInspector(
   const label = context.worldQueries.getBuildingLabel(building.kind);
   const cost = getBuildingCost(building.kind);
   const definition = getBuildingDefinition(building.kind);
-  const active = building.assignedLabor > 0 && matureTrees > 0;
+  const storageCaps = buildingStorageCaps(building.kind);
+  const storageFull = storageCaps.timber > 0 && building.timber >= storageCaps.timber - 0.001;
+  const active = building.assignedLabor > 0 && matureTrees > 0 && !storageFull;
   const cycleSeconds = laborScaledInterval(definition.harvestInterval, building.assignedLabor);
 
   return {
@@ -29,9 +31,11 @@ export function renderLumberMillInspector(
     title: label,
     statusText: building.assignedLabor === 0
       ? 'Idle — assign labor to harvest timber'
-      : matureTrees > 0
-        ? `Harvesting — ${matureTrees} mature trees in range`
-        : 'Idle — no mature trees in range',
+      : storageFull
+        ? `Storage full — not harvesting (${matureTrees} mature trees in range)`
+        : matureTrees > 0
+          ? `Harvesting — ${matureTrees} mature trees in range`
+          : 'Idle — no mature trees in range',
     statusState: active ? 'active' : 'idle',
     detailsHtml: `
       ${buildingCostRows(building.kind, cost)}

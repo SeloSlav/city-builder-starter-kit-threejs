@@ -20,20 +20,51 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: SimTickSchedule) {
 
     let tick = SimTickContext::new(ctx);
 
-    let building_ids: Vec<u64> = ctx.db.building().iter().map(|b| b.id).collect();
-    for building_id in building_ids {
-        let Some(building) = ctx.db.building().id().find(&building_id) else {
-            continue;
-        };
-        let Some(sim_kind) = crate::building_defs::building_def(&building.kind).and_then(|def| def.sim_kind) else {
+    let mut lumber_mill_ids: Vec<u64> = Vec::new();
+    let mut reforester_ids: Vec<u64> = Vec::new();
+    let mut stone_quarry_ids: Vec<u64> = Vec::new();
+    let mut woodcutters_lodge_ids: Vec<u64> = Vec::new();
+
+    for building in ctx.db.building().iter() {
+        let Some(sim_kind) =
+            crate::building_defs::building_def(&building.kind).and_then(|def| def.sim_kind)
+        else {
             continue;
         };
         match sim_kind {
-            BuildingSimKind::LumberMill => step_lumber_mill(ctx, building),
-            BuildingSimKind::Reforester => step_reforester(ctx, building),
-            BuildingSimKind::StoneQuarry => step_stone_quarry(ctx, building),
-            BuildingSimKind::WoodcuttersLodge => step_woodcutters_lodge(ctx, &tick, building),
+            BuildingSimKind::LumberMill => lumber_mill_ids.push(building.id),
+            BuildingSimKind::Reforester => reforester_ids.push(building.id),
+            BuildingSimKind::StoneQuarry => stone_quarry_ids.push(building.id),
+            BuildingSimKind::WoodcuttersLodge => woodcutters_lodge_ids.push(building.id),
         }
+    }
+
+    for building_id in reforester_ids {
+        let Some(building) = ctx.db.building().id().find(&building_id) else {
+            continue;
+        };
+        step_reforester(ctx, building);
+    }
+
+    for building_id in lumber_mill_ids {
+        let Some(building) = ctx.db.building().id().find(&building_id) else {
+            continue;
+        };
+        step_lumber_mill(ctx, building);
+    }
+
+    for building_id in stone_quarry_ids {
+        let Some(building) = ctx.db.building().id().find(&building_id) else {
+            continue;
+        };
+        step_stone_quarry(ctx, building);
+    }
+
+    for building_id in woodcutters_lodge_ids {
+        let Some(building) = ctx.db.building().id().find(&building_id) else {
+            continue;
+        };
+        step_woodcutters_lodge(ctx, &tick, building);
     }
 
     let residence_ids: Vec<u64> = ctx.db.residence().iter().map(|row| row.id).collect();

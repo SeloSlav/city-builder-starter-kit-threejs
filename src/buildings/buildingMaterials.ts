@@ -99,7 +99,7 @@ export function addMesh(
   mesh.position.copy(position);
   mesh.rotation.copy(rotation);
   mesh.scale.copy(scale);
-  // Detailed building meshes are draw-call heavy; they receive terrain/tree shadows but do not cast.
+  // Detailed meshes stay off the shadow pass; one invisible proxy per building casts instead.
   mesh.castShadow = false;
   mesh.receiveShadow = true;
   group.add(mesh);

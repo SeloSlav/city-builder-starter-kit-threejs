@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { disposeObject3D } from '../utils/dispose.ts';
 import type { BuildingKind, BuildingState } from '../resources/types.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
+import { areBuildingShadowsDisabled } from '../scene/shadowPreference.ts';
 import { buildingPlacementYaw } from './buildingPlacement.ts';
+import { createBuildingShadowProxy } from './buildingShadowProxy.ts';
 import { createBuildingMesh } from './BuildingMeshes.ts';
 import {
   createBuildingPreviewMesh,
@@ -152,6 +154,9 @@ export class BuildingMarkers {
     let marker = this.buildingMeshes.get(building.id);
     if (!marker) {
       marker = createBuildingMesh(building.kind);
+      const shadowProxy = createBuildingShadowProxy(building.kind);
+      shadowProxy.castShadow = !areBuildingShadowsDisabled();
+      marker.add(shadowProxy);
       marker.rotation.y = buildingPlacementYaw(building.x, building.z);
       this.buildingMeshes.set(building.id, marker);
       this.group.add(marker);
@@ -159,6 +164,11 @@ export class BuildingMarkers {
 
     const y = this.terrain.getHeightAt(building.x, building.z);
     marker.position.set(building.x, y, building.z);
+    if (!marker.getObjectByName('Building shadow proxy')) {
+      const shadowProxy = createBuildingShadowProxy(building.kind);
+      shadowProxy.castShadow = !areBuildingShadowsDisabled();
+      marker.add(shadowProxy);
+    }
   }
 
   private removeBuilding(id: string): void {

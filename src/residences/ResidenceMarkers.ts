@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { addTriangularGableWall } from '../buildings/BuildingMeshes.ts';
+import { createResidenceShadowProxy } from '../buildings/buildingShadowProxy.ts';
 import { addMesh, shingleMaterial, stoneMaterial, timberMaterial } from '../buildings/buildingMaterials.ts';
+import { areBuildingShadowsDisabled } from '../scene/shadowPreference.ts';
 import { MAIN_HOUSE_DEPTH, MAIN_HOUSE_WIDTH } from './burgageLayout.ts';
 
 const WINDOW_MATERIAL = new THREE.MeshStandardMaterial({
@@ -211,12 +213,20 @@ export class ResidenceMarkers {
       let marker = this.meshes.get(residence.id);
       if (!marker) {
         marker = createResidenceMesh();
+        const shadowProxy = createResidenceShadowProxy();
+        shadowProxy.castShadow = !areBuildingShadowsDisabled();
+        marker.add(shadowProxy);
         this.root.add(marker);
         this.meshes.set(residence.id, marker);
       }
       const y = getHeightAt(residence.x, residence.z);
       marker.position.set(residence.x, y, residence.z);
       marker.rotation.y = residence.yaw;
+      if (!marker.getObjectByName('Building shadow proxy')) {
+        const shadowProxy = createResidenceShadowProxy();
+        shadowProxy.castShadow = !areBuildingShadowsDisabled();
+        marker.add(shadowProxy);
+      }
     }
 
     for (const [id, marker] of this.meshes) {

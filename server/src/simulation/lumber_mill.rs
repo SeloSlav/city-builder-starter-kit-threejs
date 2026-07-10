@@ -34,7 +34,8 @@ pub fn step_lumber_mill(ctx: &ReducerContext, building: Building) {
     let labor_interval = interval / building.assigned_labor as f64;
 
     let caps = building_storage_caps(&building.kind);
-    if building.timber >= caps.timber - 1e-6 {
+    let timber_room = (caps.timber - building.timber).max(0.0);
+    if timber_room <= 1e-6 {
         ctx.db.building().id().update(Building {
             action_cooldown: labor_interval,
             ..building
@@ -50,13 +51,22 @@ pub fn step_lumber_mill(ctx: &ReducerContext, building: Building) {
         return;
     };
 
+    let (timber_deposited, _, _, mut updated) =
+        deposit_building(&building, caps, target.wood_yield, 0.0, 0.0);
+    if timber_deposited <= 1e-6 {
+        ctx.db.building().id().update(Building {
+            action_cooldown: labor_interval,
+            ..building
+        });
+        return;
+    }
+
     ctx.db.tree_entity().tree_id().update(TreeEntity {
         phase: "stump".to_string(),
         growth_progress: 0.0,
         ..target
     });
 
-    let (_, _, _, mut updated) = deposit_building(&building, caps, target.wood_yield, 0.0, 0.0);
     updated.action_cooldown = labor_interval;
     ctx.db.building().id().update(updated);
 }

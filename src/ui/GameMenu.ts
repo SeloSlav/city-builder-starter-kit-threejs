@@ -1,10 +1,17 @@
 import {
+  areBuildingShadowsDisabled,
+  areTreeShadowsDisabled,
+  setBuildingShadowsDisabled,
+  setTreeShadowsDisabled,
+} from '../scene/shadowPreference.ts';
+import {
   areTipCardsDisabled,
   setTipCardsDisabled,
 } from './tipCardsPreference.ts';
 
 type GameMenuOptions = {
   onTipsPreferenceChange: () => void;
+  onShadowPreferenceChange: () => void;
   onOpenChange?: (open: boolean) => void;
   onExportGameState?: () => void;
   onImportGameState?: () => void;
@@ -16,9 +23,12 @@ export class GameMenu {
   private readonly backdrop: HTMLElement;
   private readonly dialog: HTMLElement;
   private readonly tipsCheckbox: HTMLInputElement;
+  private readonly treeShadowsCheckbox: HTMLInputElement;
+  private readonly buildingShadowsCheckbox: HTMLInputElement;
   private readonly menuButton: HTMLButtonElement;
   private open = false;
   private readonly onTipsPreferenceChange: () => void;
+  private readonly onShadowPreferenceChange: () => void;
   private readonly onOpenChange?: (open: boolean) => void;
   private readonly onExportGameState?: () => void;
   private readonly onImportGameState?: () => void;
@@ -27,6 +37,7 @@ export class GameMenu {
 
   constructor(parent: HTMLElement, options: GameMenuOptions) {
     this.onTipsPreferenceChange = options.onTipsPreferenceChange;
+    this.onShadowPreferenceChange = options.onShadowPreferenceChange;
     this.onOpenChange = options.onOpenChange;
     this.onExportGameState = options.onExportGameState;
     this.onImportGameState = options.onImportGameState;
@@ -54,6 +65,14 @@ export class GameMenu {
           <input type="checkbox" data-tips-checkbox />
           <span>Turn off tips</span>
         </label>
+        <label class="game-menu-option">
+          <input type="checkbox" data-tree-shadows-checkbox />
+          <span>Turn off tree shadows</span>
+        </label>
+        <label class="game-menu-option">
+          <input type="checkbox" data-building-shadows-checkbox />
+          <span>Turn off building shadows</span>
+        </label>
         <div class="game-menu-actions">
           <button type="button" class="game-menu-action" data-export-state>Export game state</button>
           <button type="button" class="game-menu-action" data-import-state>Import game state</button>
@@ -64,6 +83,8 @@ export class GameMenu {
 
     this.dialog = this.backdrop.querySelector<HTMLElement>('.game-menu-dialog')!;
     this.tipsCheckbox = this.backdrop.querySelector<HTMLInputElement>('[data-tips-checkbox]')!;
+    this.treeShadowsCheckbox = this.backdrop.querySelector<HTMLInputElement>('[data-tree-shadows-checkbox]')!;
+    this.buildingShadowsCheckbox = this.backdrop.querySelector<HTMLInputElement>('[data-building-shadows-checkbox]')!;
     const returnButton = this.backdrop.querySelector<HTMLButtonElement>('[data-return-button]')!;
     const exportButton = this.backdrop.querySelector<HTMLButtonElement>('[data-export-state]')!;
     const importButton = this.backdrop.querySelector<HTMLButtonElement>('[data-import-state]')!;
@@ -72,6 +93,8 @@ export class GameMenu {
     parent.appendChild(this.backdrop);
 
     this.tipsCheckbox.checked = areTipCardsDisabled();
+    this.treeShadowsCheckbox.checked = areTreeShadowsDisabled();
+    this.buildingShadowsCheckbox.checked = areBuildingShadowsDisabled();
     this.menuButton.addEventListener('click', () => this.toggle());
     returnButton.addEventListener('click', () => this.close());
     exportButton.addEventListener('click', () => {
@@ -87,6 +110,14 @@ export class GameMenu {
     this.tipsCheckbox.addEventListener('change', () => {
       setTipCardsDisabled(this.tipsCheckbox.checked);
       this.onTipsPreferenceChange();
+    });
+    this.treeShadowsCheckbox.addEventListener('change', () => {
+      setTreeShadowsDisabled(this.treeShadowsCheckbox.checked);
+      this.onShadowPreferenceChange();
+    });
+    this.buildingShadowsCheckbox.addEventListener('change', () => {
+      setBuildingShadowsDisabled(this.buildingShadowsCheckbox.checked);
+      this.onShadowPreferenceChange();
     });
 
     this.onKeyDown = (event: KeyboardEvent) => {
@@ -128,6 +159,8 @@ export class GameMenu {
   private openMenu(): void {
     this.open = true;
     this.tipsCheckbox.checked = areTipCardsDisabled();
+    this.treeShadowsCheckbox.checked = areTreeShadowsDisabled();
+    this.buildingShadowsCheckbox.checked = areBuildingShadowsDisabled();
     this.backdrop.hidden = false;
     this.menuButton.setAttribute('aria-expanded', 'true');
     this.onOpenChange?.(true);

@@ -76,6 +76,7 @@ export class BuildToolbar {
       onBurgagePlotIncrease?: () => void;
       onBurgageRotateFrontage?: () => void;
       onMenuOpenChange?: (open: boolean) => void;
+      onShadowPreferenceChange?: () => void;
       canOpenMenuFromKeyboard?: () => boolean;
       onExportGameState?: () => void;
       onImportGameState?: () => void;
@@ -226,6 +227,7 @@ export class BuildToolbar {
     this.root = root;
     this.gameMenu = new GameMenu(root, {
       onTipsPreferenceChange: () => this.syncContextPanels(),
+      onShadowPreferenceChange: () => handlers.onShadowPreferenceChange?.(),
       onOpenChange: handlers.onMenuOpenChange,
       canOpenFromKeyboard: handlers.canOpenMenuFromKeyboard,
       onExportGameState: handlers.onExportGameState,
