@@ -1,6 +1,6 @@
 /**
- * Game runtime — connects SpacetimeDB store to the Three.js app loop.
- * Render tick stays in App; simulation is server-authoritative via scheduled tick_sim.
+ * Game runtime — connects SpacetimeDB to the Three.js client.
+ * All simulation runs in SpacetimeDB tick_sim; the client reads replicated tables only.
  */
 
 import type { SpacetimeGameSnapshot, SpacetimeGameStore } from '../data/spacetimeGameStore.ts';
@@ -8,7 +8,6 @@ import { getOrCreateAnonymousToken } from '../network/identityPersistence.ts';
 import type { RoadNetworkSnapshot } from '../roads/RoadNetwork.ts';
 import type { GameState } from '../resources/types.ts';
 import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
-import type { TreeRegistry } from '../resources/TreeRegistry.ts';
 
 export type GameRuntimeCallbacks = {
   onSnapshot: (snapshot: SpacetimeGameSnapshot, gameState: GameState) => void;
@@ -23,7 +22,6 @@ export class GameRuntime {
   private readonly callbacks: GameRuntimeCallbacks;
   private unsubscribe: (() => void) | null = null;
   private roadsHydrated = false;
-  private treeRegistry: TreeRegistry | null = null;
 
   constructor(
     store: SpacetimeGameStore,
@@ -55,23 +53,6 @@ export class GameRuntime {
         this.callbacks.onRoadsHydrated(snapshot.roads);
       }
     });
-  }
-
-  setTreeRegistry(treeRegistry: TreeRegistry): void {
-    this.treeRegistry = treeRegistry;
-    void this.bootstrapWorldIfReady();
-  }
-
-  async bootstrapWorldIfReady(): Promise<void> {
-    if (!this.store.isConnected || !this.treeRegistry) return;
-    await this.store.bootstrapQuarries(this.registry);
-    await this.store.bootstrapTrees(this.treeRegistry.entries.map((entry) => ({
-      id: entry.id,
-      layoutIndex: entry.layoutIndex,
-      woodYield: entry.woodYield,
-      x: entry.x,
-      z: entry.z,
-    })));
   }
 
   dispose(): void {

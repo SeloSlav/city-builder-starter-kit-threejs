@@ -9,8 +9,6 @@ import type {
   Building,
   PlayerResources,
   Quarry,
-  QuarryBootstrap,
-  TreeBootstrap,
   TreeEntity,
 } from '../generated/types.ts';
 import { connect, getConnection, isConnected } from '../network/spacetimedbClient.ts';
@@ -57,13 +55,19 @@ export class SpacetimeGameStore {
   private buildings = new Map<string, BuildingState>();
   private roads: RoadNetworkSnapshot | null = null;
   private simTick = 0;
-  private bootstrappedQuarries = false;
-  private bootstrappedTrees = false;
   private roadSyncTimer: number | null = null;
   private pendingRoadSnapshot: string | null = null;
 
   get isConnected(): boolean {
     return isConnected();
+  }
+
+  hasServerQuarries(): boolean {
+    return this.serverQuarryCount() > 0;
+  }
+
+  hasServerTrees(): boolean {
+    return this.serverTreeCount() > 0;
   }
 
   get snapshot(): SpacetimeGameSnapshot {
@@ -107,15 +111,17 @@ export class SpacetimeGameStore {
 
   toGameState(seed: number, registry: WorldLayoutRegistry): GameState {
     const quarries = new Map(this.quarries);
-    for (const definition of registry.definitionList) {
-      if (quarries.has(definition.id)) continue;
-      quarries.set(definition.id, {
-        nodeId: definition.id,
-        kind: definition.kind,
-        resource: definition.resource,
-        remaining: definition.maxYield,
-        maxYield: definition.maxYield,
-      });
+    if (!this.isConnected) {
+      for (const definition of registry.definitionList) {
+        if (quarries.has(definition.id)) continue;
+        quarries.set(definition.id, {
+          nodeId: definition.id,
+          kind: definition.kind,
+          resource: definition.resource,
+          remaining: definition.maxYield,
+          maxYield: definition.maxYield,
+        });
+      }
     }
 
     return {
@@ -129,33 +135,8 @@ export class SpacetimeGameStore {
     };
   }
 
-  async bootstrapQuarries(registry: WorldLayoutRegistry): Promise<void> {
-    if (this.bootstrappedQuarries || !this.connection) return;
-    const quarries: QuarryBootstrap[] = registry.definitionList.map((definition) => ({
-      quarryId: definition.id,
-      x: definition.x,
-      z: definition.z,
-      maxYield: definition.maxYield,
-    }));
-    await this.callReducer('bootstrapQuarries', { quarries });
-    this.bootstrappedQuarries = true;
-  }
-
-  async bootstrapTrees(entries: Array<{ id: string; layoutIndex: number; woodYield: number; x: number; z: number }>): Promise<void> {
-    if (this.bootstrappedTrees || !this.connection || entries.length === 0) return;
-    const trees: TreeBootstrap[] = entries.map((entry) => ({
-      treeId: entry.id,
-      layoutIndex: entry.layoutIndex,
-      woodYield: entry.woodYield,
-      x: entry.x,
-      z: entry.z,
-    }));
-    await this.callReducer('bootstrapTrees', { trees });
-    this.bootstrappedTrees = true;
-  }
-
   async placeBuilding(kind: BuildingKind, x: number, z: number): Promise<void> {
-    await this.callReducer('placeBuilding', { kind, x, z });
+    await this.callReducer('placeBuilding', 'place_building', { kind, x, z });
   }
 
   queueRoadSync(snapshot: RoadNetworkSnapshot): void {
@@ -176,7 +157,21 @@ export class SpacetimeGameStore {
     if (!this.connection || !this.pendingRoadSnapshot) return;
     const snapshotJson = this.pendingRoadSnapshot;
     this.pendingRoadSnapshot = null;
-    await this.callReducer('syncRoadNetwork', { snapshotJson });
+    await this.callReducer('syncRoadNetwork', 'sync_road_network', { snapshotJson });
+  }
+
+  private serverTreeCount(): number {
+    const connection = getConnection();
+    if (!connection) return 0;
+    const table = (connection.db as { tree_entity?: { iter: () => Iterable<unknown> } }).tree_entity;
+    return table ? [...table.iter()].length : 0;
+  }
+
+  private serverQuarryCount(): number {
+    const connection = getConnection();
+    if (!connection) return 0;
+    const table = (connection.db as { quarry?: { iter: () => Iterable<unknown> } }).quarry;
+    return table ? [...table.iter()].length : 0;
   }
 
   private startSubscriptions(): void {
@@ -308,13 +303,17 @@ export class SpacetimeGameStore {
     this.emit();
   }
 
-  private async callReducer(name: string, args: Record<string, unknown>): Promise<void> {
+  private async callReducer(
+    camelName: string,
+    snakeName: string,
+    args: Record<string, unknown>,
+  ): Promise<void> {
     const connection = getConnection();
     if (!connection) throw new Error('Not connected to SpacetimeDB.');
-    const reducers = connection.reducers as unknown as Record<string, (payload: Record<string, unknown>) => Promise<unknown>>;
-    const fn = reducers[name];
+    const reducers = connection.reducers as unknown as Record<string, ((payload: Record<string, unknown>) => Promise<void>) | undefined>;
+    const fn = reducers[camelName] ?? reducers[snakeName];
     if (!fn) {
-      throw new Error(`Reducer ${name} is missing from generated bindings.`);
+      throw new Error(`Reducer ${camelName} is missing from generated bindings.`);
     }
     await fn(args);
   }

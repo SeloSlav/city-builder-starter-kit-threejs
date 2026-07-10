@@ -1,6 +1,8 @@
 //! Medieval Road System — SpacetimeDB server module.
 //! Single-player localhost: anonymous identity per browser token; resources/buildings/roads scoped by owner.
 
+mod world_gen;
+
 use spacetimedb::{reducer, Identity, ReducerContext, ScheduleAt, Table, TimeDuration};
 
 pub const DEFAULT_WORLD_SEED: u64 = 0x71a2e0d;
@@ -115,8 +117,40 @@ pub fn init(ctx: &ReducerContext) {
         next_building_id: 1,
         sim_tick: 0,
     });
+    seed_world_entities(ctx, DEFAULT_WORLD_SEED);
     ensure_sim_schedule(ctx);
     log::info!("Medieval Road System module initialized (seed={DEFAULT_WORLD_SEED})");
+}
+
+fn seed_world_entities(ctx: &ReducerContext, seed: u64) {
+    if ctx.db.quarry().iter().count() == 0 {
+        for quarry in world_gen::bootstrap_quarry_rows(seed) {
+            ctx.db.quarry().insert(Quarry {
+                quarry_id: quarry.quarry_id,
+                x: quarry.x,
+                z: quarry.z,
+                max_yield: quarry.max_yield,
+                remaining: quarry.max_yield,
+            });
+        }
+    }
+
+    if ctx.db.tree_entity().iter().count() == 0 {
+        for tree in world_gen::bootstrap_tree_rows() {
+            if tree.tree_id.is_empty() {
+                continue;
+            }
+            ctx.db.tree_entity().insert(TreeEntity {
+                tree_id: tree.tree_id,
+                layout_index: tree.layout_index,
+                phase: "mature".to_string(),
+                growth_progress: 1.0,
+                wood_yield: tree.wood_yield.max(1.0),
+                x: tree.x,
+                z: tree.z,
+            });
+        }
+    }
 }
 
 #[reducer(client_connected)]
@@ -154,40 +188,60 @@ pub fn bootstrap_quarries(ctx: &ReducerContext, quarries: Vec<QuarryBootstrap>) 
     if ctx.db.quarry().iter().count() > 0 {
         return Ok(());
     }
-    for quarry in quarries {
-        if quarry.quarry_id.is_empty() || quarry.max_yield <= 0.0 {
-            continue;
+    if !quarries.is_empty() {
+        for quarry in quarries {
+            if quarry.quarry_id.is_empty() || quarry.max_yield <= 0.0 {
+                continue;
+            }
+            ctx.db.quarry().insert(Quarry {
+                quarry_id: quarry.quarry_id,
+                x: quarry.x,
+                z: quarry.z,
+                max_yield: quarry.max_yield,
+                remaining: quarry.max_yield,
+            });
         }
-        ctx.db.quarry().insert(Quarry {
-            quarry_id: quarry.quarry_id,
-            x: quarry.x,
-            z: quarry.z,
-            max_yield: quarry.max_yield,
-            remaining: quarry.max_yield,
-        });
+        return Ok(());
     }
+
+    let config = ctx
+        .db
+        .world_config()
+        .id()
+        .find(&0)
+        .ok_or_else(|| "World not initialized.".to_string())?;
+    seed_world_entities(ctx, config.seed);
     Ok(())
 }
 
 #[reducer]
 pub fn bootstrap_trees(ctx: &ReducerContext, trees: Vec<TreeBootstrap>) -> Result<(), String> {
-    for tree in trees {
-        if tree.tree_id.is_empty() {
-            continue;
+    if !trees.is_empty() {
+        for tree in trees {
+            if tree.tree_id.is_empty() {
+                continue;
+            }
+            if ctx.db.tree_entity().tree_id().find(&tree.tree_id).is_some() {
+                continue;
+            }
+            ctx.db.tree_entity().insert(TreeEntity {
+                tree_id: tree.tree_id,
+                layout_index: tree.layout_index,
+                phase: "mature".to_string(),
+                growth_progress: 1.0,
+                wood_yield: tree.wood_yield.max(1.0),
+                x: tree.x,
+                z: tree.z,
+            });
         }
-        if ctx.db.tree_entity().tree_id().find(&tree.tree_id).is_some() {
-            continue;
-        }
-        ctx.db.tree_entity().insert(TreeEntity {
-            tree_id: tree.tree_id,
-            layout_index: tree.layout_index,
-            phase: "mature".to_string(),
-            growth_progress: 1.0,
-            wood_yield: tree.wood_yield.max(1.0),
-            x: tree.x,
-            z: tree.z,
-        });
+        return Ok(());
     }
+
+    if ctx.db.tree_entity().iter().count() > 0 {
+        return Ok(());
+    }
+
+    seed_world_entities(ctx, DEFAULT_WORLD_SEED);
     Ok(())
 }
 

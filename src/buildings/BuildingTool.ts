@@ -1,6 +1,5 @@
 import type { TerrainProjector } from '../terrain/TerrainProjector.ts';
 import type { BuildingKind, GameState } from '../resources/types.ts';
-import { placeBuilding } from '../resources/GameState.ts';
 import { getBuildingDefinition } from '../resources/buildings.ts';
 import type { BuildingPlacementFailureReason } from './BuildingPlacementValidation.ts';
 import { validateBuildingPlacement } from './BuildingPlacementValidation.ts';
@@ -13,13 +12,12 @@ type BuildingToolOptions = {
   terrainProjector: TerrainProjector;
   markers: BuildingMarkers;
   getState: () => GameState;
-  onPlaced: (state: GameState) => void;
-  /** When set (SpacetimeDB connected), placement goes through the server reducer. */
-  onPlaceBuilding?: (kind: BuildingKind, x: number, z: number) => void | Promise<void>;
+  onPlaceBuilding: (kind: BuildingKind, x: number, z: number) => void | Promise<void>;
   isWaterAt: (x: number, z: number) => boolean;
   getHeightAt: (x: number, z: number) => number;
   onModeChanged: () => void;
   onPlacementRejected?: (reason: BuildingPlacementFailureReason) => void;
+  onPlacementFailed?: (message: string) => void;
   isBlocked: () => boolean;
 };
 
@@ -111,17 +109,12 @@ export class BuildingTool {
 
   private async placeAt(kind: BuildingKind, x: number, z: number): Promise<void> {
     try {
-      if (this.options.onPlaceBuilding) {
-        await this.options.onPlaceBuilding(kind, x, z);
-      } else {
-        const result = placeBuilding(this.options.getState(), kind, x, z);
-        if (!result.ok) return;
-        this.options.onPlaced(result.state);
-        this.options.markers.syncBuildings(result.state.buildings.values());
-      }
+      await this.options.onPlaceBuilding(kind, x, z);
       this.setMode('off');
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Building placement failed.';
       console.error('Building placement failed:', error);
+      this.options.onPlacementFailed?.(message);
     }
   }
 

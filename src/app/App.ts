@@ -8,8 +8,6 @@ import {
   createInitialGameState,
   deserializeGameState,
   gameStateToSnapshot,
-  initTreeEntities,
-  placeBuilding,
   restoreGameState,
   serializeGameState,
 } from '../resources/GameState.ts';
@@ -17,7 +15,6 @@ import type { SpacetimeGameSnapshot } from '../data/spacetimeGameStore.ts';
 import type { GameState } from '../resources/types.ts';
 import { ForestVisualSync } from '../resources/ForestVisualSync.ts';
 import { ResourceInspector } from '../resources/ResourceInspector.ts';
-import { Simulation } from '../resources/Simulation.ts';
 import { TreeRegistry } from '../resources/TreeRegistry.ts';
 import { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
 import { WorldQueries } from '../resources/WorldQueries.ts';
@@ -54,11 +51,11 @@ export class App {
   private layoutRegistry: WorldLayoutRegistry | null = null;
   private treeRegistry: TreeRegistry | null = null;
   private forestVisualSync: ForestVisualSync | null = null;
-  private simulation: Simulation | null = null;
   private spacetimeStore: SpacetimeGameStore | null = null;
   private gameRuntime: GameRuntime | null = null;
   private spacetimeConnected = false;
   private previousTreePhases = new Map<string, string>();
+  private previousTreeGrowth = new Map<string, number>();
   private animationId = 0;
   private lastTime = 0;
   private frameBudgetTime = 0;
@@ -165,26 +162,20 @@ export class App {
       terrainProjector: sceneManager.terrainProjector,
       markers: buildingMarkers,
       getState: () => this.gameState ?? gameState,
-      onPlaced: (state) => {
-        this.gameState = state;
-        this.syncResourceUi();
-      },
       onPlaceBuilding: async (kind, x, z) => {
-        if (this.spacetimeConnected && this.spacetimeStore) {
-          await this.spacetimeStore.placeBuilding(kind, x, z);
-          return;
+        if (!this.spacetimeStore?.isConnected) {
+          throw new Error('SpacetimeDB is not connected. Start the local server and refresh.');
         }
-        const result = placeBuilding(this.gameState ?? gameState, kind, x, z);
-        if (!result.ok) return;
-        this.gameState = result.state;
-        buildingMarkers.syncBuildings(result.state.buildings.values());
-        this.syncResourceUi();
+        await this.spacetimeStore.placeBuilding(kind, x, z);
       },
       isWaterAt: (x, z) => sceneManager.riverField.isRenderedWetAt(x, z),
       getHeightAt: (x, z) => sceneManager.terrain.getHeightAt(x, z),
       onModeChanged: () => this.syncToolbar(),
       onPlacementRejected: (reason) => {
         this.toastManager?.showMessageId(buildingPlacementReasonToToastId(reason), { variant: 'error' });
+      },
+      onPlacementFailed: (message) => {
+        this.toastManager?.show(message, { variant: 'error' });
       },
       isBlocked: () =>
         roadTool.isEnabled()
@@ -286,8 +277,9 @@ export class App {
         this.syncToolbar();
       },
       onConnectError: (error) => {
-        console.warn('SpacetimeDB unavailable — running local simulation fallback.', error);
+        console.warn('SpacetimeDB unavailable — game simulation requires the server.', error);
         this.spacetimeConnected = false;
+        this.toastManager?.show('SpacetimeDB is offline. Run `spacetime start` and refresh.', { variant: 'error' });
       },
     });
     this.gameRuntime.start();
@@ -353,8 +345,6 @@ export class App {
     const dt = Math.min(0.05, Math.max(0.001, rawDt));
     this.lastTime = time;
 
-    this.stepSimulation(dt);
-
     const firstPersonActive = this.firstPersonController?.isActive() ?? false;
     if (firstPersonActive) {
       this.firstPersonController?.update(dt);
@@ -376,34 +366,12 @@ export class App {
     this.animationId = requestAnimationFrame(this.tick);
   };
 
-  private stepSimulation(dt: number): void {
-    if (this.spacetimeConnected) return;
-    if (!this.simulation || !this.gameState || !this.forestVisualSync) return;
-
-    const previousWood = this.gameState.stockpile.wood;
-    const result = this.simulation.step(this.gameState, dt);
-    this.gameState = result.state;
-
-    if (result.changedTreeIds.length > 0) {
-      this.forestVisualSync.syncTrees(this.gameState.trees, result.changedTreeIds);
-    }
-
-    if (result.changedTreeIds.length > 0 || this.gameState.stockpile.wood !== previousWood) {
-      this.syncResourceUi();
-    }
-  }
-
   private onForestReady(): void {
     const forestManager = this.sceneManager?.getForestManager();
     if (!forestManager || !this.gameState) return;
 
     this.treeRegistry = TreeRegistry.fromForestManager(forestManager);
-    this.gameState = initTreeEntities(this.gameState, this.treeRegistry);
     this.forestVisualSync = new ForestVisualSync(forestManager);
-    this.forestVisualSync.syncAll(this.gameState.trees);
-    this.simulation = new Simulation(this.treeRegistry);
-    this.gameRuntime?.setTreeRegistry(this.treeRegistry);
-    void this.gameRuntime?.bootstrapWorldIfReady();
     this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
     this.syncResourceUi();
     this.exposeDevHandles();
@@ -458,21 +426,33 @@ export class App {
 
   private applySpacetimeSnapshot(snapshot: SpacetimeGameSnapshot, state: GameState): void {
     this.spacetimeConnected = snapshot.connected;
+
+    if (!snapshot.connected) {
+      this.syncToolbar();
+      return;
+    }
+
+    const previous = this.gameState;
     this.gameState = state;
 
+    const previousTreeCount = previous?.trees.size ?? 0;
     const changedTreeIds: string[] = [];
     for (const [treeId, entity] of state.trees) {
-      const previous = this.previousTreePhases.get(treeId);
-      if (previous !== entity.phase || previous === undefined) {
+      const previousPhase = this.previousTreePhases.get(treeId);
+      const previousGrowth = this.previousTreeGrowth.get(treeId);
+      const phaseChanged = previousPhase !== entity.phase || previousPhase === undefined;
+      const growthChanged = previousGrowth !== entity.growthProgress;
+      if (phaseChanged || growthChanged) {
         changedTreeIds.push(treeId);
       }
       this.previousTreePhases.set(treeId, entity.phase);
+      this.previousTreeGrowth.set(treeId, entity.growthProgress);
     }
 
-    if (changedTreeIds.length > 0) {
-      this.forestVisualSync?.syncTrees(state.trees, changedTreeIds);
-    } else if (this.forestVisualSync && snapshot.simTick === 0) {
+    if (this.forestVisualSync && state.trees.size > 0 && previousTreeCount === 0) {
       this.forestVisualSync.syncAll(state.trees);
+    } else if (changedTreeIds.length > 0) {
+      this.forestVisualSync?.syncTrees(state.trees, changedTreeIds);
     }
 
     this.buildingMarkers?.syncBuildings(state.buildings.values());

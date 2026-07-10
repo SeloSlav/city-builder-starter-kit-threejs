@@ -107,6 +107,23 @@ export type ForestPropsOptions = {
   rendererBackend?: RendererBackendKind;
 };
 
+export type ForestTreePlacement = TreePlacement;
+
+/** Deterministic tree layout used by ForestManager and server world bootstrap. */
+export function computeForestTreePlacements(
+  playableSize = 820,
+  terrainSize = 1080,
+  isBlockedAt?: (x: number, z: number) => boolean,
+): ForestTreePlacement[] {
+  const rng = mulberry32(0x5eedf0a5);
+  const spawnConfig = createForestSpawnConfig(playableSize, terrainSize);
+  const forestCores = createForestCores(rng, spawnConfig);
+  const treePlacements = createTreePlacements(rng, forestCores, spawnConfig, isBlockedAt);
+  const hillEdgePlacements = createHillEdgeTreePlacements(rng, spawnConfig, treePlacements, isBlockedAt);
+  const saplingPlacements = createSaplingPlacements(rng, forestCores, spawnConfig, treePlacements, isBlockedAt);
+  return [...treePlacements, ...hillEdgePlacements, ...saplingPlacements];
+}
+
 export async function createForestProps(
   terrain: Terrain,
   maxAnisotropy: number,
