@@ -3,11 +3,12 @@ import type { Terrain } from '../terrain/Terrain.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
 import { distancePointToPolylineXZ } from '../utils/pathGeometry.ts';
 
-const WEAR_INNER_MARGIN = 0.55;
-const WEAR_OUTER_MARGIN = 4.8;
-const WEAR_SOFTEN_CENTER_WEIGHT = 0.62;
-const WEAR_SOFTEN_CARDINAL_WEIGHT = 0.08;
-const WEAR_SOFTEN_DIAGONAL_WEIGHT = 0.015;
+const WEAR_INNER_MARGIN = -0.18;
+/** Keep terrain wear under the opaque core only; the mesh shoulder handles the grass fade. */
+const WEAR_OUTER_MARGIN = 0.32;
+const WEAR_SOFTEN_CENTER_WEIGHT = 0.48;
+const WEAR_SOFTEN_CARDINAL_WEIGHT = 0.22;
+const WEAR_SOFTEN_DIAGONAL_WEIGHT = 0.1;
 
 type RoadWearPath = {
   path: THREE.Vector3[];

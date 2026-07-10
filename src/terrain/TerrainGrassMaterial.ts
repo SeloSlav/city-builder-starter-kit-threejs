@@ -146,8 +146,8 @@ function buildTrampledWearColorNode(textures: TextureSet, grassUv: TslNode): Tsl
     vec3(luminance, luminance, luminance) as TslNode,
     float(0.52) as TslNode,
   ) as TslNode;
-  const wornTint = desaturated.mul(vec3(0.62, 0.58, 0.46) as TslNode);
-  return wornTint.mul(float(0.78) as TslNode);
+  const wornTint = desaturated.mul(vec3(0.68, 0.64, 0.52) as TslNode);
+  return wornTint.mul(float(0.9) as TslNode);
 }
 
 export function createTerrainGrassMaterialWithRiverShore(
@@ -159,7 +159,7 @@ export function createTerrainGrassMaterialWithRiverShore(
   const dirtColor = buildDirtGroundColorNode(roadTextures, blendNodes.grassUv);
   const wearColor = buildTrampledWearColorNode(roadTextures, blendNodes.grassUv);
   const shoreBlend = pow(attribute('shoreBlend', 'float') as TslNode, float(0.82) as TslNode) as TslNode;
-  const roadWear = pow(attribute('roadWearBlend', 'float') as TslNode, float(0.78) as TslNode) as TslNode;
+  const roadWear = pow(attribute('roadWearBlend', 'float') as TslNode, float(0.62) as TslNode) as TslNode;
   const grassWithShore = mix(blendNodes.colorNode, mudColor, shoreBlend) as TslNode;
   const meadowWithWear = mix(grassWithShore, wearColor, roadWear) as TslNode;
   const colorNode = applyCloseZoomDirtBlend(meadowWithWear, dirtColor, shoreBlend, roadWear);
