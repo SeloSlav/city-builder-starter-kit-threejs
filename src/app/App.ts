@@ -14,7 +14,7 @@ import {
   serializeGameState,
 } from '../resources/GameState.ts';
 import type { SpacetimeGameSnapshot } from '../data/spacetimeGameStore.ts';
-import type { GameState } from '../resources/types.ts';
+import type { BuildingState, GameState } from '../resources/types.ts';
 import { ForestVisualSync } from '../resources/ForestVisualSync.ts';
 import { ResourceInspector } from '../resources/ResourceInspector.ts';
 import { TreeRegistry } from '../resources/TreeRegistry.ts';
@@ -27,7 +27,7 @@ import { RoadTool } from '../roads/RoadTool.ts';
 import { GameRuntime } from '../runtime/GameRuntime.ts';
 import { SceneManager } from '../scene/SceneManager.ts';
 import { beginStartupTextureLoad } from '../scene/startupTextures.ts';
-import { setActiveBuildingLayout, sampleNaturalTerrainHeight } from '../terrain/TerrainHeight.ts';
+import { setActivePlacedBuildingLayout, setActivePreviewBuilding, sampleNaturalTerrainHeight } from '../terrain/TerrainHeight.ts';
 import { updateTerrainBuildingPads } from '../terrain/TerrainBuildingPads.ts';
 import { BuildToolbar, type ToolbarStats } from '../ui/BuildToolbar.ts';
 import { LoadingScreen } from '../ui/LoadingScreen.ts';
@@ -58,7 +58,7 @@ export class App {
   private spacetimeStore: SpacetimeGameStore | null = null;
   private gameRuntime: GameRuntime | null = null;
   private spacetimeConnected = false;
-  private buildingTerrainPreview: BuildingTerrainSource | null = null;
+  private lastPlacedBuildingSignature = '';
   private previousTreePhases = new Map<string, string>();
   private previousTreeGrowth = new Map<string, number>();
   private animationId = 0;
@@ -176,8 +176,8 @@ export class App {
       isWaterAt: (x, z) => sceneManager.riverField.isRenderedWetAt(x, z),
       getNaturalHeightAt: (x, z) => sampleNaturalTerrainHeight(x, z),
       onPreviewChange: (preview) => {
-        this.buildingTerrainPreview = preview;
-        this.syncBuildingTerrain();
+        setActivePreviewBuilding(preview);
+        this.syncBuildingTerrainLayout();
       },
       onModeChanged: () => this.syncToolbar(),
       onPlacementRejected: (reason) => {
@@ -382,7 +382,7 @@ export class App {
     this.treeRegistry = TreeRegistry.fromForestManager(forestManager);
     this.forestVisualSync = new ForestVisualSync(forestManager);
     this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
-    this.syncBuildingTerrain({ forceMeshUpdate: true });
+    this.syncPlacedBuildingTerrain({ forceMeshUpdate: true });
     this.syncResourceUi();
     this.exposeDevHandles();
   }
@@ -465,35 +465,56 @@ export class App {
       this.forestVisualSync?.syncTrees(state.trees, changedTreeIds);
     }
 
-    this.buildingMarkers?.syncBuildings(state.buildings.values());
-    this.syncBuildingTerrain({ forceMeshUpdate: true });
+    const buildingSignature = this.getPlacedBuildingSignature(state.buildings);
+    const buildingsChanged = buildingSignature !== this.lastPlacedBuildingSignature;
+    if (buildingsChanged) {
+      this.lastPlacedBuildingSignature = buildingSignature;
+      this.buildingMarkers?.syncBuildings(state.buildings.values());
+      this.syncPlacedBuildingTerrain({ forceMeshUpdate: true });
+    }
+
     this.syncResourceUi();
     this.syncToolbar();
   }
 
-  private syncBuildingTerrain(options?: { forceMeshUpdate?: boolean }): void {
+  private syncBuildingTerrainLayout(): void {
     if (!this.sceneManager) return;
 
-    const previewSources: BuildingTerrainSource[] = [];
-    const placedSources: BuildingTerrainSource[] = [];
-    if (this.gameState) {
-      for (const building of this.gameState.buildings.values()) {
-        placedSources.push({ kind: building.kind, x: building.x, z: building.z });
-      }
-    }
-    if (this.buildingTerrainPreview) {
-      previewSources.push(this.buildingTerrainPreview);
-    }
+    const placedSources = this.collectPlacedBuildingSources();
+    const placedLayout = BuildingTerrainLayout.fromBuildings(placedSources, sampleNaturalTerrainHeight);
+    setActivePlacedBuildingLayout(placedSources.length > 0 ? placedLayout : null);
+  }
 
-    const layoutSources = [...placedSources, ...previewSources];
-    const layout = BuildingTerrainLayout.fromBuildings(layoutSources, sampleNaturalTerrainHeight);
-    setActiveBuildingLayout(layout);
+  private syncPlacedBuildingTerrain(options?: { forceMeshUpdate?: boolean }): void {
+    if (!this.sceneManager) return;
+
+    const placedSources = this.collectPlacedBuildingSources();
+    const placedLayout = BuildingTerrainLayout.fromBuildings(placedSources, sampleNaturalTerrainHeight);
+    setActivePlacedBuildingLayout(placedSources.length > 0 ? placedLayout : null);
 
     if (options?.forceMeshUpdate) {
-      const placedLayout = BuildingTerrainLayout.fromBuildings(placedSources, sampleNaturalTerrainHeight);
-      updateTerrainBuildingPads(this.sceneManager.terrain, placedLayout);
+      updateTerrainBuildingPads(this.sceneManager.terrain, placedSources.length > 0 ? placedLayout : null);
       this.buildingMarkers?.syncBuildings(this.gameState?.buildings.values() ?? []);
+      if (this.gameState) {
+        this.lastPlacedBuildingSignature = this.getPlacedBuildingSignature(this.gameState.buildings);
+      }
     }
+  }
+
+  private collectPlacedBuildingSources(): BuildingTerrainSource[] {
+    const placedSources: BuildingTerrainSource[] = [];
+    if (!this.gameState) return placedSources;
+    for (const building of this.gameState.buildings.values()) {
+      placedSources.push({ kind: building.kind, x: building.x, z: building.z });
+    }
+    return placedSources;
+  }
+
+  private getPlacedBuildingSignature(buildings: Map<string, BuildingState>): string {
+    return [...buildings.values()]
+      .map((building) => `${building.id}:${building.kind}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
+      .sort()
+      .join('|');
   }
 
   private syncResourceUi(): void {
@@ -533,7 +554,7 @@ export class App {
           this.roadNetwork!.restore(snapshot.roads);
           this.sceneManager!.syncRoadNetwork(this.roadNetwork!);
           this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
-          this.syncBuildingTerrain({ forceMeshUpdate: true });
+          this.syncPlacedBuildingTerrain({ forceMeshUpdate: true });
           this.forestVisualSync?.syncAll(this.gameState.trees);
           this.roadSelection?.refresh();
           this.syncResourceUi();
@@ -567,7 +588,7 @@ export class App {
         this.roadNetwork!.restore(snapshot.roads);
         this.sceneManager?.syncRoadNetwork(this.roadNetwork!);
         this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
-        this.syncBuildingTerrain({ forceMeshUpdate: true });
+        this.syncPlacedBuildingTerrain({ forceMeshUpdate: true });
         this.forestVisualSync?.syncAll(this.gameState.trees);
         this.roadSelection?.refresh();
         this.syncResourceUi();

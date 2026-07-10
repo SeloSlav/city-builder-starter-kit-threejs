@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { BuildingTerrainLayout } from '../buildings/BuildingTerrainLayout.ts';
 import type { Terrain, TerrainBounds } from './Terrain.ts';
-import { sampleBaseTerrainHeight } from './TerrainHeight.ts';
+import { sampleHeightWithBuildingPads } from './TerrainHeight.ts';
 
 let lastAppliedBounds: TerrainBounds[] = [];
 
@@ -45,7 +45,7 @@ export function updateTerrainBuildingPads(terrain: Terrain, layout: BuildingTerr
         const positionOffset = vertexIndex * 3;
         const x = positions.array[positionOffset] as number;
         const z = positions.array[positionOffset + 2] as number;
-        positions.array[positionOffset + 1] = sampleBaseTerrainHeight(x, z);
+        positions.array[positionOffset + 1] = sampleHeightWithBuildingPads(x, z, layout);
       }
     }
   }
