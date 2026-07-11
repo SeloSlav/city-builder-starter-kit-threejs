@@ -1,0 +1,55 @@
+.resource-inspector-supplemental {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(238, 232, 220, 0.1);
+}
+
+.resource-inspector-supplemental[hidden] {
+  display: none;
+}
+
+.backyard-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.backyard-picker-row {
+  margin: 0;
+}
+
+.backyard-picker-option {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  text-align: left;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(238, 232, 220, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.backyard-picker-option:hover,
+.backyard-picker-option:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.backyard-picker-option__title {
+  font-weight: 600;
+}
+
+.backyard-picker-option__cost {
+  font-size: 0.86rem;
+  color: rgba(238, 232, 220, 0.72);
+}
+
+.backyard-picker-option__hint {
+  font-size: 0.8rem;
+  color: rgba(238, 232, 220, 0.58);
+}

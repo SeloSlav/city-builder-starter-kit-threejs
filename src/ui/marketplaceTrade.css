@@ -1,0 +1,75 @@
+.marketplace-trade-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.marketplace-trade-intro,
+.marketplace-trade-stock {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(238, 232, 220, 0.62);
+  line-height: 1.45;
+}
+
+.marketplace-trade-stock {
+  color: rgba(238, 232, 220, 0.78);
+}
+
+.marketplace-trade-section {
+  display: grid;
+  gap: 8px;
+}
+
+.marketplace-trade-section__title {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(238, 232, 220, 0.5);
+}
+
+.marketplace-trade-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.marketplace-trade-row {
+  margin: 0;
+}
+
+.marketplace-trade-option {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(238, 232, 220, 0.14);
+  border-radius: 8px;
+  background: rgba(18, 16, 14, 0.55);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.marketplace-trade-option:hover:not(:disabled),
+.marketplace-trade-option:focus-visible:not(:disabled) {
+  border-color: rgba(210, 178, 108, 0.55);
+  background: rgba(28, 24, 18, 0.72);
+}
+
+.marketplace-trade-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.marketplace-trade-option__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.marketplace-trade-option__hint {
+  font-size: 0.78rem;
+  color: rgba(238, 232, 220, 0.55);
+}
