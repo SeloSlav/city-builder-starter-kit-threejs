@@ -1,9 +1,8 @@
 import { BuildingTerrainLayout } from '../buildings/BuildingTerrainLayout.ts';
 import type { RiverLayout } from '../rivers/RiverLayout.ts';
 import type { QuarryLayout } from '../quarries/QuarryLayout.ts';
-import { getActiveWorldDimensions } from '../world/worldGenerationContext.ts';
-import { topographyScale, getActiveWorldGeneration } from '../world/worldGenerationContext.ts';
-import { getActiveWorldGeneration as readSettings } from '../world/worldGenerationContext.ts';
+import { getActiveWorldDimensions, getActiveWorldGeneration } from '../world/worldGenerationContext.ts';
+import { topographyScale } from '../world/worldGenerationSettings.ts';
 
 let activeRiverLayout: RiverLayout | null = null;
 let activeQuarryLayout: QuarryLayout | null = null;
@@ -100,9 +99,10 @@ function ridgedFbm(x: number, z: number, octaves: number): number {
 }
 
 function getEdgeHillFactor(x: number, z: number): number {
+  const { playableSize, terrainSize } = getActiveWorldDimensions();
   const edgeDistance = Math.max(Math.abs(x), Math.abs(z));
-  const hillStart = PLAYABLE_SIZE * 0.44;
-  const hillEnd = TERRAIN_SIZE * 0.5;
+  const hillStart = playableSize * 0.44;
+  const hillEnd = terrainSize * 0.5;
   return smoothstep(hillStart, hillEnd, edgeDistance);
 }
 
