@@ -68,14 +68,14 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: SimTickSchedule) {
     }
 
     let residence_ids: Vec<u64> = ctx.db.residence().iter().map(|row| row.id).collect();
-    for residence_id in residence_ids {
-        let Some(residence) = ctx.db.residence().id().find(&residence_id) else {
+    for residence_id in &residence_ids {
+        let Some(residence) = ctx.db.residence().id().find(residence_id) else {
             continue;
         };
         step_residence_settlement(ctx, residence);
     }
-    for residence_id in residence_ids {
-        let Some(residence) = ctx.db.residence().id().find(&residence_id) else {
+    for residence_id in &residence_ids {
+        let Some(residence) = ctx.db.residence().id().find(residence_id) else {
             continue;
         };
         step_residence_needs(ctx, residence);

@@ -197,17 +197,9 @@ fn deliver_firewood_trip(
         }
         available -= delivered;
         ctx.db.residence().id().update(Residence {
-            id: residence.id,
-            zone_id: residence.zone_id,
-            owner: residence.owner,
-            parcel_index: residence.parcel_index,
-            x: residence.x,
-            z: residence.z,
-            yaw: residence.yaw,
-            population: residence.population,
             firewood_stock: residence.firewood_stock + delivered,
-            abandoned: residence.abandoned,
             needs_deficit_ticks: 0,
+            ..*residence
         });
         break;
     }
