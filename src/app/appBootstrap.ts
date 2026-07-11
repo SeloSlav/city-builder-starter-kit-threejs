@@ -46,7 +46,7 @@ import {
 } from './placedBuildingTerrainSync.ts';
 import { LoadingScreen } from '../ui/LoadingScreen.ts';
 import { ToastManager } from '../ui/ToastManager.ts';
-import { saveWorldGenerationSettings } from '../world/worldGenerationSettings.ts';
+import { saveWorldGenerationSettings, shouldShowWorldSetup } from '../world/worldGenerationSettings.ts';
 import { getDraftWorldGeneration, setDraftWorldGeneration } from '../world/worldGenerationContext.ts';
 import { mountTooltips } from '../ui/tooltips.ts';
 import { setHydrologyOverlayEnabled, isHydrologyOverlayEnabled } from '../scene/hydrologyOverlayPreference.ts';
@@ -117,6 +117,12 @@ export async function bootstrapAppSession(
       </div>
     `;
 
+  if (shouldShowWorldSetup()) {
+    loadingScreen?.setProgress({
+      label: 'New settlement',
+      detail: 'Choose map size, landscape, and seed',
+    });
+  }
   const worldSettings = await resolveWorldGenerationSettings(root);
   setDraftWorldGeneration(worldSettings);
   saveWorldGenerationSettings(worldSettings);
