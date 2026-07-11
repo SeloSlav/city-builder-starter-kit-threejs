@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { BuildingKind } from '../resources/types.ts';
 import { MAIN_HOUSE_DEPTH, MAIN_HOUSE_WIDTH } from '../residences/burgageLayout.ts';
+import { TREE_SHADOW_CAST_LAYER } from '../scene/SceneLayers.ts';
 import { getBuildingPadParams } from './BuildingTerrainLayout.ts';
 
 export const BUILDING_SHADOW_PROXY_FLAG = 'buildingShadowProxy';
@@ -48,6 +49,7 @@ function createShadowProxyMesh(geometry: THREE.BufferGeometry, height: number): 
   const mesh = new THREE.Mesh(geometry, shadowCastMaterial);
   mesh.name = 'Building shadow proxy';
   mesh.position.y = height * 0.5;
+  mesh.layers.set(TREE_SHADOW_CAST_LAYER);
   mesh.castShadow = true;
   mesh.receiveShadow = false;
   mesh.frustumCulled = false;

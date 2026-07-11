@@ -45,6 +45,7 @@ import { updateTerrainBuildingPads } from '../terrain/TerrainBuildingPads.ts';
 import { BuildToolbar, type ToolbarStats } from '../ui/BuildToolbar.ts';
 import { LoadingScreen } from '../ui/LoadingScreen.ts';
 import { ToastManager } from '../ui/ToastManager.ts';
+import { mountTooltips } from '../ui/tooltips.ts';
 import { roadPlacementReasonToToastId, buildingPlacementReasonToToastId, burgagePlacementReasonToToastId } from '../ui/toastMessages.ts';
 
 const TARGET_MAX_FPS = 90;
@@ -66,6 +67,7 @@ export class App {
   private burgageFencing: BurgageFencing | null = null;
   private toolbar: BuildToolbar | null = null;
   private toastManager: ToastManager | null = null;
+  private disposeTooltips: (() => void) | null = null;
   private resourceInspector: ResourceInspector | null = null;
   private quarryMapIcons: QuarryMapIcons | null = null;
   private gameState: GameState | null = null;
@@ -377,6 +379,7 @@ export class App {
       onExportGameState: () => this.exportGameState(),
       onImportGameState: () => this.importGameState(),
     });
+    const disposeTooltips = mountTooltips(uiRoot);
     const toastManager = new ToastManager(uiRoot);
     const resourceInspector = new ResourceInspector({
       domElement: sceneManager.renderer.domElement,
@@ -501,6 +504,7 @@ export class App {
     this.burgageFencing = burgageFencing;
     this.toolbar = toolbar;
     this.toastManager = toastManager;
+    this.disposeTooltips = disposeTooltips;
     this.resourceInspector = resourceInspector;
     this.quarryMapIcons = quarryMapIcons;
     this.gameState = gameState;
@@ -570,6 +574,8 @@ export class App {
     this.resourceInspector?.dispose();
     this.quarryMapIcons?.dispose();
     this.toastManager?.dispose();
+    this.disposeTooltips?.();
+    this.disposeTooltips = null;
     this.firstPersonController?.dispose();
     this.cameraController?.dispose();
     this.toolbar?.dispose();

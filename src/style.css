@@ -270,14 +270,11 @@ button {
   line-height: 1.2;
 }
 
-.settlement-hud__stat[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
+.ui-tooltip {
+  position: fixed;
+  z-index: 40;
   width: max-content;
-  max-width: min(240px, calc(100vw - 40px));
+  max-width: min(240px, calc(100vw - 24px));
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -292,22 +289,17 @@ button {
   white-space: normal;
   pointer-events: none;
   opacity: 0;
-  visibility: hidden;
   transform: translateY(-4px);
-  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
+  transition: opacity 0.12s ease, transform 0.12s ease;
 }
 
-.settlement-hud__perf .settlement-hud__stat:last-child[data-tooltip]::after,
-.settlement-hud__body .settlement-hud__stat:nth-child(3n)[data-tooltip]::after {
-  left: auto;
-  right: 0;
-}
-
-.settlement-hud__stat[data-tooltip]:hover::after,
-.settlement-hud__stat[data-tooltip]:focus-visible::after {
+.ui-tooltip.is-visible {
   opacity: 1;
-  visibility: visible;
   transform: translateY(0);
+}
+
+.ui-tooltip[hidden] {
+  display: none;
 }
 
 .resource-inspector-labor {
@@ -811,13 +803,10 @@ button {
   bottom: 74px;
   transform: translateX(-50%);
   z-index: 6;
-  width: min(560px, calc(100vw - 28px));
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: rgba(23, 25, 21, 0.92);
-  box-shadow: 0 14px 34px var(--shadow);
-  backdrop-filter: blur(14px);
+  width: max-content;
+  max-width: calc(100vw - 28px);
+  padding: 0;
+  pointer-events: none;
 }
 
 .construction-menu[hidden] {
@@ -825,51 +814,125 @@ button {
 }
 
 .construction-menu__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  pointer-events: auto;
 }
 
 .construction-card {
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-  padding: 8px 6px 10px;
+  position: relative;
+  display: block;
+  padding: 0;
+  margin: 0;
   color: var(--ink);
-  background: rgba(238, 232, 220, 0.06);
-  border: 1px solid rgba(238, 232, 220, 0.14);
-  border-radius: 10px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   cursor: pointer;
-  transition: border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+  line-height: 0;
 }
 
 .construction-card:hover,
 .construction-card:focus-visible {
-  border-color: rgba(215, 180, 99, 0.75);
   outline: none;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 22px var(--shadow);
 }
 
-.construction-card.is-active,
-.construction-card[aria-pressed='true'] {
-  border-color: rgba(215, 180, 99, 0.85);
-  background: rgba(215, 180, 99, 0.14);
+.construction-card:hover .construction-card__art,
+.construction-card:focus-visible .construction-card__art {
+  filter: brightness(1.1);
+}
+
+.construction-card.is-active .construction-card__art,
+.construction-card[aria-pressed='true'] .construction-card__art {
+  filter: drop-shadow(0 0 8px rgba(215, 180, 99, 0.95)) brightness(1.08);
 }
 
 .construction-card__art {
-  width: 56px;
-  height: 56px;
+  display: block;
+  height: 112px;
+  width: auto;
   object-fit: contain;
   pointer-events: none;
   user-select: none;
+  transition: filter 0.12s ease;
 }
 
-.construction-card__label {
-  font-size: 11px;
+.construction-card__tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+  min-width: 200px;
+  max-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid rgba(196, 167, 99, 0.35);
+  border-radius: 8px;
+  background: rgba(16, 20, 26, 0.96);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(6px);
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease,
+    visibility 0.14s ease;
+}
+
+.construction-card__tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-top-color: rgba(196, 167, 99, 0.35);
+}
+
+.construction-card__tooltip::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: -1px;
+  margin-left: -5px;
+  border: 5px solid transparent;
+  border-top-color: rgba(16, 20, 26, 0.96);
+}
+
+.construction-card:hover .construction-card__tooltip,
+.construction-card:focus-visible .construction-card__tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.construction-card__tooltip-title {
+  font-size: 13px;
   font-weight: 650;
-  line-height: 1.2;
-  text-align: center;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+.construction-card__tooltip-desc {
+  color: rgba(238, 232, 220, 0.88);
+}
+
+.construction-card__tooltip-cost {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(196, 167, 99, 0.95);
 }
 
 .builder-status-bar {
@@ -1299,11 +1362,20 @@ button {
   }
 
   .construction-menu {
-    right: 10px;
-    left: 10px;
+    left: 50%;
+    right: auto;
     bottom: 64px;
-    transform: none;
-    width: auto;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 20px);
+  }
+
+  .construction-card__art {
+    height: 88px;
+  }
+
+  .construction-card__tooltip {
+    min-width: 180px;
+    max-width: min(240px, calc(100vw - 32px));
   }
 
   .hud-bottom-right {

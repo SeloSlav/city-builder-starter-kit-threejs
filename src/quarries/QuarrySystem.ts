@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { MossyRockTextureSet } from '../utils/propTextureLoad.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
 import { createRockShadowGeometry } from '../props/ForestProps.ts';
+import { TREE_SHADOW_CAST_LAYER } from '../scene/SceneLayers.ts';
 import type { QuarryLayout, QuarrySite } from './QuarryLayout.ts';
 import type { RockObstacle } from '../utils/pathGeometry.ts';
 
@@ -122,6 +123,7 @@ function createQuarryRockMeshes(
     mesh.receiveShadow = true;
     const shadowMesh = new THREE.InstancedMesh(shadowGeometry, shadowMaterials.shadowCast, bucket.length);
     shadowMesh.name = `Quarry boulder shadows ${variantIndex + 1}`;
+    shadowMesh.layers.set(TREE_SHADOW_CAST_LAYER);
     shadowMesh.castShadow = true;
     shadowMesh.receiveShadow = false;
     shadowMesh.customDepthMaterial = shadowMaterials.shadowDepth;

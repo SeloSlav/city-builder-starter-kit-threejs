@@ -433,8 +433,14 @@ export class SceneManager {
   }
 
   private refreshShadowMap(): void {
+    if (this.sunLight) {
+      this.sunLight.shadow.needsUpdate = true;
+    }
+
     const shadowMap = this.renderer.shadowMap as { needsUpdate?: boolean };
-    if ('needsUpdate' in shadowMap) shadowMap.needsUpdate = true;
+    if ('needsUpdate' in shadowMap) {
+      shadowMap.needsUpdate = true;
+    }
   }
 
   getRoadPickMeshes(): THREE.Object3D[] {
@@ -511,7 +517,7 @@ export class SceneManager {
     sun.shadow.bias = -0.00015;
     sun.shadow.normalBias = 0.012;
     sun.shadow.radius = 2.8;
-    sun.shadow.autoUpdate = false;
+    sun.shadow.autoUpdate = true;
     sun.shadow.camera.layers.enable(TREE_SHADOW_CAST_LAYER);
     this.scene.add(sun);
     this.scene.add(sun.target);

@@ -20,6 +20,51 @@ const BUILD_CARD_ART = {
   residences: '/assets/ui/build-menu/residence.png',
 } as const;
 
+const BUILD_CARD_COPY = {
+  lumber_mill: {
+    title: 'Lumber mill',
+    description: 'Workers fell mature trees in a wide radius and stockpile timber for building.',
+    cost: () => formatBuildingCost(getBuildingCost('lumber_mill')),
+  },
+  stone_quarry: {
+    title: "Stonecutter's camp",
+    description: 'Quarries stone from rock outcrops within range for walls and foundations.',
+    cost: () => formatBuildingCost(getBuildingCost('stone_quarry')),
+  },
+  reforester: {
+    title: 'Reforester',
+    description: 'Regrows cleared woodland, turning stumps into saplings and mature forest.',
+    cost: () => formatBuildingCost(getBuildingCost('reforester')),
+  },
+  woodcutters_lodge: {
+    title: "Woodcutter's lodge",
+    description: 'Chops timber into firewood and hauls it to homes along connected roads.',
+    cost: () => formatBuildingCost(getBuildingCost('woodcutters_lodge')),
+  },
+  residences: {
+    title: 'Residence',
+    description: 'Draw burgage plots along a road. Each cottage houses settlers over time.',
+    cost: () => `${formatBuildingCost(residenceZoneCost(1))} per home`,
+  },
+} as const;
+
+function renderConstructionCard(
+  action: string,
+  artKey: keyof typeof BUILD_CARD_ART,
+): string {
+  const copy = BUILD_CARD_COPY[artKey];
+  const cost = copy.cost();
+  return `
+          <button type="button" class="construction-card" data-action="${action}" aria-label="${copy.title}">
+            <img class="construction-card__art" src="${BUILD_CARD_ART[artKey]}" alt="" draggable="false" />
+            <span class="construction-card__tooltip" role="tooltip">
+              <span class="construction-card__tooltip-title">${copy.title}</span>
+              <span class="construction-card__tooltip-desc">${copy.description}</span>
+              <span class="construction-card__tooltip-cost">Cost: ${cost}</span>
+            </span>
+          </button>`;
+}
+
 type DeletePopupOptions = {
   clientX: number;
   clientY: number;
@@ -265,31 +310,16 @@ export class BuildToolbar {
 
       <section class="construction-menu" data-build-menu hidden aria-label="Build menu">
         <div class="construction-menu__cards">
-          <button type="button" class="construction-card" data-action="lumber-mill" title="Place lumber mill (${formatBuildingCost(getBuildingCost('lumber_mill'))})">
-            <img class="construction-card__art" src="${BUILD_CARD_ART.lumber_mill}" alt="" draggable="false" />
-            <span class="construction-card__label">Lumber mill</span>
-          </button>
-          <button type="button" class="construction-card" data-action="stone-quarry" title="Place stonecutter's camp (${formatBuildingCost(getBuildingCost('stone_quarry'))})">
-            <img class="construction-card__art" src="${BUILD_CARD_ART.stone_quarry}" alt="" draggable="false" />
-            <span class="construction-card__label">Stonecutters</span>
-          </button>
-          <button type="button" class="construction-card" data-action="reforester" title="Place forester (${formatBuildingCost(getBuildingCost('reforester'))})">
-            <img class="construction-card__art" src="${BUILD_CARD_ART.reforester}" alt="" draggable="false" />
-            <span class="construction-card__label">Forester</span>
-          </button>
-          <button type="button" class="construction-card" data-action="woodcutters-lodge" title="Place woodcutter's lodge (${formatBuildingCost(getBuildingCost('woodcutters_lodge'))})">
-            <img class="construction-card__art" src="${BUILD_CARD_ART.woodcutters_lodge}" alt="" draggable="false" />
-            <span class="construction-card__label">Woodcutter</span>
-          </button>
-          <button type="button" class="construction-card" data-action="residences" title="Place residences (${formatBuildingCost(residenceZoneCost(1))} each)">
-            <img class="construction-card__art" src="${BUILD_CARD_ART.residences}" alt="" draggable="false" />
-            <span class="construction-card__label">Residence</span>
-          </button>
+          ${renderConstructionCard('lumber-mill', 'lumber_mill')}
+          ${renderConstructionCard('stone-quarry', 'stone_quarry')}
+          ${renderConstructionCard('reforester', 'reforester')}
+          ${renderConstructionCard('woodcutters-lodge', 'woodcutters_lodge')}
+          ${renderConstructionCard('residences', 'residences')}
         </div>
       </section>
 
       <nav class="construction-dock" data-construction-dock aria-label="Construction tools">
-        <button type="button" class="construction-dock-button" data-action="road" data-tooltip="Roads (R)" title="Roads (R)" aria-label="Roads" aria-pressed="false">
+        <button type="button" class="construction-dock-button" data-action="road" data-tooltip="Roads (R)" aria-label="Roads" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M9 21c4.8-4.8 5.2-12.2 1-18" />
             <path d="M15 21c-2.8-5.7-2.2-11.6 2-18" />
@@ -298,17 +328,17 @@ export class BuildToolbar {
             <path d="M12 16.5h1" />
           </svg>
         </button>
-        <button type="button" class="construction-dock-button" data-action="build-menu" data-tooltip="Build (B)" title="Build (B)" aria-label="Build menu" aria-expanded="false" aria-pressed="false">
+        <button type="button" class="construction-dock-button" data-action="build-menu" data-tooltip="Build (B)" aria-label="Build menu" aria-expanded="false" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M14.5 5.5l4 4" />
             <path d="M12.3 7.7l4-4 3.9 3.9-4 4" />
             <path d="M14.8 10.8L6.4 19.2a2.1 2.1 0 0 1-3-3l8.4-8.4" />
           </svg>
         </button>
-        <button type="button" class="construction-dock-button construction-dock-button--text" data-action="help" data-tooltip="Help tips" title="Help tips" aria-label="Toggle help tips" aria-pressed="false">
+        <button type="button" class="construction-dock-button construction-dock-button--text" data-action="help" data-tooltip="Help tips" aria-label="Toggle help tips" aria-pressed="false">
           <span aria-hidden="true">?</span>
         </button>
-        <button type="button" class="construction-dock-button" data-action="settings" data-tooltip="Settings" title="Settings" aria-label="Settings">
+        <button type="button" class="construction-dock-button" data-action="settings" data-tooltip="Settings" aria-label="Settings">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 8.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4Z" />
             <path d="M19.4 13.5a7.8 7.8 0 0 0 0-3l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.6A8 8 0 0 0 7 6.6l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5l.4 2.6h4l.4-2.6a8 8 0 0 0 2.6-1.5l2.4 1 2-3.4-2-1.5Z" />
