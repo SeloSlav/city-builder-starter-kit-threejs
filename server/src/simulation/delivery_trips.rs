@@ -9,6 +9,8 @@ use crate::simulation::delivery_cargo::{
     pick_delivery_target, residence_delivery_room, withdraw_delivery_cargo, DeliveryCargoTotals,
 };
 use crate::roads::{RoadNetwork, RoadPathRoute};
+use crate::simulation::game_calendar::GameClock;
+use crate::simulation::labor_and_logistics_paused;
 use crate::simulation::residence_needs::{
     apply_need_delivery, ResidenceNeedKind,
 };
@@ -37,10 +39,10 @@ impl DeliveryTripPhase {
     }
 }
 
-pub fn step_delivery_trips(ctx: &ReducerContext, tick: &SimTickContext) {
+pub fn step_delivery_trips(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock) {
     let trips: Vec<DeliveryTrip> = ctx.db.delivery_trip().iter().collect();
     for trip in trips {
-        step_one_trip(ctx, tick, trip);
+        step_one_trip(ctx, tick, clock, trip);
     }
 }
 
@@ -99,6 +101,17 @@ pub fn try_start_delivery_trip(
         return false;
     }
 
+    if labor_and_logistics_paused(ctx, building.owner, &crate::simulation::game_clock(
+        ctx.db
+            .world_config()
+            .id()
+            .find(&0)
+            .map(|config| config.sim_tick)
+            .unwrap_or(0),
+    )) {
+        return false;
+    }
+
     let available = building_delivery_stock(building, need_kind);
     if available <= 1e-6 {
         return false;
@@ -145,7 +158,11 @@ pub fn try_start_delivery_trip(
     true
 }
 
-fn step_one_trip(ctx: &ReducerContext, tick: &SimTickContext, mut trip: DeliveryTrip) {
+fn step_one_trip(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, mut trip: DeliveryTrip) {
+    if labor_and_logistics_paused(ctx, trip.owner, clock) {
+        return;
+    }
+
     let Some(network) = tick.road_network(trip.owner) else {
         return_trip_cargo_to_building(ctx, &trip);
         ctx.db.delivery_trip().id().delete(trip.id);

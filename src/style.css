@@ -8,6 +8,7 @@
 @import url('./ui/hudPanels.css');
 @import url('./ui/constructionDock.css');
 @import url('./ui/cityAdmin.css');
+@import url('./ui/worldSetup.css');
 @import url('./ui/buildChrome.css');
 
 :root {

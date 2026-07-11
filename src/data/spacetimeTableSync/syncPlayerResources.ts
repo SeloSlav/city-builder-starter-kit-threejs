@@ -26,6 +26,7 @@ export function syncPlayerResources(rows: Iterable<PlayerResources>, state: Game
     state.parishPolicy = {
       autoSweepEnabled: row.chapelAutoSweepEnabled ?? DEFAULT_PARISH_POLICY.autoSweepEnabled,
       cofferReserveGold: row.chapelCofferReserveGold ?? DEFAULT_PARISH_POLICY.cofferReserveGold,
+      sabbathObservanceEnabled: row.sabbathObservanceEnabled ?? DEFAULT_PARISH_POLICY.sabbathObservanceEnabled,
       manualCollectTotal: row.parishManualCollectTotal ?? 0,
       autoSweepTotal: row.parishAutoSweepTotal ?? 0,
       salaryPaidTotal: row.parishSalaryPaidTotal ?? 0,

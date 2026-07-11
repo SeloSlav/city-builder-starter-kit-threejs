@@ -16,7 +16,10 @@ pub fn step_residence_settlement(
         return;
     }
 
-    let required_ticks = effective_settle_ticks(has_chapel_access);
+    let required_ticks = effective_settle_ticks(
+        has_chapel_access,
+        crate::simulation::labor_schedule::owner_sabbath_observance_enabled(ctx, residence.owner),
+    );
 
     let next_ticks = residence.settlement_ticks.saturating_add(1);
     if next_ticks < required_ticks {

@@ -17,6 +17,7 @@ import { chapelCofferGold } from '../resources/chapelCoffer.ts';
 export type ParishPolicyState = {
   autoSweepEnabled: boolean;
   cofferReserveGold: number;
+  sabbathObservanceEnabled: boolean;
   manualCollectTotal: number;
   autoSweepTotal: number;
   salaryPaidTotal: number;
@@ -27,6 +28,7 @@ export type ParishPolicyState = {
 export const DEFAULT_PARISH_POLICY: ParishPolicyState = {
   autoSweepEnabled: false,
   cofferReserveGold: CHAPEL_COFFER_RESERVE_DEFAULT,
+  sabbathObservanceEnabled: false,
   manualCollectTotal: 0,
   autoSweepTotal: 0,
   salaryPaidTotal: 0,

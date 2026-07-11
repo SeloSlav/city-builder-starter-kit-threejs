@@ -14,6 +14,8 @@ use crate::simulation::delivery_supplier::{
     delivery_work_ready, dispatch_delivery_if_ready, should_alternate_single_worker,
     DeliveryDispatchConfig,
 };
+use crate::simulation::game_calendar::GameClock;
+use crate::simulation::labor_and_logistics_paused;
 use crate::simulation::residence_needs::{
     load_needs, need_stock, ResidenceNeedKind,
 };
@@ -23,7 +25,11 @@ use crate::simulation::road_logistics::{
 use crate::simulation::tick_context::SimTickContext;
 use crate::tables::{Building, Residence};
 
-pub fn step_well(ctx: &ReducerContext, tick: &SimTickContext, sim_tick: u64, building: Building) {
+pub fn step_well(ctx: &ReducerContext, tick: &SimTickContext, sim_tick: u64, clock: &GameClock, building: Building) {
+    if labor_and_logistics_paused(ctx, building.owner, clock) {
+        return;
+    }
+
     let Some(def) = building_def(&building.kind) else {
         return;
     };

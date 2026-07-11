@@ -15,6 +15,8 @@ use crate::simulation::delivery_supplier::{
 use crate::simulation::residence_needs::{
     load_needs, need_stock, ResidenceNeedKind,
 };
+use crate::simulation::game_calendar::GameClock;
+use crate::simulation::labor_and_logistics_paused;
 use crate::simulation::road_logistics::{
     claim_residences_for_lodges, lodge_labor_split, owner_lodges, sort_mills_by_road_path,
     sort_residences_for_delivery,
@@ -22,7 +24,11 @@ use crate::simulation::road_logistics::{
 use crate::simulation::tick_context::SimTickContext;
 use crate::tables::{Building, Residence};
 
-pub fn step_woodcutters_lodge(ctx: &ReducerContext, tick: &SimTickContext, building: Building) {
+pub fn step_woodcutters_lodge(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, building: Building) {
+    if labor_and_logistics_paused(ctx, building.owner, clock) {
+        return;
+    }
+
     let Some(def) = building_def(&building.kind) else {
         return;
     };

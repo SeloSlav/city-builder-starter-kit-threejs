@@ -2,7 +2,9 @@ import type { DbConnection } from '../generated/index.ts';
 import { getConnection } from '../network/spacetimedbClient.ts';
 import type { BackyardGardenKind } from '../residences/backyardGarden.ts';
 import type { BuildingKind, BurgageFrontageEdge } from '../resources/types.ts';
+import type { WorldLayout } from '../resources/WorldLayout.ts';
 import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
+import { computeWorldBootstrapDataFromLayout } from '../world/worldBootstrapData.ts';
 import {
   parseBuildingServerId,
   parseResidenceServerId,
@@ -100,10 +102,12 @@ export async function setEconomicActivityTaxRate(taxRate: number): Promise<void>
 export async function setChapelParishPolicy(
   autoSweepEnabled: boolean,
   cofferReserveGold: number,
+  sabbathObservanceEnabled: boolean,
 ): Promise<void> {
   await callReducer('setChapelParishPolicy', 'set_chapel_parish_policy', {
     autoSweepEnabled,
     cofferReserveGold,
+    sabbathObservanceEnabled,
   });
 }
 
@@ -145,28 +149,52 @@ export async function demolishBuilding(buildingId: string): Promise<void> {
   await callReducer('demolishBuilding', 'demolish_building', { buildingId: serverId });
 }
 
-export async function bootstrapWorld(registry: WorldLayoutRegistry): Promise<void> {
-  const quarries = registry.definitionList
-    .filter((definition) => definition.kind === 'quarry')
-    .map((definition) => ({
-      quarryId: definition.id,
-      x: definition.x,
-      z: definition.z,
-      maxYield: definition.maxYield,
-    }));
-  const nodes = registry.definitionList
-    .filter((definition) => definition.kind === 'game' || definition.kind === 'berries')
-    .map((definition) => ({
-      nodeId: definition.id,
-      nodeKind: definition.kind,
-      x: definition.x,
-      z: definition.z,
-      maxYield: definition.maxYield,
-      anchorX: definition.x,
-      anchorZ: definition.z,
-    }));
+export async function bootstrapWorld(
+  registry: WorldLayoutRegistry,
+  worldLayout: WorldLayout,
+): Promise<void> {
+  const bootstrap = computeWorldBootstrapDataFromLayout(worldLayout);
+  const quarries = bootstrap.quarries.length > 0
+    ? bootstrap.quarries
+    : registry.definitionList
+      .filter((definition) => definition.kind === 'quarry')
+      .map((definition) => ({
+        quarryId: definition.id,
+        x: definition.x,
+        z: definition.z,
+        maxYield: definition.maxYield,
+      }));
+  const nodes = bootstrap.foragingNodes.length > 0
+    ? bootstrap.foragingNodes.map((node) => ({
+      nodeId: node.nodeId,
+      nodeKind: node.nodeKind,
+      x: node.x,
+      z: node.z,
+      maxYield: node.maxYield,
+      anchorX: node.anchorX,
+      anchorZ: node.anchorZ,
+    }))
+    : registry.definitionList
+      .filter((definition) => definition.kind === 'game' || definition.kind === 'berries')
+      .map((definition) => ({
+        nodeId: definition.id,
+        nodeKind: definition.kind,
+        x: definition.x,
+        z: definition.z,
+        maxYield: definition.maxYield,
+        anchorX: definition.x,
+        anchorZ: definition.z,
+      }));
+  const trees = bootstrap.trees.map((tree) => ({
+    treeId: tree.treeId,
+    layoutIndex: tree.layoutIndex,
+    x: tree.x,
+    z: tree.z,
+    woodYield: tree.woodYield,
+  }));
   await callReducer('bootstrapQuarries', 'bootstrap_quarries', { quarries });
   await callReducer('bootstrapForaging', 'bootstrap_foraging', { nodes });
+  await callReducer('bootstrapTrees', 'bootstrap_trees', { trees });
 }
 
 export async function syncRoadNetwork(snapshotJson: string): Promise<void> {

@@ -5,6 +5,7 @@
 
 import type { SpacetimeGameSnapshot, SpacetimeGameStore } from '../data/spacetimeGameStore.ts';
 import type { RoadNetworkSnapshot } from '../roads/RoadNetwork.ts';
+import type { WorldLayout } from '../resources/WorldLayout.ts';
 import type { GameState } from '../resources/types.ts';
 import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
 
@@ -17,7 +18,7 @@ export type GameRuntimeCallbacks = {
 export class GameRuntime {
   readonly store: SpacetimeGameStore;
   private readonly registry: WorldLayoutRegistry;
-  private readonly seed: number;
+  private readonly worldLayout: WorldLayout;
   private readonly callbacks: GameRuntimeCallbacks;
   private unsubscribe: (() => void) | null = null;
   private roadsHydrated = false;
@@ -26,12 +27,12 @@ export class GameRuntime {
   constructor(
     store: SpacetimeGameStore,
     registry: WorldLayoutRegistry,
-    seed: number,
+    worldLayout: WorldLayout,
     callbacks: GameRuntimeCallbacks,
   ) {
     this.store = store;
     this.registry = registry;
-    this.seed = seed;
+    this.worldLayout = worldLayout;
     this.callbacks = callbacks;
   }
 
@@ -44,13 +45,13 @@ export class GameRuntime {
     }
 
     this.unsubscribe = this.store.subscribe((snapshot) => {
-      const gameState = this.store.toGameState(this.seed, this.registry);
+      const gameState = this.store.toGameState(this.worldLayout.seed, this.registry);
       this.callbacks.onSnapshot(snapshot, gameState);
 
       if (!this.worldBootstrapped && snapshot.connected) {
         this.worldBootstrapped = true;
-        void this.store.bootstrapWorld(this.registry).catch((error) => {
-          console.warn('[GameRuntime] Failed to bootstrap quarries', error);
+        void this.store.bootstrapWorld(this.registry, this.worldLayout).catch((error) => {
+          console.warn('[GameRuntime] Failed to bootstrap world entities', error);
           this.worldBootstrapped = false;
         });
       }

@@ -3,6 +3,10 @@ import type { RiverField } from '../rivers/RiverField.ts';
 import type { QuarryLayout } from '../quarries/QuarryLayout.ts';
 import { sampleBaseTerrainHeight } from './TerrainHeight.ts';
 import { sampleTerrainMeshHeight } from './TerrainMeshHeight.ts';
+import type { WorldDimensions } from '../world/worldGenerationSettings.ts';
+import { resolveWorldDimensions } from '../world/worldGenerationSettings.ts';
+import { DEFAULT_WORLD_GENERATION_SETTINGS } from '../world/worldGenerationSettings.ts';
+import { getActiveWorldDimensions } from '../world/worldGenerationContext.ts';
 import { yieldToMain } from '../utils/yieldToMain.ts';
 
 export type TerrainBounds = {
@@ -15,14 +19,14 @@ export type TerrainBounds = {
 const TERRAIN_ROWS_PER_YIELD = 40;
 
 export class Terrain {
-  readonly size = 1080;
-  readonly playableSize = 820;
+  readonly size: number;
+  readonly playableSize: number;
   readonly resolution = 769;
   readonly bounds: TerrainBounds;
   readonly mesh: THREE.Mesh;
   private dirtZoomGateAttr!: THREE.BufferAttribute;
 
-  static fullBounds(size = 1080): TerrainBounds {
+  static fullBounds(size = resolveWorldDimensions(DEFAULT_WORLD_GENERATION_SETTINGS.mapSize).terrainSize): TerrainBounds {
     const half = size * 0.5;
     return { minX: -half, maxX: half, minZ: -half, maxZ: half };
   }
@@ -32,12 +36,15 @@ export class Terrain {
     riverField?: RiverField,
     quarryLayout?: QuarryLayout,
     onProgress?: (completedRows: number, totalRows: number) => void,
+    dimensions: WorldDimensions = resolveWorldDimensions(DEFAULT_WORLD_GENERATION_SETTINGS.mapSize),
   ): Promise<Terrain> {
-    const geometry = await Terrain.buildGeometryAsync(riverField, quarryLayout, onProgress);
-    return new Terrain(material, geometry);
+    const geometry = await Terrain.buildGeometryAsync(riverField, quarryLayout, dimensions, onProgress);
+    return new Terrain(material, geometry, dimensions);
   }
 
-  private constructor(material: THREE.Material, geometry: THREE.BufferGeometry) {
+  private constructor(material: THREE.Material, geometry: THREE.BufferGeometry, dimensions: WorldDimensions) {
+    this.size = dimensions.terrainSize;
+    this.playableSize = dimensions.playableSize;
     const half = this.playableSize * 0.5;
     this.bounds = { minX: -half, maxX: half, minZ: -half, maxZ: half };
     this.dirtZoomGateAttr = geometry.getAttribute('dirtZoomGate') as THREE.BufferAttribute;
@@ -85,10 +92,11 @@ export class Terrain {
   private static async buildGeometryAsync(
     riverField: RiverField | undefined,
     quarryLayout: QuarryLayout | undefined,
+    dimensions: WorldDimensions,
     onProgress?: (completedRows: number, totalRows: number) => void,
   ): Promise<THREE.BufferGeometry> {
     const resolution = 769;
-    const size = 1080;
+    const size = dimensions.terrainSize;
     const vertexCount = resolution * resolution;
     const positions = new Float32Array(vertexCount * 3);
     const uvs = new Float32Array(vertexCount * 2);
@@ -198,9 +206,10 @@ class TerrainVertexBuilder {
   }
 
   private getEdgeHillFactor(x: number, z: number): number {
+    const { playableSize, terrainSize } = getActiveWorldDimensions();
     const edgeDistance = Math.max(Math.abs(x), Math.abs(z));
-    const hillStart = 820 * 0.44;
-    const hillEnd = 1080 * 0.5;
+    const hillStart = playableSize * 0.44;
+    const hillEnd = terrainSize * 0.5;
     return this.smoothstep(hillStart, hillEnd, edgeDistance);
   }
 

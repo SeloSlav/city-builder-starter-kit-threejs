@@ -62,6 +62,16 @@ type MarketplaceTradeOffer = MarketplaceGoldBuyOffer | MarketplaceGoldSellOffer 
 
 export type GameBalance = {
   sim: { tickMicros: number; tickDt: number };
+  calendar: {
+    secondsPerDay: number;
+    hoursPerDay: number;
+    daysPerMonth: number;
+    monthsPerYear: number;
+    daysPerWeek: number;
+    sundayWeekday: number;
+    workStartHour: number;
+    workEndHour: number;
+  };
   economy: {
     startingTimber: number;
     startingStone: number;
@@ -116,6 +126,8 @@ export type GameBalance = {
     chapelCofferReserveDefault: number;
     chapelCofferReserveMin: number;
     chapelCofferReserveMax: number;
+    sabbathObservanceAttendanceBonus: number;
+    sabbathObservanceSettlementBonus: number;
   };
   roads: {
     buildingRoadAccessDistance: number;
@@ -185,6 +197,15 @@ function generateRust(): string {
     `pub const TICK_MICROS: i64 = ${b.sim.tickMicros};`,
     `pub const TICK_DT: f64 = ${rustF64(b.sim.tickDt)};`,
     '',
+    `pub const CALENDAR_SECONDS_PER_DAY: f64 = ${rustF64(b.calendar.secondsPerDay)};`,
+    `pub const CALENDAR_HOURS_PER_DAY: u32 = ${b.calendar.hoursPerDay};`,
+    `pub const CALENDAR_DAYS_PER_MONTH: u32 = ${b.calendar.daysPerMonth};`,
+    `pub const CALENDAR_MONTHS_PER_YEAR: u32 = ${b.calendar.monthsPerYear};`,
+    `pub const CALENDAR_DAYS_PER_WEEK: u32 = ${b.calendar.daysPerWeek};`,
+    `pub const CALENDAR_SUNDAY_WEEKDAY: u32 = ${b.calendar.sundayWeekday};`,
+    `pub const CALENDAR_WORK_START_HOUR: u32 = ${b.calendar.workStartHour};`,
+    `pub const CALENDAR_WORK_END_HOUR: u32 = ${b.calendar.workEndHour};`,
+    '',
     `pub const STARTING_TIMBER: f64 = ${rustF64(b.economy.startingTimber)};`,
     `pub const STARTING_STONE: f64 = ${rustF64(b.economy.startingStone)};`,
     `pub const STARTING_GOLD: f64 = ${rustF64(b.economy.startingGold)};`,
@@ -237,6 +258,8 @@ function generateRust(): string {
     `pub const CHAPEL_COFFER_RESERVE_DEFAULT: f64 = ${rustF64(b.population.chapelCofferReserveDefault)};`,
     `pub const CHAPEL_COFFER_RESERVE_MIN: f64 = ${rustF64(b.population.chapelCofferReserveMin)};`,
     `pub const CHAPEL_COFFER_RESERVE_MAX: f64 = ${rustF64(b.population.chapelCofferReserveMax)};`,
+    `pub const CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS: f64 = ${rustF64(b.population.sabbathObservanceAttendanceBonus)};`,
+    `pub const CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS: f64 = ${rustF64(b.population.sabbathObservanceSettlementBonus)};`,
     '',
     `pub const BUILDING_ROAD_ACCESS_DISTANCE: f64 = ${rustF64(b.roads.buildingRoadAccessDistance)};`,
     `pub const BURGAGE_ROAD_FRONTAGE_DISTANCE: f64 = ${rustF64(b.roads.burgageRoadFrontageDistance)};`,
@@ -433,6 +456,16 @@ function generateTypeScript(): string {
     '',
     `export const SIM_TICK_SECONDS = ${b.sim.tickDt};`,
     '',
+    `export const CALENDAR_SECONDS_PER_DAY = ${b.calendar.secondsPerDay};`,
+    `export const CALENDAR_HOURS_PER_DAY = ${b.calendar.hoursPerDay};`,
+    `export const CALENDAR_DAYS_PER_MONTH = ${b.calendar.daysPerMonth};`,
+    `export const CALENDAR_MONTHS_PER_YEAR = ${b.calendar.monthsPerYear};`,
+    `export const CALENDAR_DAYS_PER_WEEK = ${b.calendar.daysPerWeek};`,
+    `export const CALENDAR_SUNDAY_WEEKDAY = ${b.calendar.sundayWeekday};`,
+    `export const CALENDAR_WORK_START_HOUR = ${b.calendar.workStartHour};`,
+    `export const CALENDAR_WORK_END_HOUR = ${b.calendar.workEndHour};`,
+    `export const SECONDS_PER_DAY = ${b.calendar.secondsPerDay};`,
+    '',
     `export const STARTING_TIMBER = ${b.economy.startingTimber};`,
     `export const STARTING_STONE = ${b.economy.startingStone};`,
     `export const STARTING_GOLD = ${b.economy.startingGold};`,
@@ -485,6 +518,8 @@ function generateTypeScript(): string {
     `export const CHAPEL_COFFER_RESERVE_DEFAULT = ${b.population.chapelCofferReserveDefault};`,
     `export const CHAPEL_COFFER_RESERVE_MIN = ${b.population.chapelCofferReserveMin};`,
     `export const CHAPEL_COFFER_RESERVE_MAX = ${b.population.chapelCofferReserveMax};`,
+    `export const CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS = ${b.population.sabbathObservanceAttendanceBonus};`,
+    `export const CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS = ${b.population.sabbathObservanceSettlementBonus};`,
     '',
     `export const BUILDING_ROAD_ACCESS_DISTANCE = ${b.roads.buildingRoadAccessDistance};`,
     `export const BURGAGE_ROAD_FRONTAGE_DISTANCE = ${b.roads.burgageRoadFrontageDistance};`,

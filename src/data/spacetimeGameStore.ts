@@ -36,6 +36,7 @@ import type {
 } from '../resources/types.ts';
 import { createEmptyStockpile } from '../resources/types.ts';
 import type { DeliveryTripState } from '../logistics/deliveryTrips.ts';
+import type { WorldLayout } from '../resources/WorldLayout.ts';
 import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
 import { inferNextBuildingId } from './spacetimeIds.ts';
 import * as spacetimeReducers from './spacetimeReducers.ts';
@@ -248,8 +249,16 @@ export class SpacetimeGameStore {
     return spacetimeReducers.setEconomicActivityTaxRate(taxRate);
   }
 
-  setChapelParishPolicy(autoSweepEnabled: boolean, cofferReserveGold: number): Promise<void> {
-    return spacetimeReducers.setChapelParishPolicy(autoSweepEnabled, cofferReserveGold);
+  setChapelParishPolicy(
+    autoSweepEnabled: boolean,
+    cofferReserveGold: number,
+    sabbathObservanceEnabled: boolean,
+  ): Promise<void> {
+    return spacetimeReducers.setChapelParishPolicy(
+      autoSweepEnabled,
+      cofferReserveGold,
+      sabbathObservanceEnabled,
+    );
   }
 
   async assignBuildingLabor(buildingId: string, labor: number): Promise<void> {
@@ -286,8 +295,8 @@ export class SpacetimeGameStore {
     return spacetimeReducers.demolishBuilding(buildingId);
   }
 
-  bootstrapWorld(registry: WorldLayoutRegistry): Promise<void> {
-    return spacetimeReducers.bootstrapWorld(registry);
+  bootstrapWorld(registry: WorldLayoutRegistry, worldLayout: WorldLayout): Promise<void> {
+    return spacetimeReducers.bootstrapWorld(registry, worldLayout);
   }
 
   queueRoadSync(snapshot: RoadNetworkSnapshot): void {

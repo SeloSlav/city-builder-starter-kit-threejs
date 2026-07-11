@@ -1,6 +1,6 @@
 # Medieval Settlement — Three.js
 
-A real-time Three.js sandbox for growing a **medieval settlement** on a procedural 3D landscape. Draw dirt road networks across rolling hills, pine forests, and winding rivers — wooden bridges and graded ramps appear automatically when a path crosses water. Place production buildings to harvest timber, stone, game, and berries; connect wells and woodcutter's lodges along those roads; then lay out residence zones along your roads so settlers move in over time. Homes need firewood, water, and food — road-based delivery crews haul supplies from lodges, wells, hunter's halls, and forager's sheds while you watch colored agents travel the network. Assign workers from your labor pool, plant backyard gardens for local food and village gold, and keep the supply chain running before homes are abandoned. A [SpacetimeDB](https://spacetimedb.com/) Rust module runs the authoritative economy simulation; the client renders replicated state in real time. Toggle the hydrology overlay to scout well sites, inspect foraging nodes and quarries from map icons, and drop into first-person walk mode to explore on foot.
+A real-time Three.js sandbox for growing a **medieval settlement** on a procedural 3D landscape. On a fresh game, choose map size, topography, hydrology, forest density, and world seed before generation begins. Draw dirt road networks across rolling hills, pine forests, and winding rivers — wooden bridges and graded ramps appear automatically when a path crosses water. Place production buildings to harvest timber, stone, game, and berries; connect wells and woodcutter's lodges along those roads; then lay out residence zones along your roads so settlers move in over time. Homes need firewood, water, and food — road-based delivery crews haul supplies from lodges, wells, hunter's halls, and forager's sheds while you watch colored agents travel the network. Assign workers from your labor pool, plant backyard gardens for local food and village gold, and keep the supply chain running before homes are abandoned. A [SpacetimeDB](https://spacetimedb.com/) Rust module runs the authoritative economy simulation; the client renders replicated state in real time. Toggle the hydrology overlay to scout well sites, inspect foraging nodes and quarries from map icons, and drop into first-person walk mode to explore on foot.
 
 ![Road network with wooden bridges, ramps, and forest](docs/screenshots/medieval-roads-bridges-forest.png)
 
@@ -79,6 +79,7 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 
 ### Landscape & environment
 
+- **World setup** — on first launch (or via game menu → **New world…**), pick map size (Small / Medium / Large), topography roughness, hydrology intensity, forest density, and a reproducible world seed before the terrain generates.
 - Large procedural heightfield terrain with multi-layer value noise and broad macro shaping.
 - TSL grass-blend terrain material mixing meadow, dense, and dry grass PBR texture sets.
 - River-carved valleys with muddy shore blending where water meets land.
@@ -154,6 +155,7 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 | Free look (walk mode) | Hold `Alt` |
 | Exit walk mode | `Escape` (walk mode) |
 | Open game menu | Click the menu button (top-left) or `Escape` (RTS mode) |
+| Start a new world | Game menu → **New world…** |
 
 ## Quick Start
 

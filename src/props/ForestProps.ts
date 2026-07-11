@@ -105,6 +105,9 @@ const TAU = Math.PI * 2;
 export type ForestPropsOptions = {
   isBlockedAt?: (x: number, z: number) => boolean;
   rendererBackend?: RendererBackendKind;
+  treeSeed?: number;
+  densityScale?: number;
+  forestCores?: ForestCore[];
 };
 
 export type ForestTreePlacement = TreePlacement;
@@ -114,9 +117,10 @@ export function computeForestTreePlacements(
   playableSize = 820,
   terrainSize = 1080,
   isBlockedAt?: (x: number, z: number) => boolean,
+  options?: { treeSeed?: number; densityScale?: number },
 ): ForestTreePlacement[] {
-  const rng = mulberry32(0x5eedf0a5);
-  const spawnConfig = createForestSpawnConfig(playableSize, terrainSize);
+  const rng = mulberry32(options?.treeSeed ?? 0x5eedf0a5);
+  const spawnConfig = createForestSpawnConfig(playableSize, terrainSize, options?.densityScale ?? 1);
   const forestCores = createForestCores(rng, spawnConfig);
   const treePlacements = createTreePlacements(rng, forestCores, spawnConfig, isBlockedAt);
   const hillEdgePlacements = createHillEdgeTreePlacements(rng, spawnConfig, treePlacements, isBlockedAt);
@@ -129,14 +133,18 @@ export async function createForestProps(
   maxAnisotropy: number,
   options?: ForestPropsOptions,
 ): Promise<ForestManager> {
-  const rng = mulberry32(0x5eedf0a5);
-  const spawnConfig = createForestSpawnConfig(terrain.playableSize, terrain.size);
+  const rng = mulberry32(options?.treeSeed ?? 0x5eedf0a5);
+  const spawnConfig = createForestSpawnConfig(
+    terrain.playableSize,
+    terrain.size,
+    options?.densityScale ?? 1,
+  );
   const isBlockedAt = options?.isBlockedAt;
   const enableTreeShadowFilter = options?.rendererBackend !== 'webgpu';
   const materials = await createForestMaterials(maxAnisotropy, enableTreeShadowFilter);
   const forest = new THREE.Group();
   forest.name = 'Road-scale forest props';
-  const forestCores = createForestCores(rng, spawnConfig);
+  const forestCores = options?.forestCores ?? createForestCores(rng, spawnConfig);
   const treePlacements = createTreePlacements(rng, forestCores, spawnConfig, isBlockedAt);
   const hillEdgePlacements = createHillEdgeTreePlacements(rng, spawnConfig, treePlacements, isBlockedAt);
   const saplingPlacements = createSaplingPlacements(rng, forestCores, spawnConfig, treePlacements, isBlockedAt);

@@ -3,6 +3,16 @@
     "tickMicros": 200000,
     "tickDt": 0.2
   },
+  "calendar": {
+    "secondsPerDay": 86400,
+    "hoursPerDay": 24,
+    "daysPerMonth": 30,
+    "monthsPerYear": 12,
+    "daysPerWeek": 7,
+    "sundayWeekday": 0,
+    "workStartHour": 6,
+    "workEndHour": 20
+  },
   "economy": {
     "startingTimber": 160,
     "startingStone": 140,
@@ -77,7 +87,9 @@
     "chapelAutoSweepFraction": 0.5,
     "chapelCofferReserveDefault": 80,
     "chapelCofferReserveMin": 20,
-    "chapelCofferReserveMax": 200
+    "chapelCofferReserveMax": 200,
+    "sabbathObservanceAttendanceBonus": 0.12,
+    "sabbathObservanceSettlementBonus": 0.08
   },
   "roads": {
     "buildingRoadAccessDistance": 20,

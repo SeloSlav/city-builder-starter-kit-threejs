@@ -1,17 +1,15 @@
 import { computeForestTreePlacements } from '../props/ForestProps.ts';
-import {
-  createForestCores,
-  createForestSpawnConfig,
-  mulberry32,
-} from '../props/forestField.ts';
-import { ForagingLayout } from '../foraging/ForagingLayout.ts';
-import { QuarryLayout } from '../quarries/QuarryLayout.ts';
 import { RiverField } from '../rivers/RiverField.ts';
-import { RiverLayout } from '../rivers/RiverLayout.ts';
 import { treeWoodYield } from '../resources/treeYield.ts';
-import { DEFAULT_WORLD_SEED, FOREST_LAYOUT_SEED } from '../resources/WorldLayout.ts';
+import { createWorldLayout, type WorldLayout } from '../resources/WorldLayout.ts';
 import { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
 import { Terrain } from '../terrain/Terrain.ts';
+import {
+  DEFAULT_WORLD_GENERATION_SETTINGS,
+  forestDensityScale,
+  resolveWorldDimensions,
+  type WorldGenerationSettings,
+} from './worldGenerationSettings.ts';
 
 export type WorldBootstrapQuarry = {
   quarryId: string;
@@ -47,27 +45,20 @@ export type WorldBootstrapData = {
 };
 
 /** Headless bootstrap for scripts — rebuilds river/quarry blocking without full terrain mesh. */
-export function computeWorldBootstrapDataHeadless(seed = DEFAULT_WORLD_SEED): WorldBootstrapData {
-  const riverBounds = Terrain.fullBounds();
-  const riverLayout = RiverLayout.create({ bounds: riverBounds });
-  const quarryLayout = QuarryLayout.create({
-    bounds: riverBounds,
-    seed,
-    riverLayout,
-    playableHalf: 410,
-  });
-  const spawnConfig = createForestSpawnConfig(820, 1080);
-  const forestCores = createForestCores(mulberry32(FOREST_LAYOUT_SEED), spawnConfig);
-  const foragingLayout = ForagingLayout.create({
-    forestCores,
-    playableHalf: 410,
-    seed: seed ^ 0x4f0d21,
-  });
-  const worldLayout = { seed, quarryLayout, foragingLayout, riverLayout, forestCores };
+export function computeWorldBootstrapDataHeadless(
+  settings: WorldGenerationSettings = DEFAULT_WORLD_GENERATION_SETTINGS,
+): WorldBootstrapData {
+  const worldLayout = createWorldLayout(settings);
+  return computeWorldBootstrapDataFromLayout(worldLayout);
+}
+
+export function computeWorldBootstrapDataFromLayout(worldLayout: WorldLayout): WorldBootstrapData {
+  const dims = resolveWorldDimensions(worldLayout.settings.mapSize);
   const registry = WorldLayoutRegistry.fromWorldLayout(worldLayout);
-  const riverField = RiverField.fromLayout({ bounds: riverBounds, layout: riverLayout });
+  const riverBounds = Terrain.fullBounds(dims.terrainSize);
+  const riverField = RiverField.fromLayout({ bounds: riverBounds, layout: worldLayout.riverLayout });
   const isBlockedAt = (x: number, z: number) =>
-    riverField.isBlockedForProps(x, z) || quarryLayout.isBlockedForProps(x, z);
+    riverField.isBlockedForProps(x, z) || worldLayout.quarryLayout.isBlockedForProps(x, z);
 
   const quarries: WorldBootstrapQuarry[] = registry.definitionList
     .filter((definition) => definition.kind === 'quarry')
@@ -90,7 +81,10 @@ export function computeWorldBootstrapDataHeadless(seed = DEFAULT_WORLD_SEED): Wo
       anchorZ: definition.z,
     }));
 
-  const treePlacements = computeForestTreePlacements(820, 1080, isBlockedAt);
+  const treePlacements = computeForestTreePlacements(dims.playableSize, dims.terrainSize, isBlockedAt, {
+    treeSeed: worldLayout.treeSeed,
+    densityScale: forestDensityScale(worldLayout.settings.forestDensity),
+  });
   const trees: WorldBootstrapTree[] = treePlacements.map((placement, layoutIndex) => ({
     treeId: `tree-${layoutIndex}`,
     layoutIndex,
@@ -104,10 +98,10 @@ export function computeWorldBootstrapDataHeadless(seed = DEFAULT_WORLD_SEED): Wo
   }));
 
   return {
-    seed,
+    seed: worldLayout.seed,
     quarries,
     foragingNodes,
-    gameRespawnCandidates: foragingLayout.gameRespawnCandidates,
+    gameRespawnCandidates: worldLayout.foragingLayout.gameRespawnCandidates,
     trees,
   };
 }

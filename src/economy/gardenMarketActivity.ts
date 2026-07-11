@@ -24,4 +24,5 @@ export function gardenMarketActivity(
   return activity;
 }
 
-export const SECONDS_PER_DAY = 86_400;
+export { SECONDS_PER_DAY } from '../world/gameCalendar.ts';
+export { GAME_DAY_SECONDS } from '../world/gameCalendar.ts';

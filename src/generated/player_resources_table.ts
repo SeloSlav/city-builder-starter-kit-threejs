@@ -21,6 +21,7 @@ export default __t.row({
   economicActivityTaxRate: __t.f64().name("economic_activity_tax_rate"),
   chapelAutoSweepEnabled: __t.bool().name("chapel_auto_sweep_enabled"),
   chapelCofferReserveGold: __t.f64().name("chapel_coffer_reserve_gold"),
+  sabbathObservanceEnabled: __t.bool().name("sabbath_observance_enabled"),
   parishManualCollectTotal: __t.f64().name("parish_manual_collect_total"),
   parishAutoSweepTotal: __t.f64().name("parish_auto_sweep_total"),
   parishSalaryPaidTotal: __t.f64().name("parish_salary_paid_total"),

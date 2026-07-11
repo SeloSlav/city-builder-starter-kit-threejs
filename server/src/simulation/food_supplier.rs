@@ -12,7 +12,8 @@ use crate::simulation::delivery_supplier::{
     delivery_work_ready, dispatch_delivery_if_ready, should_alternate_single_worker,
     DeliveryDispatchConfig,
 };
-use crate::simulation::foraging_respawn::mark_foraging_depleted;
+use crate::simulation::game_calendar::GameClock;
+use crate::simulation::labor_and_logistics_paused;
 use crate::simulation::lodge_logistics::lodge_labor_split;
 use crate::simulation::residence_needs::{load_needs, need_stock, ResidenceNeedKind};
 use crate::simulation::road_logistics::{
@@ -22,21 +23,26 @@ use crate::simulation::spatial::find_nearest_foraging_node;
 use crate::simulation::tick_context::SimTickContext;
 use crate::tables::{Building, ForagingNode, Residence};
 
-pub fn step_hunters_hall(ctx: &ReducerContext, tick: &SimTickContext, building: Building) {
-    step_food_supplier(ctx, tick, building, "game", GAME_PER_HARVEST);
+pub fn step_hunters_hall(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, building: Building) {
+    step_food_supplier(ctx, tick, clock, building, "game", GAME_PER_HARVEST);
 }
 
-pub fn step_foragers_shed(ctx: &ReducerContext, tick: &SimTickContext, building: Building) {
-    step_food_supplier(ctx, tick, building, "berries", BERRIES_PER_HARVEST);
+pub fn step_foragers_shed(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, building: Building) {
+    step_food_supplier(ctx, tick, clock, building, "berries", BERRIES_PER_HARVEST);
 }
 
 fn step_food_supplier(
     ctx: &ReducerContext,
     tick: &SimTickContext,
+    clock: &GameClock,
     building: Building,
     node_kind: &str,
     harvest_amount: f64,
 ) {
+    if labor_and_logistics_paused(ctx, building.owner, clock) {
+        return;
+    }
+
     let Some(def) = building_def(&building.kind) else {
         return;
     };

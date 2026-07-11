@@ -34,6 +34,9 @@ pub struct PlayerResources {
     /// Gold kept in coffer for parish operations before auto-sweep.
     #[default(80.0)]
     pub chapel_coffer_reserve_gold: f64,
+    /// When true and a staffed chapel exists, villagers rest on Sundays.
+    #[default(false)]
+    pub sabbath_observance_enabled: bool,
     /// Lifetime gold manually collected from chapel coffers.
     #[default(0.0)]
     pub parish_manual_collect_total: f64,

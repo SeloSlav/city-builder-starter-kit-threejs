@@ -2,21 +2,28 @@ use crate::balance_generated::{
     ABANDON_AFTER_DEFICIT_TICKS, CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER,
     CHAPEL_BASE_ATTENDANCE_CHANCE, CHAPEL_COMMUNITY_ATTENDANCE_BONUS,
     CHAPEL_PRIEST_ATTENDANCE_BONUS, CHAPEL_RECOVERY_NEEDS_REQUIRED,
-    CHAPEL_RECOVERY_STOCK_MULTIPLIER, CHAPEL_SETTLEMENT_TICKS_MULTIPLIER,
+    CHAPEL_RECOVERY_STOCK_MULTIPLIER, CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS,
+    CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS, CHAPEL_SETTLEMENT_TICKS_MULTIPLIER,
     CHAPEL_TITHE_GOLD_PER_PERSON_PER_DAY, RESIDENCE_RECOVERY_FIREWOOD_MIN,
     RESIDENCE_RECOVERY_FOOD_MIN, RESIDENCE_RECOVERY_WATER_MIN, RESIDENCE_SETTLE_TICKS,
-    TICK_DT,
+    TICK_DT, CALENDAR_SECONDS_PER_DAY,
 };
 use crate::simulation::residence_needs::ResidenceNeedKind;
 
-const SECONDS_PER_DAY: f64 = 86_400.0;
+const SECONDS_PER_DAY: f64 = CALENDAR_SECONDS_PER_DAY;
 
-pub fn effective_settle_ticks(has_chapel_access: bool) -> u32 {
-    if !has_chapel_access {
-        return RESIDENCE_SETTLE_TICKS;
+pub fn effective_settle_ticks(has_chapel_access: bool, sabbath_observance: bool) -> u32 {
+    let mut ticks = if !has_chapel_access {
+        RESIDENCE_SETTLE_TICKS
+    } else {
+        ((RESIDENCE_SETTLE_TICKS as f64) * CHAPEL_SETTLEMENT_TICKS_MULTIPLIER).ceil() as u32
+    };
+
+    if has_chapel_access && sabbath_observance {
+        ticks = ((ticks as f64) * (1.0 - CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS)).ceil() as u32;
     }
 
-    ((RESIDENCE_SETTLE_TICKS as f64) * CHAPEL_SETTLEMENT_TICKS_MULTIPLIER).ceil() as u32
+    ticks.max(1)
 }
 
 pub fn effective_abandon_after_deficit_ticks(has_chapel_access: bool) -> u32 {
@@ -49,15 +56,20 @@ pub fn recovery_needs_required(has_chapel_access: bool) -> u32 {
     }
 }
 
-pub fn chapel_attendance_chance(assigned_labor: u32) -> f64 {
+pub fn chapel_attendance_chance(assigned_labor: u32, sabbath_observance: bool) -> f64 {
     if assigned_labor == 0 {
         return 0.0;
     }
 
-    (CHAPEL_BASE_ATTENDANCE_CHANCE
+    let mut chance = CHAPEL_BASE_ATTENDANCE_CHANCE
         + CHAPEL_PRIEST_ATTENDANCE_BONUS * assigned_labor as f64
-        + CHAPEL_COMMUNITY_ATTENDANCE_BONUS)
-        .clamp(0.0, 1.0)
+        + CHAPEL_COMMUNITY_ATTENDANCE_BONUS;
+
+    if sabbath_observance {
+        chance += CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS;
+    }
+
+    chance.clamp(0.0, 1.0)
 }
 
 pub fn chapel_tithe_gold_per_tick(population: u32) -> f64 {
@@ -84,9 +96,9 @@ mod tests {
 
     #[test]
     fn effective_settle_ticks_matches_balance() {
-        assert_eq!(effective_settle_ticks(false), RESIDENCE_SETTLE_TICKS);
+        assert_eq!(effective_settle_ticks(false, false), RESIDENCE_SETTLE_TICKS);
         assert_eq!(
-            effective_settle_ticks(true),
+            effective_settle_ticks(true, false),
             (RESIDENCE_SETTLE_TICKS as f64 * CHAPEL_SETTLEMENT_TICKS_MULTIPLIER).ceil() as u32,
         );
     }
@@ -108,14 +120,14 @@ mod tests {
 
     #[test]
     fn chapel_attendance_chance_matches_balance() {
-        assert_eq!(chapel_attendance_chance(0), 0.0);
+        assert_eq!(chapel_attendance_chance(0, false), 0.0);
         assert_eq!(
-            chapel_attendance_chance(1),
+            chapel_attendance_chance(1, false),
             CHAPEL_BASE_ATTENDANCE_CHANCE
                 + CHAPEL_PRIEST_ATTENDANCE_BONUS
                 + CHAPEL_COMMUNITY_ATTENDANCE_BONUS,
         );
-        assert_eq!(chapel_attendance_chance(2), 1.0);
+        assert_eq!(chapel_attendance_chance(2, false), 1.0);
     }
 
     #[test]

@@ -22,7 +22,10 @@ pub fn step_chapels(
             continue;
         };
 
-        let attendance_chance = chapel_attendance_chance(chapel.assigned_labor);
+        let attendance_chance = chapel_attendance_chance(
+            chapel.assigned_labor,
+            crate::simulation::labor_schedule::owner_sabbath_observance_enabled(ctx, residence.owner),
+        );
         if !roll_chapel_attendance(residence.id, sim_tick, attendance_chance) {
             continue;
         }

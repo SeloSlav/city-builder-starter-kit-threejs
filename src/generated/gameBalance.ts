@@ -5,6 +5,16 @@ export type BuildingKind = (typeof BUILDING_KINDS)[number];
 
 export const SIM_TICK_SECONDS = 0.2;
 
+export const CALENDAR_SECONDS_PER_DAY = 86400;
+export const CALENDAR_HOURS_PER_DAY = 24;
+export const CALENDAR_DAYS_PER_MONTH = 30;
+export const CALENDAR_MONTHS_PER_YEAR = 12;
+export const CALENDAR_DAYS_PER_WEEK = 7;
+export const CALENDAR_SUNDAY_WEEKDAY = 0;
+export const CALENDAR_WORK_START_HOUR = 6;
+export const CALENDAR_WORK_END_HOUR = 20;
+export const SECONDS_PER_DAY = 86400;
+
 export const STARTING_TIMBER = 160;
 export const STARTING_STONE = 140;
 export const STARTING_GOLD = 0;
@@ -57,6 +67,8 @@ export const CHAPEL_AUTO_SWEEP_FRACTION = 0.5;
 export const CHAPEL_COFFER_RESERVE_DEFAULT = 80;
 export const CHAPEL_COFFER_RESERVE_MIN = 20;
 export const CHAPEL_COFFER_RESERVE_MAX = 200;
+export const CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS = 0.12;
+export const CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS = 0.08;
 
 export const BUILDING_ROAD_ACCESS_DISTANCE = 20;
 export const BURGAGE_ROAD_FRONTAGE_DISTANCE = 16;

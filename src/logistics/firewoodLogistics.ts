@@ -5,8 +5,7 @@ import {
 import { getNeedStock } from '../residences/residenceNeedState.ts';
 import type { ResidenceState } from '../resources/types.ts';
 
-/** One in-game day for firewood runway display (60 sim seconds). */
-export const GAME_DAY_SECONDS = 60;
+import { GAME_DAY_SECONDS } from '../world/gameCalendar.ts';
 
 export function residenceFirewoodDemandPerSecond(residence: ResidenceState): number {
   if (residence.abandoned || residence.population <= 0) return 0;

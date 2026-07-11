@@ -1,6 +1,8 @@
 import {
   CHAPEL_COFFER_RESERVE_MAX,
   CHAPEL_COFFER_RESERVE_MIN,
+  CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS,
+  CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS,
   ECONOMIC_ACTIVITY_TAX_RATE_MAX,
   ECONOMIC_ACTIVITY_TAX_RATE_MIN,
 } from '../generated/gameBalance.ts';
@@ -16,7 +18,11 @@ import type { WorldQueries } from '../resources/WorldQueries.ts';
 type CityAdministrationPanelOptions = {
   onTaxRateChange: (taxRate: number) => void | Promise<void>;
   onTaxRateChangeFailed?: (error: unknown) => void;
-  onParishPolicyChange: (autoSweepEnabled: boolean, cofferReserveGold: number) => void | Promise<void>;
+  onParishPolicyChange: (
+    autoSweepEnabled: boolean,
+    cofferReserveGold: number,
+    sabbathObservanceEnabled: boolean,
+  ) => void | Promise<void>;
   onParishPolicyChangeFailed?: (error: unknown) => void;
   getGameState: () => GameState | null;
   getTaxRate: () => number;
@@ -32,6 +38,7 @@ export class CityAdministrationPanel {
   private readonly slider: HTMLInputElement;
   private readonly reserveSlider: HTMLInputElement;
   private readonly autoSweepToggle: HTMLInputElement;
+  private readonly sabbathToggle: HTMLInputElement;
   private readonly taxRateValue: HTMLElement;
   private readonly reserveValue: HTMLElement;
   private readonly productivityValue: HTMLElement;
@@ -49,6 +56,7 @@ export class CityAdministrationPanel {
   private pendingRate: number | null = null;
   private pendingReserve: number | null = null;
   private pendingAutoSweep: boolean | null = null;
+  private pendingSabbath: boolean | null = null;
   private debounceTimer: number | null = null;
   private parishDebounceTimer: number | null = null;
   private readonly options: CityAdministrationPanelOptions;
@@ -95,6 +103,15 @@ export class CityAdministrationPanel {
           <input type="checkbox" data-auto-sweep-toggle />
           <span>Auto-sweep surplus to treasury</span>
         </label>
+        <label class="city-admin-panel__toggle">
+          <input type="checkbox" data-sabbath-toggle />
+          <span>Observe Sunday sabbath (staffed chapel)</span>
+        </label>
+        <p class="city-admin-panel__intro city-admin-panel__intro--compact">
+          Sabbath pauses work and deliveries every Sunday when a priest is assigned. Villagers attend more often
+          (+${Math.round(CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS * 100)}% attendance) and settle in faster
+          (+${Math.round(CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS * 100)}% settlement speed).
+        </p>
         <label class="city-admin-panel__slider-label" for="city-admin-reserve-slider">
           <span>Coffer reserve</span>
           <strong data-reserve-value>80 gold</strong>
@@ -158,6 +175,7 @@ export class CityAdministrationPanel {
     this.slider = this.root.querySelector<HTMLInputElement>('#city-admin-tax-slider')!;
     this.reserveSlider = this.root.querySelector<HTMLInputElement>('#city-admin-reserve-slider')!;
     this.autoSweepToggle = this.root.querySelector<HTMLInputElement>('[data-auto-sweep-toggle]')!;
+    this.sabbathToggle = this.root.querySelector<HTMLInputElement>('[data-sabbath-toggle]')!;
     this.taxRateValue = this.root.querySelector<HTMLElement>('[data-tax-rate-value]')!;
     this.reserveValue = this.root.querySelector<HTMLElement>('[data-reserve-value]')!;
     this.productivityValue = this.root.querySelector<HTMLElement>('[data-productivity-value]')!;
@@ -178,6 +196,7 @@ export class CityAdministrationPanel {
     this.slider.addEventListener('input', () => this.onSliderInput());
     this.reserveSlider.addEventListener('input', () => this.onReserveInput());
     this.autoSweepToggle.addEventListener('change', () => this.onAutoSweepToggle());
+    this.sabbathToggle.addEventListener('change', () => this.onSabbathToggle());
   }
 
   isOpen(): boolean {
@@ -234,6 +253,9 @@ export class CityAdministrationPanel {
     if (this.pendingAutoSweep === null) {
       this.autoSweepToggle.checked = parishPolicy.autoSweepEnabled;
     }
+    if (this.pendingSabbath === null) {
+      this.sabbathToggle.checked = parishPolicy.sabbathObservanceEnabled;
+    }
     this.updateReadout(this.pendingRate ?? taxRate, this.getEffectiveParishPolicy(parishPolicy));
   }
 
@@ -242,6 +264,7 @@ export class CityAdministrationPanel {
       ...base,
       autoSweepEnabled: this.pendingAutoSweep ?? base.autoSweepEnabled,
       cofferReserveGold: this.pendingReserve ?? base.cofferReserveGold,
+      sabbathObservanceEnabled: this.pendingSabbath ?? base.sabbathObservanceEnabled,
     };
   }
 
@@ -264,6 +287,15 @@ export class CityAdministrationPanel {
 
   private onAutoSweepToggle(): void {
     this.pendingAutoSweep = this.autoSweepToggle.checked;
+    this.updateReadout(
+      this.pendingRate ?? this.options.getTaxRate(),
+      this.getEffectiveParishPolicy(this.options.getParishPolicy()),
+    );
+    this.scheduleParishCommit();
+  }
+
+  private onSabbathToggle(): void {
+    this.pendingSabbath = this.sabbathToggle.checked;
     this.updateReadout(
       this.pendingRate ?? this.options.getTaxRate(),
       this.getEffectiveParishPolicy(this.options.getParishPolicy()),
@@ -303,7 +335,7 @@ export class CityAdministrationPanel {
     if (this.pendingRate !== null) {
       void this.commitRate(this.pendingRate);
     }
-    if (this.pendingReserve !== null || this.pendingAutoSweep !== null) {
+    if (this.pendingReserve !== null || this.pendingAutoSweep !== null || this.pendingSabbath !== null) {
       void this.commitParishPolicy();
     }
   }
@@ -321,9 +353,14 @@ export class CityAdministrationPanel {
   private async commitParishPolicy(): Promise<void> {
     const policy = this.getEffectiveParishPolicy(this.options.getParishPolicy());
     try {
-      await this.options.onParishPolicyChange(policy.autoSweepEnabled, policy.cofferReserveGold);
+      await this.options.onParishPolicyChange(
+        policy.autoSweepEnabled,
+        policy.cofferReserveGold,
+        policy.sabbathObservanceEnabled,
+      );
       this.pendingReserve = null;
       this.pendingAutoSweep = null;
+      this.pendingSabbath = null;
     } catch (error) {
       this.options.onParishPolicyChangeFailed?.(error);
       this.syncPanel();

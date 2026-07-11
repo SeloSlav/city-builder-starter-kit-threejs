@@ -106,6 +106,7 @@ export const PlayerResources = __t.object("PlayerResources", {
   economicActivityTaxRate: __t.f64(),
   chapelAutoSweepEnabled: __t.bool(),
   chapelCofferReserveGold: __t.f64(),
+  sabbathObservanceEnabled: __t.bool(),
   parishManualCollectTotal: __t.f64(),
   parishAutoSweepTotal: __t.f64(),
   parishSalaryPaidTotal: __t.f64(),

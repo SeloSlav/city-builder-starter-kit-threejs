@@ -16,10 +16,10 @@ import {
   scaledRiverDrain,
   forestDensityScale,
   type WorldGenerationSettings,
-} from './worldGenerationSettings.ts';
-import { DEFAULT_WORLD_GENERATION_SETTINGS } from './worldGenerationSettings.ts';
+} from '../world/worldGenerationSettings.ts';
+import { DEFAULT_WORLD_GENERATION_SETTINGS } from '../world/worldGenerationSettings.ts';
 
-export { DEFAULT_WORLD_SEED } from './worldGenerationSettings.ts';
+export { DEFAULT_WORLD_SEED } from '../world/worldGenerationSettings.ts';
 
 export type WorldLayout = {
   settings: WorldGenerationSettings;

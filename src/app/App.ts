@@ -48,6 +48,16 @@ import { ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT } from '../economy/villageEconomy.ts
 import { DEFAULT_PARISH_POLICY } from '../economy/chapelParish.ts';
 import { LoadingScreen } from '../ui/LoadingScreen.ts';
 import { ToastManager } from '../ui/ToastManager.ts';
+import { WorldSetupPanel } from '../ui/WorldSetupPanel.ts';
+import {
+  DEFAULT_WORLD_GENERATION_SETTINGS,
+  loadStoredWorldGenerationSettings,
+  saveWorldGenerationSettings,
+  shouldShowWorldSetup,
+  clearStoredWorldGenerationSettings,
+} from '../world/worldGenerationSettings.ts';
+import { clearStoredSpacetimeToken } from '../network/identityPersistence.ts';
+import { setActiveWorldGeneration } from '../world/worldGenerationContext.ts';
 import { mountTooltips } from '../ui/tooltips.ts';
 import { setHydrologyOverlayEnabled, isHydrologyOverlayEnabled } from '../scene/hydrologyOverlayPreference.ts';
 import { roadPlacementReasonToToastId, buildingPlacementReasonToToastId, burgagePlacementReasonToToastId } from '../ui/toastMessages.ts';
@@ -104,7 +114,6 @@ export class App {
     const loadingScreen = LoadingScreen.tryCreate();
     const materialsPromise = RoadMaterialFactory.create(8);
     const startupTexturesPromise = beginStartupTextureLoad();
-    loadingScreen?.setProgress({ label: 'Starting world…', detail: 'Setting up scene shell' });
 
     this.root.innerHTML = `
       <div class="app-shell">
@@ -113,10 +122,16 @@ export class App {
       </div>
     `;
 
+    const worldSettings = await this.resolveWorldGenerationSettings();
+    setActiveWorldGeneration(worldSettings);
+    saveWorldGenerationSettings(worldSettings);
+
+    loadingScreen?.setProgress({ label: 'Starting world…', detail: 'Setting up scene shell' });
+
     const sceneRoot = this.mustElement('[data-scene-root]');
     const uiRoot = this.mustElement('[data-ui-root]');
 
-    const sceneManager = await SceneManager.create(sceneRoot, (label, detail) => {
+    const sceneManager = await SceneManager.create(sceneRoot, worldSettings, (label, detail) => {
       loadingScreen?.setProgress({ label, detail });
     }, materialsPromise, startupTexturesPromise);
     const layoutRegistry = WorldLayoutRegistry.fromWorldLayout(sceneManager.worldLayout);
@@ -381,6 +396,7 @@ export class App {
         && !roadTool.isEnabled()
         && !buildingTool.isEnabled()
         && !burgageTool.isEnabled(),
+      onNewWorld: () => this.beginNewWorld(),
     });
     this.cityAdminPanel = new CityAdministrationPanel(uiRoot, {
       getGameState: () => this.gameState,
@@ -398,12 +414,16 @@ export class App {
         const message = error instanceof Error ? error.message : 'Could not update tax rate.';
         this.toastManager?.show(message, { variant: 'error' });
       },
-      onParishPolicyChange: async (autoSweepEnabled, cofferReserveGold) => {
+      onParishPolicyChange: async (autoSweepEnabled, cofferReserveGold, sabbathObservanceEnabled) => {
         if (!this.spacetimeStore?.isConnected) {
           this.toastManager?.show('SpacetimeDB is not connected.', { variant: 'error' });
           throw new Error('SpacetimeDB is not connected.');
         }
-        await this.spacetimeStore.setChapelParishPolicy(autoSweepEnabled, cofferReserveGold);
+        await this.spacetimeStore.setChapelParishPolicy(
+          autoSweepEnabled,
+          cofferReserveGold,
+          sabbathObservanceEnabled,
+        );
       },
       onParishPolicyChangeFailed: (error) => {
         const message = error instanceof Error ? error.message : 'Could not update parish policy.';
@@ -512,7 +532,11 @@ export class App {
 
     const spacetimeStore = new SpacetimeGameStore();
     this.spacetimeStore = spacetimeStore;
-    this.gameRuntime = new GameRuntime(spacetimeStore, layoutRegistry, sceneManager.worldLayout.seed, {
+    this.gameRuntime = new GameRuntime(
+      spacetimeStore,
+      layoutRegistry,
+      sceneManager.worldLayout,
+      {
       onSnapshot: (snapshot, state) => this.applySpacetimeSnapshot(snapshot, state),
       onRoadsHydrated: (roads) => {
         this.roadNetwork?.restore(roads);
@@ -887,6 +911,25 @@ export class App {
       registry: this.layoutRegistry,
       treeRegistry: this.treeRegistry,
     };
+  }
+
+  private async resolveWorldGenerationSettings() {
+    if (shouldShowWorldSetup()) {
+      return WorldSetupPanel.prompt(this.root);
+    }
+    return loadStoredWorldGenerationSettings() ?? DEFAULT_WORLD_GENERATION_SETTINGS;
+  }
+
+  private beginNewWorld(): void {
+    const confirmed = window.confirm(
+      'Start a new world? This clears your saved world settings and local player identity, then reloads the page.',
+    );
+    if (!confirmed) return;
+    clearStoredWorldGenerationSettings();
+    clearStoredSpacetimeToken('city-builder');
+    const url = new URL(window.location.href);
+    url.searchParams.set('new', '1');
+    window.location.assign(url.toString());
   }
 
   private mustElement(selector: string): HTMLElement {

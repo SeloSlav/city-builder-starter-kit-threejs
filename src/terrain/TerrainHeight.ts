@@ -132,11 +132,12 @@ export function sampleRawTerrainHeight(x: number, z: number): number {
   const layout = activeRiverLayout;
   const basinX = layout?.drain.x ?? 0;
   const basinZ = layout?.drain.z ?? -88;
-  const n1 = fbm(x * 0.014, z * 0.014, 4) * 5.6;
-  const n2 = fbm(x * 0.04 + 18.4, z * 0.04 - 9.2, 3) * 1.2;
-  const broad = Math.sin(x * 0.012 + z * 0.005) * 1.35 + Math.cos(z * 0.011) * 1.0;
-  const basin = -Math.exp(-((x - basinX) * (x - basinX) + (z - basinZ) * (z - basinZ)) / 62000) * 3.4;
-  return n1 + n2 + broad + basin + getMacroDrainage(x, z) + getEdgeHillHeight(x, z);
+  const relief = topographyScale(getActiveWorldGeneration().topography);
+  const n1 = fbm(x * 0.014, z * 0.014, 4) * 5.6 * relief;
+  const n2 = fbm(x * 0.04 + 18.4, z * 0.04 - 9.2, 3) * 1.2 * relief;
+  const broad = (Math.sin(x * 0.012 + z * 0.005) * 1.35 + Math.cos(z * 0.011) * 1.0) * relief;
+  const basin = -Math.exp(-((x - basinX) * (x - basinX) + (z - basinZ) * (z - basinZ)) / 62000) * 3.4 * relief;
+  return n1 + n2 + broad + basin + getMacroDrainage(x, z) * relief + getEdgeHillHeight(x, z) * relief;
 }
 
 export function sampleNaturalTerrainHeight(x: number, z: number): number {

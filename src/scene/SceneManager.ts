@@ -10,6 +10,9 @@ import { RiverField } from '../rivers/RiverField.ts';
 import { setActiveRiverLayout, setActiveQuarryLayout, getActivePlacedBuildingLayout } from '../terrain/TerrainHeight.ts';
 import { createQuarrySystem, type QuarrySystem } from '../quarries/QuarrySystem.ts';
 import { createWorldLayout, type WorldLayout } from '../resources/WorldLayout.ts';
+import type { WorldGenerationSettings } from '../world/worldGenerationSettings.ts';
+import { resolveWorldDimensions } from '../world/worldGenerationSettings.ts';
+import { forestDensityScale } from '../world/worldGenerationSettings.ts';
 import type { RoadEdge } from '../roads/RoadEdge.ts';
 import { RoadJunctionBuilder } from '../roads/RoadJunctionBuilder.ts';
 import { RoadMaterialFactory } from '../roads/RoadMaterialFactory.ts';
@@ -161,6 +164,7 @@ export class SceneManager {
 
   static async create(
     container: HTMLElement,
+    settings: WorldGenerationSettings,
     onProgress?: (label: string, detail?: string) => void,
     materialsPromise?: Promise<RoadMaterialFactory>,
     startupTexturesPromise?: Promise<SceneStartupTextures>,
@@ -175,11 +179,12 @@ export class SceneManager {
     container.appendChild(backend.renderer.domElement);
 
     onProgress?.('Building world', 'River layout, quarries, and terrain');
-    const worldLayout = createWorldLayout();
+    const dimensions = resolveWorldDimensions(settings.mapSize);
+    const worldLayout = createWorldLayout(settings);
     const { quarryLayout, riverLayout } = worldLayout;
     setActiveRiverLayout(riverLayout);
     setActiveQuarryLayout(quarryLayout);
-    const riverBounds = Terrain.fullBounds();
+    const riverBounds = Terrain.fullBounds(dimensions.terrainSize);
     const riverField = RiverField.fromLayout({ bounds: riverBounds, layout: riverLayout });
     await yieldToMain();
 
@@ -190,6 +195,7 @@ export class SceneManager {
       (completedRows, totalRows) => {
         onProgress?.('Building world', `Shaping terrain (${completedRows}/${totalRows})`);
       },
+      dimensions,
     );
     await yieldToMain();
 
@@ -220,6 +226,9 @@ export class SceneManager {
     this.forestManager = await createForestProps(this.terrain, this.maxAnisotropy, {
       isBlockedAt: (x, z) => this.riverSystem.isBlockedAt(x, z) || this.quarrySystem.isBlockedAt(x, z),
       rendererBackend: this.rendererBackend,
+      treeSeed: this.worldLayout.treeSeed,
+      densityScale: forestDensityScale(this.worldLayout.settings.forestDensity),
+      forestCores: this.worldLayout.forestCores,
     });
     if (GRASS_BLADES_ENABLED) {
       this.grassField = createGrassBladeField(this.terrain, {

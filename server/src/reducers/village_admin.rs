@@ -28,6 +28,7 @@ pub fn set_chapel_parish_policy(
     ctx: &ReducerContext,
     auto_sweep_enabled: bool,
     coffer_reserve_gold: f64,
+    sabbath_observance_enabled: bool,
 ) -> Result<(), String> {
     let owner = ctx.sender();
     ensure_player_resources(ctx, owner);
@@ -39,6 +40,7 @@ pub fn set_chapel_parish_policy(
 
     resources.chapel_auto_sweep_enabled = auto_sweep_enabled;
     resources.chapel_coffer_reserve_gold = reserve;
+    resources.sabbath_observance_enabled = sabbath_observance_enabled;
     ctx.db.player_resources().owner().update(resources);
     Ok(())
 }

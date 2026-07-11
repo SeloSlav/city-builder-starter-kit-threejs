@@ -135,11 +135,17 @@ export class BuildToolbar {
       onMenuOpenChange?: (open: boolean) => void;
       onShadowPreferenceChange?: () => void;
       canOpenMenuFromKeyboard?: () => boolean;
+      onNewWorld?: () => void;
     },
   ) {
     root.innerHTML = `
       <div class="hud-right-stack">
         <div class="settlement-hud" data-settlement-hud data-fps-panel aria-label="Settlement overview" aria-live="polite">
+          <div class="settlement-hud__clock" data-settlement-clock>
+            <span class="settlement-hud__clock-date" data-clock-date>Year 1</span>
+            <span class="settlement-hud__clock-time" data-clock-time>06:00</span>
+            <span class="settlement-hud__clock-detail" data-clock-detail></span>
+          </div>
           <div class="settlement-hud__perf">
             <div
               class="settlement-hud__stat settlement-hud__stat--perf"
@@ -392,10 +398,10 @@ export class BuildToolbar {
     };
     window.addEventListener('keydown', this.onKeyDown, true);
     this.gameMenu = new GameMenu(root, {
-      onTipsPreferenceChange: () => this.syncContextPanels(),
       onShadowPreferenceChange: () => handlers.onShadowPreferenceChange?.(),
       onOpenChange: handlers.onMenuOpenChange,
       canOpenFromKeyboard: handlers.canOpenMenuFromKeyboard,
+      onNewWorld: handlers.onNewWorld,
       showButton: false,
     });
     this.unsubscribeTipsPreference = subscribeTipCardsPreference(() => this.syncContextPanels());

@@ -5,6 +5,8 @@ use crate::balance_generated::{
 };
 use crate::db::*;
 use crate::economy::{credit_treasury_gold, credit_residence_wealth, garden_market_activity, player_economic_activity_tax_rate, taxed_economic_activity};
+use crate::simulation::game_calendar::GameClock;
+use crate::simulation::labor_and_logistics_paused;
 use crate::simulation::landmark_access::residence_has_marketplace_access;
 use crate::simulation::residence_needs::food;
 use crate::simulation::residence_needs::state::{find_need_mut, load_needs, persist_needs};
@@ -12,7 +14,7 @@ use crate::simulation::residence_needs::ResidenceNeedKind;
 use crate::simulation::tick_context::SimTickContext;
 use crate::tables::{Building, Residence};
 
-pub fn step_backyard_gardens(ctx: &ReducerContext, tick: &SimTickContext) {
+pub fn step_backyard_gardens(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock) {
     let marketplaces: Vec<Building> = ctx
         .db
         .building()
@@ -27,6 +29,9 @@ pub fn step_backyard_gardens(ctx: &ReducerContext, tick: &SimTickContext) {
         let Some(residence) = ctx.db.residence().id().find(&garden.residence_id) else {
             continue;
         };
+        if labor_and_logistics_paused(ctx, residence.owner, clock) {
+            continue;
+        }
         if residence.abandoned || residence.population == 0 {
             continue;
         }

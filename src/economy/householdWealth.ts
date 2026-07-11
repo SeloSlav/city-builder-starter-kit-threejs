@@ -2,6 +2,7 @@ import {
   CHAPEL_BASE_ATTENDANCE_CHANCE,
   CHAPEL_COMMUNITY_ATTENDANCE_BONUS,
   CHAPEL_PRIEST_ATTENDANCE_BONUS,
+  CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS,
   CHAPEL_TITHE_GOLD_PER_PERSON_PER_DAY,
   HOUSEHOLD_MAX_WEALTH,
   SIM_TICK_SECONDS,
@@ -11,17 +12,20 @@ import { taxedEconomicActivity } from './villageEconomy.ts';
 
 export { HOUSEHOLD_MAX_WEALTH };
 
-export function chapelAttendanceChance(assignedLabor: number): number {
+export function chapelAttendanceChance(assignedLabor: number, sabbathObservance = false): number {
   if (assignedLabor <= 0) {
     return 0;
   }
 
-  return Math.min(
-    1,
-    CHAPEL_BASE_ATTENDANCE_CHANCE
-      + CHAPEL_PRIEST_ATTENDANCE_BONUS * assignedLabor
-      + CHAPEL_COMMUNITY_ATTENDANCE_BONUS,
-  );
+  let chance = CHAPEL_BASE_ATTENDANCE_CHANCE
+    + CHAPEL_PRIEST_ATTENDANCE_BONUS * assignedLabor
+    + CHAPEL_COMMUNITY_ATTENDANCE_BONUS;
+
+  if (sabbathObservance) {
+    chance += CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS;
+  }
+
+  return Math.min(1, chance);
 }
 
 export function formatChapelAttendanceChance(assignedLabor: number): string {

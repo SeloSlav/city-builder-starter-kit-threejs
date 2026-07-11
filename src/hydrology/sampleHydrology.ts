@@ -1,4 +1,6 @@
 import type { RiverField } from '../rivers/RiverField.ts';
+import { getActiveWorldGeneration } from '../world/worldGenerationContext.ts';
+import { hydrologyScoreScale } from '../world/worldGenerationSettings.ts';
 
 const SHORE_DECAY_METERS = 32;
 const VALLEY_DEPTH_SCALE = 1.85;
@@ -18,8 +20,9 @@ export function sampleHydrologyScore(riverField: RiverField, x: number, z: numbe
     : Math.exp(-shoreDistance / SHORE_DECAY_METERS);
   const valleyFactor = Math.min(1, valleyDepth / VALLEY_DEPTH_SCALE);
   const riverFactor = riverMask;
+  const intensity = hydrologyScoreScale(getActiveWorldGeneration().hydrology);
 
-  return clamp01(riverFactor * 0.34 + shoreFactor * 0.42 + valleyFactor * 0.24);
+  return clamp01((riverFactor * 0.34 + shoreFactor * 0.42 + valleyFactor * 0.24) * intensity);
 }
 
 /** Map display score — emphasizes visible rivers and near-shore moisture. */
@@ -36,8 +39,9 @@ export function sampleHydrologyMapScore(riverField: RiverField, x: number, z: nu
   const nearShore = Math.exp(-shoreDistance / 18);
   const valleyDepth = riverField.layout.getValleyDepression(x, z);
   const valleyFactor = Math.min(0.55, valleyDepth / VALLEY_DEPTH_SCALE * 0.55);
+  const intensity = hydrologyScoreScale(getActiveWorldGeneration().hydrology);
 
-  return clamp01(nearShore * 0.78 + valleyFactor);
+  return clamp01((nearShore * 0.78 + valleyFactor) * intensity);
 }
 
 export function hydrologyGradeLabel(score: number): string {

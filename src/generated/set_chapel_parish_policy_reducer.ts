@@ -13,4 +13,5 @@ import {
 export default {
   autoSweepEnabled: __t.bool(),
   cofferReserveGold: __t.f64(),
+  sabbathObservanceEnabled: __t.bool(),
 };
