@@ -193,6 +193,36 @@ fn building_pad_params(kind: &str) -> BuildingPadParams {
             radius_z: 4.3,
             inner_fade: 0.88,
         },
+        "stone_quarry" => BuildingPadParams {
+            radius_x: 10.5,
+            radius_z: 10.5,
+            inner_fade: 0.82,
+        },
+        "well" => BuildingPadParams {
+            radius_x: 2.2,
+            radius_z: 2.2,
+            inner_fade: 0.9,
+        },
+        "hunters_hall" => BuildingPadParams {
+            radius_x: 5.2,
+            radius_z: 4.8,
+            inner_fade: 0.88,
+        },
+        "foragers_shed" => BuildingPadParams {
+            radius_x: 4.2,
+            radius_z: 3.8,
+            inner_fade: 0.88,
+        },
+        "chapel" => BuildingPadParams {
+            radius_x: 3.4,
+            radius_z: 4.2,
+            inner_fade: 0.9,
+        },
+        "marketplace" => BuildingPadParams {
+            radius_x: 4.2,
+            radius_z: 3.4,
+            inner_fade: 0.9,
+        },
         _ => BuildingPadParams {
             radius_x: 10.5,
             radius_z: 10.5,
