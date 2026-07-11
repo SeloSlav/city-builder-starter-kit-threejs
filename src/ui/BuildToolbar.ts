@@ -362,7 +362,6 @@ export class BuildToolbar {
       canOpenFromKeyboard: handlers.canOpenMenuFromKeyboard,
       onExportGameState: handlers.onExportGameState,
       onImportGameState: handlers.onImportGameState,
-      showButton: false,
     });
     this.unsubscribeTipsPreference = subscribeTipCardsPreference(() => this.syncContextPanels());
 
@@ -398,6 +397,7 @@ export class BuildToolbar {
     this.builderHelpList = this.mustElement(root, '[data-road-controls-panel] .road-controls-list');
     this.builderStatusBar = this.mustElement(root, '[data-builder-status]');
     this.compassHud = new CompassHud(root);
+    this.helpButton.setAttribute('aria-pressed', String(!areTipCardsDisabled()));
 
     this.syncContextPanels();
     this.roadButton.addEventListener('click', () => {
@@ -441,8 +441,11 @@ export class BuildToolbar {
     const woodcuttersLodgeMode = stats.mode === 'woodcutters_lodge';
     const stoneQuarryMode = stats.mode === 'stone_quarry';
     const residencesMode = stats.mode === 'residences';
+    const constructionMode = lumberMode || reforesterMode || woodcuttersLodgeMode || stoneQuarryMode || residencesMode;
     this.roadButton.classList.toggle('is-active', roadMode);
     this.roadButton.setAttribute('aria-pressed', String(roadMode));
+    this.buildMenuButton.classList.toggle('is-active', constructionMode || this.buildMenuOpen);
+    this.buildMenuButton.setAttribute('aria-pressed', String(constructionMode || this.buildMenuOpen));
     this.lumberMillButton.classList.toggle('is-active', lumberMode);
     this.lumberMillButton.setAttribute('aria-pressed', String(lumberMode));
     this.reforesterButton.classList.toggle('is-active', reforesterMode);
@@ -459,7 +462,7 @@ export class BuildToolbar {
     this.statusLabel.textContent = this.describeStatus(stats);
     this.statusLabel.dataset.state = stats.canBuild
       ? 'ready'
-      : (roadMode || residencesMode)
+      : this.isBuilderHudMode(stats.mode)
         ? (stats.hasDraft ? 'draft' : 'active')
         : 'idle';
     if (this.isBuilderHudMode(stats.mode)) {
@@ -556,13 +559,13 @@ export class BuildToolbar {
   }
 
   isGameMenuOpen(): boolean {
-    return this.gameMenu.isOpen();
+    return this.gameMenu?.isOpen() ?? false;
   }
 
   setFirstPersonMode(active: boolean): void {
     this.firstPersonActive = active;
     this.fpModePanel.classList.toggle('is-active', active);
-    this.roadTools.hidden = active;
+    this.constructionDock.hidden = active;
     this.zoomStat.hidden = active;
     this.compassHud.setVisible(active);
     this.syncContextPanels();
@@ -571,6 +574,7 @@ export class BuildToolbar {
   private syncContextPanels(): void {
     const builderActive = this.isBuilderHudMode(this.hudMode);
     const tipHudMode = builderActive ? 'road' : 'idle';
+    this.helpButton.setAttribute('aria-pressed', String(!areTipCardsDisabled()));
     syncTipCardVisibility(this.root, {
       firstPersonActive: this.firstPersonActive,
       hudMode: tipHudMode,
@@ -611,8 +615,9 @@ export class BuildToolbar {
   }
 
   dispose(): void {
+    window.removeEventListener('keydown', this.onKeyDown, true);
     this.unsubscribeTipsPreference();
-    this.gameMenu.dispose();
+    this.gameMenu?.dispose();
     this.compassHud.dispose();
   }
 
@@ -637,6 +642,31 @@ export class BuildToolbar {
     this.deleteCancel = null;
     this.deleteRemove = null;
     if (runCancel) cancel?.();
+  }
+
+  private toggleBuildMenu(): void {
+    this.setBuildMenuOpen(!this.buildMenuOpen);
+  }
+
+  private setBuildMenuOpen(open: boolean): void {
+    if (this.buildMenuOpen === open) return;
+    this.buildMenuOpen = open;
+    this.buildMenu.hidden = !open;
+    this.buildMenuButton.setAttribute('aria-expanded', String(open));
+    this.buildMenuButton.classList.toggle('is-active', open);
+    this.buildMenuButton.setAttribute('aria-pressed', String(open));
+  }
+
+  private chooseBuildMenuItem(handler: () => void): void {
+    this.setBuildMenuOpen(false);
+    handler();
+  }
+
+  private toggleHelpTips(): void {
+    const disabled = !areTipCardsDisabled();
+    setTipCardsDisabled(disabled);
+    this.helpButton.setAttribute('aria-pressed', String(!disabled));
+    this.syncContextPanels();
   }
 
   private describeBuilderHelp(mode: ToolbarStats['mode']): string {
@@ -710,4 +740,10 @@ export class BuildToolbar {
     if (!element) throw new Error(`Missing toolbar element ${selector}`);
     return element;
   }
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  const tag = element?.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || Boolean(element?.isContentEditable);
 }

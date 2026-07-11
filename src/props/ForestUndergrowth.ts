@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import type { Terrain } from '../terrain/Terrain.ts';
-import { TREE_SHADOW_CAST_LAYER } from '../scene/SceneLayers.ts';
 import type { RendererBackendKind } from '../scene/RendererBackend.ts';
 import {
   CENTRAL_CLEARING_RADIUS,
@@ -245,7 +244,6 @@ function createShadowInstancedMesh(
 ): THREE.InstancedMesh {
   const mesh = new THREE.InstancedMesh(geometry, shadowCast, count);
   mesh.name = name;
-  mesh.layers.set(TREE_SHADOW_CAST_LAYER);
   mesh.castShadow = true;
   mesh.receiveShadow = false;
   mesh.customDepthMaterial = shadowDepth;

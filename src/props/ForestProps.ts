@@ -97,7 +97,6 @@ type RockOutcrop = {
 };
 
 import { loadMossyRockTextures, loadPineFoliageTextures } from '../utils/propTextureLoad.ts';
-import { TREE_SHADOW_CAST_LAYER } from '../scene/SceneLayers.ts';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const TAU = Math.PI * 2;
@@ -926,12 +925,10 @@ function createMixedMountainForest(
   trunkMesh.castShadow = true;
   trunkMesh.receiveShadow = true;
   coniferShadowMesh.name = 'Instanced conifer crown shadows';
-  coniferShadowMesh.layers.set(TREE_SHADOW_CAST_LAYER);
   coniferShadowMesh.castShadow = true;
   coniferShadowMesh.receiveShadow = false;
   coniferShadowMesh.customDepthMaterial = materials.shadowDepth;
   broadleafShadowMesh.name = 'Instanced broadleaf crown shadows';
-  broadleafShadowMesh.layers.set(TREE_SHADOW_CAST_LAYER);
   broadleafShadowMesh.castShadow = true;
   broadleafShadowMesh.receiveShadow = false;
   broadleafShadowMesh.customDepthMaterial = materials.shadowDepth;
@@ -1483,7 +1480,6 @@ function createRockField(
     mesh.receiveShadow = true;
     const shadowMesh = new THREE.InstancedMesh(shadowGeometry, shadowCast, bucket.length);
     shadowMesh.name = `Instanced mossy boulder shadows ${variantIndex + 1}`;
-    shadowMesh.layers.set(TREE_SHADOW_CAST_LAYER);
     shadowMesh.castShadow = true;
     shadowMesh.receiveShadow = false;
     shadowMesh.customDepthMaterial = shadowDepth;
