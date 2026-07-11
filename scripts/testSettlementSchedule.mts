@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { CALENDAR_WORK_START_HOUR, SIM_TICK_SECONDS } from '../src/generated/gameBalance.ts';
-import { gameClock, isLaborPaused, laborPauseLabel } from '../src/world/gameCalendar.ts';
+import { gameClock, gameClockAtElapsedSeconds, isLaborPaused, laborPauseLabel } from '../src/world/gameCalendar.ts';
 import {
   deriveSettlementSchedule,
   expectLaborPausedLikeServer,
   settlementScheduleDirtyKey,
 } from '../src/world/settlementSchedule.ts';
+import { deriveInterpolatedSettlementSchedule } from '../src/world/interpolatedSettlementSchedule.ts';
 import { DEFAULT_PARISH_POLICY } from '../src/economy/chapelParish.ts';
 import type { GameState } from '../src/resources/types.ts';
 
@@ -83,5 +84,19 @@ const staffedSunday = deriveSettlementSchedule(
 );
 assert.equal(staffedSunday.laborPaused, true);
 assert.equal(staffedSunday.staffedChapel, true);
+
+const elapsedAtWork = workHourTick * SIM_TICK_SECONDS;
+const interpolatedWork = deriveInterpolatedSettlementSchedule(
+  elapsedAtWork + 30,
+  DEFAULT_PARISH_POLICY,
+  null,
+);
+assert.equal(interpolatedWork.laborPaused, false);
+assert.equal(interpolatedWork.clock.minute, 1);
+
+const clockFromElapsed = gameClockAtElapsedSeconds(elapsedAtWork + 90);
+assert.equal(clockFromElapsed.hour, CALENDAR_WORK_START_HOUR);
+assert.equal(clockFromElapsed.minute, 2);
+assert.equal(gameClock(workHourTick).hour, CALENDAR_WORK_START_HOUR);
 
 console.log('settlement schedule tests passed');

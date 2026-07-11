@@ -1,4 +1,5 @@
 import type { SpacetimeGameSnapshot } from '../data/spacetimeGameStore.ts';
+import { simElapsedSeconds } from '../world/gameCalendar.ts';
 import type { ResidenceMarkers } from '../residences/ResidenceMarkers.ts';
 import type { GameState } from '../resources/types.ts';
 import type { SceneManager } from '../scene/SceneManager.ts';
@@ -8,6 +9,7 @@ import {
   settlementScheduleDirtyKey,
   type SettlementSchedule,
 } from '../world/settlementSchedule.ts';
+import { deriveInterpolatedSettlementSchedule } from '../world/interpolatedSettlementSchedule.ts';
 
 export type SettlementPresentationTargets = {
   toolbar: BuildToolbar | null;
@@ -15,8 +17,16 @@ export type SettlementPresentationTargets = {
   residenceMarkers: ResidenceMarkers | null;
 };
 
+type SnapshotAnchor = {
+  simTick: number;
+  receivedAtMs: number;
+};
+
 export class SettlementPresentationController {
   private lastDirtyKey = '';
+  private anchor: SnapshotAnchor | null = null;
+  private lastSnapshot: Pick<SpacetimeGameSnapshot, 'simTick' | 'parishPolicy'> | null = null;
+  private lastGameState: GameState | null = null;
 
   sync(
     targets: SettlementPresentationTargets,
@@ -25,7 +35,7 @@ export class SettlementPresentationController {
     connected: boolean,
   ): SettlementSchedule | null {
     if (!connected) {
-      this.lastDirtyKey = '';
+      this.reset();
       return null;
     }
 
@@ -33,12 +43,44 @@ export class SettlementPresentationController {
     if (dirtyKey === this.lastDirtyKey) {
       return null;
     }
+
     this.lastDirtyKey = dirtyKey;
-    return applySettlementPresentation(targets, snapshot, gameState);
+    this.lastSnapshot = snapshot;
+    this.lastGameState = gameState;
+    this.anchor = { simTick: snapshot.simTick, receivedAtMs: performance.now() };
+
+    const schedule = deriveSettlementSchedule(snapshot, gameState);
+    targets.toolbar?.setSettlementClock(schedule);
+    this.applyVisuals(targets, schedule);
+    return schedule;
+  }
+
+  /** Smooth dawn/dusk between authoritative sim snapshots (1 real second = 1 sim second). */
+  tick(targets: SettlementPresentationTargets): void {
+    if (!this.anchor || !this.lastSnapshot) return;
+
+    const driftSeconds = (performance.now() - this.anchor.receivedAtMs) / 1000;
+    const elapsedSeconds = simElapsedSeconds(this.anchor.simTick) + driftSeconds;
+    const schedule = deriveInterpolatedSettlementSchedule(
+      elapsedSeconds,
+      this.lastSnapshot.parishPolicy,
+      this.lastGameState,
+    );
+    targets.toolbar?.setSettlementClock(schedule);
+    this.applyVisuals(targets, schedule);
   }
 
   reset(): void {
     this.lastDirtyKey = '';
+    this.anchor = null;
+    this.lastSnapshot = null;
+    this.lastGameState = null;
+  }
+
+  private applyVisuals(targets: SettlementPresentationTargets, schedule: SettlementSchedule): void {
+    targets.sceneManager?.applyDayNight(schedule.dayNight);
+    targets.residenceMarkers?.setChimneySmokeAllowed(schedule.dayNight.smokeAllowed);
+    targets.residenceMarkers?.setEveningWindowGlow(schedule.dayNight.eveningWindowGlow);
   }
 }
 

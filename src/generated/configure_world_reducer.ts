@@ -10,14 +10,10 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.row({
-  id: __t.u8().primaryKey(),
+export default {
   seed: __t.u64(),
-  nextBuildingId: __t.u64().name("next_building_id"),
-  simTick: __t.u64().name("sim_tick"),
-  mapSize: __t.u8().name("map_size"),
+  mapSize: __t.u8(),
   topography: __t.u8(),
   hydrology: __t.u8(),
-  forestDensity: __t.u8().name("forest_density"),
-  configured: __t.bool(),
-});
+  forestDensity: __t.u8(),
+};

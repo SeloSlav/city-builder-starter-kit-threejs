@@ -39,6 +39,7 @@ import BootstrapForagingReducer from "./bootstrap_foraging_reducer";
 import BootstrapQuarriesReducer from "./bootstrap_quarries_reducer";
 import BootstrapTreesReducer from "./bootstrap_trees_reducer";
 import CollectChapelCofferReducer from "./collect_chapel_coffer_reducer";
+import ConfigureWorldReducer from "./configure_world_reducer";
 import DemolishBackyardGardenReducer from "./demolish_backyard_garden_reducer";
 import DemolishBuildingReducer from "./demolish_building_reducer";
 import DemolishBurgageZoneReducer from "./demolish_burgage_zone_reducer";
@@ -257,6 +258,7 @@ const reducersSchema = __reducers(
   __reducerSchema("bootstrap_quarries", BootstrapQuarriesReducer),
   __reducerSchema("bootstrap_trees", BootstrapTreesReducer),
   __reducerSchema("collect_chapel_coffer", CollectChapelCofferReducer),
+  __reducerSchema("configure_world", ConfigureWorldReducer),
   __reducerSchema("demolish_backyard_garden", DemolishBackyardGardenReducer),
   __reducerSchema("demolish_building", DemolishBuildingReducer),
   __reducerSchema("demolish_burgage_zone", DemolishBurgageZoneReducer),

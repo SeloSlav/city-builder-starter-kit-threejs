@@ -53,7 +53,12 @@ export function simElapsedSeconds(simTick: number): number {
 }
 
 export function gameClock(simTick: number): GameClock {
-  const elapsed = simElapsedSeconds(simTick);
+  return gameClockAtElapsedSeconds(simElapsedSeconds(simTick));
+}
+
+export function gameClockAtElapsedSeconds(elapsedSeconds: number): GameClock {
+  const elapsed = Math.max(0, elapsedSeconds);
+  const simTick = elapsed / SIM_TICK_SECONDS;
   const totalDays = Math.floor(elapsed / CALENDAR_SECONDS_PER_DAY);
   const secondsIntoDay = elapsed % CALENDAR_SECONDS_PER_DAY;
   const hour = Math.min(CALENDAR_HOURS_PER_DAY - 1, Math.floor(secondsIntoDay / 3600));

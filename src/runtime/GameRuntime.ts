@@ -45,12 +45,12 @@ export class GameRuntime {
     }
 
     this.unsubscribe = this.store.subscribe((snapshot) => {
-      const gameState = this.store.toGameState(this.worldLayout.seed, this.registry);
+      const gameState = this.store.toGameState(this.registry);
       this.callbacks.onSnapshot(snapshot, gameState);
 
       if (!this.worldBootstrapped && snapshot.connected) {
         this.worldBootstrapped = true;
-        void this.store.bootstrapWorld(this.registry, this.worldLayout).catch((error) => {
+        void this.ensureWorldBootstrap().catch((error) => {
           console.warn('[GameRuntime] Failed to bootstrap world entities', error);
           this.worldBootstrapped = false;
         });
@@ -66,5 +66,10 @@ export class GameRuntime {
   dispose(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+  }
+
+  private async ensureWorldBootstrap(): Promise<void> {
+    await this.store.configureWorld(this.worldLayout.settings);
+    await this.store.bootstrapWorld(this.registry, this.worldLayout);
   }
 }

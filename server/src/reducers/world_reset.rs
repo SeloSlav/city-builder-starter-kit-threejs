@@ -1,12 +1,11 @@
 use spacetimedb::{reducer, Identity, ReducerContext};
 
-use crate::constants::DEFAULT_WORLD_SEED;
 use crate::db::*;
-use crate::lifecycle::seed_world_entities;
 use crate::tables::{
-    BackyardGarden, Building, BurgageZone, DeliveryTrip, ForagingNode, Quarry, ResidenceNeed,
-    TreeEntity, WorldConfig,
+    BackyardGarden, Building, BurgageZone, DeliveryTrip, ResidenceNeed,
+    WorldConfig,
 };
+use crate::world_entities::clear_global_world_entities;
 
 #[reducer]
 pub fn reset_world(ctx: &ReducerContext) -> Result<(), String> {
@@ -14,7 +13,6 @@ pub fn reset_world(ctx: &ReducerContext) -> Result<(), String> {
     clear_owner_settlement(ctx, owner);
     clear_global_world_entities(ctx);
     reset_world_progress(ctx);
-    seed_world_entities(ctx);
     Ok(())
 }
 
@@ -87,26 +85,12 @@ fn clear_owner_settlement(ctx: &ReducerContext, owner: Identity) {
     }
 }
 
-fn clear_global_world_entities(ctx: &ReducerContext) {
-    for tree in ctx.db.tree_entity().iter().collect::<Vec<TreeEntity>>() {
-        ctx.db.tree_entity().tree_id().delete(&tree.tree_id);
-    }
-
-    for quarry in ctx.db.quarry().iter().collect::<Vec<Quarry>>() {
-        ctx.db.quarry().quarry_id().delete(&quarry.quarry_id);
-    }
-
-    for node in ctx.db.foraging_node().iter().collect::<Vec<ForagingNode>>() {
-        ctx.db.foraging_node().node_id().delete(&node.node_id);
-    }
-}
-
 fn reset_world_progress(ctx: &ReducerContext) {
     if let Some(config) = ctx.db.world_config().id().find(&0) {
         ctx.db.world_config().id().update(WorldConfig {
             sim_tick: 0,
             next_building_id: 1,
-            seed: DEFAULT_WORLD_SEED,
+            configured: false,
             ..config
         });
     }

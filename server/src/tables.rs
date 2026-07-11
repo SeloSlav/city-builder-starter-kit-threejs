@@ -7,6 +7,18 @@ pub struct WorldConfig {
     pub seed: u64,
     pub next_building_id: u64,
     pub sim_tick: u64,
+    /// 0 = small, 1 = medium, 2 = large
+    #[default(1)]
+    pub map_size: u8,
+    #[default(50)]
+    pub topography: u8,
+    #[default(50)]
+    pub hydrology: u8,
+    #[default(50)]
+    pub forest_density: u8,
+    /// False after reset_world until a client publishes generation settings.
+    #[default(true)]
+    pub configured: bool,
 }
 
 #[spacetimedb::table(accessor = player_resources, public)]

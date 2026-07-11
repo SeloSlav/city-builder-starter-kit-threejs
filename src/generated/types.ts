@@ -194,6 +194,11 @@ export const WorldConfig = __t.object("WorldConfig", {
   seed: __t.u64(),
   nextBuildingId: __t.u64(),
   simTick: __t.u64(),
+  mapSize: __t.u8(),
+  topography: __t.u8(),
+  hydrology: __t.u8(),
+  forestDensity: __t.u8(),
+  configured: __t.bool(),
 });
 export type WorldConfig = __Infer<typeof WorldConfig>;
 

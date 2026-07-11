@@ -1,6 +1,7 @@
 import type { DeliveryTripState } from '../../logistics/deliveryTrips.ts';
 import type { ParishPolicyState } from '../../economy/chapelParish.ts';
 import type { RoadNetworkSnapshot } from '../../roads/RoadNetwork.ts';
+import type { AuthoritativeWorldGeneration } from '../../world/worldConfigAuthority.ts';
 import type {
   BackyardGardenState,
   BuildingState,
@@ -15,6 +16,7 @@ import type {
 export type GameTableSyncState = {
   identityHex: string | null;
   simTick: number;
+  worldGeneration: AuthoritativeWorldGeneration | null;
   stockpile: ResourceStockpile;
   economicActivityTaxRate: number;
   parishPolicy: ParishPolicyState;

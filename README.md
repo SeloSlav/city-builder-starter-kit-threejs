@@ -249,8 +249,9 @@ When real auth is added later, swap the token source in `src/network/identityPer
 | Backyard gardens | `backyard_garden` | Orchard, vegetable, flower, or herb plot per residence |
 | Active delivery hauls | `delivery_trip` | Road agents carrying firewood, water, or food |
 | Sim tick counter | `world_config` | Monotonic server tick |
+| World generation | `world_config` | Authoritative seed, map size, topography, hydrology, forest density (`configure_world` on connect) |
 
-**Player reducers:** `place_building`, `demolish_building`, `assign_building_labor`, `collect_chapel_coffer`, `marketplace_trade`, `set_economic_activity_tax_rate`, `set_chapel_parish_policy`, `reset_world`, `place_backyard_garden`, `demolish_backyard_garden`, `sync_road_network`, `remove_road_edge`, plus place/demolish residence zone. **Bootstrap reducers:** `bootstrap_quarries`, `bootstrap_trees`, `bootstrap_foraging`.
+**Player reducers:** `place_building`, `demolish_building`, `assign_building_labor`, `collect_chapel_coffer`, `marketplace_trade`, `set_economic_activity_tax_rate`, `set_chapel_parish_policy`, `reset_world`, `configure_world`, `place_backyard_garden`, `demolish_backyard_garden`, `sync_road_network`, `remove_road_edge`, plus place/demolish residence zone. **Bootstrap reducers:** `bootstrap_quarries`, `bootstrap_trees`, `bootstrap_foraging`.
 
 ### Offline / disconnected behavior
 
@@ -330,7 +331,7 @@ Road placement is handled by `src/roads/RoadTool.ts`. Pointer input is projected
 
 `src/grass/GrassBladeField.ts` streams instanced 3D grass tufts in camera-relative chunks. Tufts fade in at close zoom (aligned with the terrain dirt LOD band) and are cleared near committed roads. `TerrainRoadWear.ts` updates a per-vertex `roadWearBlend` attribute so the TSL grass material tints to packed dirt along road corridors.
 
-`src/data/spacetimeGameStore.ts` subscribes to replicated tables and maps rows into client `GameState`. `GameRuntime.ts` connects on startup, bootstraps quarries, trees, and foraging via reducers, and hydrates the road network from the server snapshot.
+`src/data/spacetimeGameStore.ts` subscribes to replicated tables and maps rows into client `GameState`. `GameRuntime.ts` connects on startup, publishes world-generation settings to `world_config` via `configure_world`, bootstraps quarries, trees, and foraging from the client layout, and hydrates the road network from the server snapshot. `reset_world` clears settlement progress and global entities but does not re-seed deploy-time defaults — the next connect re-publishes settings and re-bootstraps from the authoritative layout.
 
 On the server, `server/src/reducers/simulation.rs` runs each 200 ms tick: lumber mills harvest mature trees (requiring road-connected well water), reforesters advance stump regrowth, stone quarries extract from quarry sites, woodcutter's lodges process timber into firewood and dispatch trips, wells refill and deliver water, hunter's halls and forager's sheds harvest and deliver food, `delivery_trips.rs` moves agents along road paths and unloads cargo at residences, residences consume firewood/water/food with abandonment and recovery (`residence_needs/`), backyard gardens produce food and gold, and settlement ticks fill homes over time. Economy constants come from `balance/gameBalance.json` via `balance_generated.rs`.
 

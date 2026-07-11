@@ -3,24 +3,22 @@ use spacetimedb::{reducer, Identity, ReducerContext, ScheduleAt, TimeDuration};
 use crate::balance_generated::{
     CHAPEL_COFFER_RESERVE_DEFAULT, ECONOMIC_ACTIVITY_TAX_RATE,
 };
-use crate::constants::{DEFAULT_WORLD_SEED, TICK_MICROS};
+use crate::constants::TICK_MICROS;
+use crate::reducers::world_configuration::default_world_config;
 use crate::economy::{STARTING_GOLD, STARTING_STONE, STARTING_TIMBER};
 use crate::db::*;
 use crate::schedule::SimTickSchedule;
-use crate::tables::{ForagingNode, PlayerResources, Quarry, TreeEntity, WorldConfig};
+use crate::tables::{ForagingNode, PlayerResources, Quarry, TreeEntity};
 use crate::world_gen;
 
 #[reducer(init)]
 pub fn init(ctx: &ReducerContext) {
-    ctx.db.world_config().insert(WorldConfig {
-        id: 0,
-        seed: DEFAULT_WORLD_SEED,
-        next_building_id: 1,
-        sim_tick: 0,
-    });
+    let config = default_world_config();
+    let seed = config.seed;
+    ctx.db.world_config().insert(config);
     seed_world_entities(ctx);
     ensure_sim_schedule(ctx);
-    log::info!("Medieval Road System module initialized (seed={DEFAULT_WORLD_SEED})");
+    log::info!("Medieval Road System module initialized (seed={seed})");
 }
 
 #[reducer(client_connected)]

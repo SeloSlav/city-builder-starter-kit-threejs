@@ -2,7 +2,6 @@
 import { CameraController } from '../camera/CameraController.ts';
 import { FirstPersonController } from '../camera/FirstPersonController.ts';
 import { BuildingMarkers } from '../buildings/BuildingMarkers.ts';
-import { BuildingTerrainLayout } from '../buildings/BuildingTerrainLayout.ts';
 import type { BuildingTerrainSource } from '../buildings/BuildingTerrainLayout.ts';
 import { BuildingTool } from '../buildings/BuildingTool.ts';
 import { BurgageTool } from '../residences/BurgageTool.ts';
@@ -10,7 +9,6 @@ import { MAX_ZONE_DEPTH, MIN_ZONE_DEPTH } from '../residences/burgageLayout.ts';
 import { ResidenceMarkers } from '../residences/ResidenceMarkers.ts';
 import { BackyardGardenMarkers } from '../residences/BackyardGardenMarkers.ts';
 import { BurgageFencing } from '../residences/BurgageFencing.ts';
-import { collectOccupiedParcelPolygons } from '../residences/burgageZoneLayout.ts';
 import { SpacetimeGameStore } from '../data/spacetimeGameStore.ts';
 import { InputManager } from '../input/InputManager.ts';
 import {
@@ -23,7 +21,7 @@ import {
   createInitialGameState,
 } from '../resources/GameState.ts';
 import type { SpacetimeGameSnapshot } from '../data/spacetimeGameStore.ts';
-import type { BuildingState, GameState } from '../resources/types.ts';
+import type { GameState } from '../resources/types.ts';
 import { ForestVisualSync, countTreesNearBuilding } from '../resources/ForestVisualSync.ts';
 import { ResourceInspector } from '../resources/ResourceInspector.ts';
 import { computePopulationStats, computeResourceTotals } from '../resources/resourceTotals.ts';
@@ -40,8 +38,7 @@ import { createInspectorSpacetimeActions } from './inspectorSpacetimeActions.ts'
 import { createWorldMapIcons, type WorldMapIconsBundle } from './worldMapIcons.ts';
 import { DeliveryAgentRenderer } from '../logistics/DeliveryAgentRenderer.ts';
 import { beginStartupTextureLoad } from '../scene/startupTextures.ts';
-import { setActivePlacedBuildingLayout, sampleNaturalTerrainHeight } from '../terrain/TerrainHeight.ts';
-import { updateTerrainBuildingPads } from '../terrain/TerrainBuildingPads.ts';
+import { sampleNaturalTerrainHeight } from '../terrain/TerrainHeight.ts';
 import { BuildToolbar, type ToolbarStats } from '../ui/BuildToolbar.ts';
 import type { BuildingKind } from '../generated/gameBalance.ts';
 import { CityAdministrationPanel } from '../ui/CityAdministrationPanel.ts';
@@ -49,6 +46,12 @@ import { ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT } from '../economy/villageEconomy.ts
 import { DEFAULT_PARISH_POLICY } from '../economy/chapelParish.ts';
 import { beginNewWorld, resolveWorldGenerationSettings } from './worldBootstrapFlow.ts';
 import { SettlementPresentationController } from './settlementSchedulePresentation.ts';
+import { SpacetimeSnapshotApplier } from './spacetimeSnapshotApplier.ts';
+import {
+  syncBuildingTerrainLayout,
+  syncPlacedBuildingTerrain,
+  syncPreviewTerrainPads,
+} from './placedBuildingTerrainSync.ts';
 import {
   disposeSettlementWorld,
   syncSettlementWorld,
@@ -94,10 +97,7 @@ export class App {
   private spacetimeStore: SpacetimeGameStore | null = null;
   private gameRuntime: GameRuntime | null = null;
   private spacetimeConnected = false;
-  private lastPlacedBuildingSignature = '';
-  private lastForestClearanceSignature = '';
-  private previousTreePhases = new Map<string, string>();
-  private previousTreeGrowth = new Map<string, number>();
+  private readonly spacetimeSnapshotApplier = new SpacetimeSnapshotApplier();
   private animationId = 0;
   private lastTime = 0;
   private frameBudgetTime = 0;
@@ -668,6 +668,11 @@ export class App {
       dt,
     );
     this.ambientAudio?.tick(dt);
+    this.settlementPresentation.tick({
+      toolbar: this.toolbar,
+      sceneManager: this.sceneManager,
+      residenceMarkers: this.residenceMarkers,
+    });
     this.animationId = requestAnimationFrame(this.tick);
   };
 
@@ -766,6 +771,8 @@ export class App {
     this.spacetimeConnected = snapshot.connected;
 
     if (!snapshot.connected) {
+      this.spacetimeSnapshotApplier.reset();
+      this.settlementPresentation.reset();
       this.syncToolbar();
       return;
     }
@@ -773,135 +780,61 @@ export class App {
     const previous = this.gameState;
     this.gameState = state;
 
-    const previousTreeCount = previous?.trees.size ?? 0;
-    const changedTreeIds: string[] = [];
-    for (const [treeId, entity] of state.trees) {
-      const previousPhase = this.previousTreePhases.get(treeId);
-      const previousGrowth = this.previousTreeGrowth.get(treeId);
-      const phaseChanged = previousPhase !== entity.phase || previousPhase === undefined;
-      const growthChanged = previousGrowth !== entity.growthProgress;
-      if (phaseChanged || growthChanged) {
-        changedTreeIds.push(treeId);
-      }
-      this.previousTreePhases.set(treeId, entity.phase);
-      this.previousTreeGrowth.set(treeId, entity.growthProgress);
-    }
-
-    if (this.forestVisualSync && state.trees.size > 0 && previousTreeCount === 0) {
-      this.forestVisualSync.syncAll(state.trees);
-    } else if (changedTreeIds.length > 0) {
-      this.forestVisualSync?.syncTrees(state.trees, changedTreeIds);
-    }
-
-    const buildingSignature = this.getPlacedBuildingSignature(state.buildings);
-    const buildingsChanged = buildingSignature !== this.lastPlacedBuildingSignature;
-    if (buildingsChanged) {
-      this.lastPlacedBuildingSignature = buildingSignature;
-      this.buildingMarkers?.syncBuildings(state.buildings.values());
-      this.syncPlacedBuildingTerrain({ forceMeshUpdate: true });
-    }
-
-    this.syncSettlementWorld(state);
-    this.burgageFencing?.syncZones(
-      state.burgageZones.values(),
-      state.residences.values(),
-      (x, z) => this.sceneManager?.terrain.getHeightAt(x, z) ?? 0,
+    this.spacetimeSnapshotApplier.apply(
+      this.getSnapshotApplierDeps(),
+      state,
+      previous,
     );
 
-    this.syncForestClearanceIfNeeded(state);
     this.syncResourceUi();
     this.syncToolbar();
     this.applySettlementPresentation();
   }
 
-  private syncSettlementWorld(state: GameState): void {
-    syncSettlementWorld({
+  private getSnapshotApplierDeps() {
+    return {
+      sceneManager: this.sceneManager,
+      buildingMarkers: this.buildingMarkers,
+      burgageFencing: this.burgageFencing,
+      forestVisualSync: this.forestVisualSync,
+      settlementWorld: this.getSettlementWorldTargets(),
+      onForestClearanceChanged: () => this.syncForestClearance(),
+    };
+  }
+
+  private getSettlementWorldTargets() {
+    return {
       residenceMarkers: this.residenceMarkers,
       backyardGardenMarkers: this.backyardGardenMarkers,
       deliveryAgents: this.deliveryAgents,
-      getHeightAt: (x, z) => this.sceneManager?.terrain.getHeightAt(x, z) ?? 0,
-    }, state);
+      getHeightAt: (x: number, z: number) => this.sceneManager?.terrain.getHeightAt(x, z) ?? 0,
+    };
   }
 
-  private syncForestClearanceIfNeeded(state: GameState): void {
-    const signature = this.getForestClearanceSignature(state);
-    if (signature === this.lastForestClearanceSignature) return;
-    this.lastForestClearanceSignature = signature;
-    this.syncForestClearance();
+  private syncSettlementWorld(state: GameState): void {
+    syncSettlementWorld(this.getSettlementWorldTargets(), state);
   }
 
   private syncForestClearance(): void {
-    if (!this.sceneManager || !this.gameState) return;
-    this.sceneManager.setForestClearanceSources(
-      this.collectPlacedBuildingSources(),
-      collectOccupiedParcelPolygons(
-        this.gameState.burgageZones.values(),
-        this.gameState.residences.values(),
-      ),
-    );
+    if (!this.gameState) return;
+    this.spacetimeSnapshotApplier.syncForestClearance(this.getSnapshotApplierDeps(), this.gameState);
   }
 
   private syncBuildingTerrainLayout(): void {
-    if (!this.sceneManager) return;
-
-    const placedSources = this.collectPlacedBuildingSources();
-    const placedLayout = BuildingTerrainLayout.fromBuildings(placedSources, sampleNaturalTerrainHeight);
-    setActivePlacedBuildingLayout(placedSources.length > 0 ? placedLayout : null);
+    syncBuildingTerrainLayout(this.sceneManager, this.gameState);
   }
 
   private syncPreviewTerrainPads(preview: BuildingTerrainSource | null): void {
-    if (!this.sceneManager) return;
-
-    const placedSources = this.collectPlacedBuildingSources();
-    const sources = preview ? [...placedSources, preview] : placedSources;
-    const layout = sources.length > 0
-      ? BuildingTerrainLayout.fromBuildings(sources, sampleNaturalTerrainHeight)
-      : null;
-    updateTerrainBuildingPads(this.sceneManager.terrain, layout);
+    syncPreviewTerrainPads(this.sceneManager, this.gameState, preview);
   }
 
   private syncPlacedBuildingTerrain(options?: { forceMeshUpdate?: boolean }): void {
-    if (!this.sceneManager) return;
-
-    const placedSources = this.collectPlacedBuildingSources();
-    const placedLayout = BuildingTerrainLayout.fromBuildings(placedSources, sampleNaturalTerrainHeight);
-    setActivePlacedBuildingLayout(placedSources.length > 0 ? placedLayout : null);
-
-    if (options?.forceMeshUpdate) {
-      updateTerrainBuildingPads(this.sceneManager.terrain, placedSources.length > 0 ? placedLayout : null);
-      this.buildingMarkers?.syncBuildings(this.gameState?.buildings.values() ?? []);
-      if (this.gameState) {
-        this.lastPlacedBuildingSignature = this.getPlacedBuildingSignature(this.gameState.buildings);
-      }
-    }
-  }
-
-  private collectPlacedBuildingSources(): BuildingTerrainSource[] {
-    const placedSources: BuildingTerrainSource[] = [];
-    if (!this.gameState) return placedSources;
-    for (const building of this.gameState.buildings.values()) {
-      placedSources.push({ kind: building.kind, x: building.x, z: building.z });
-    }
-    return placedSources;
-  }
-
-  private getForestClearanceSignature(state: GameState): string {
-    const buildings = [...state.buildings.values()]
-      .map((building) => `${building.id}:${building.kind}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
-      .sort()
-      .join('|');
-    const residences = [...state.residences.values()]
-      .map((residence) => `${residence.id}:${residence.zoneId}:${residence.parcelIndex}`)
-      .sort()
-      .join('|');
-    return `${buildings}§${residences}`;
-  }
-
-  private getPlacedBuildingSignature(buildings: Map<string, BuildingState>): string {
-    return [...buildings.values()]
-      .map((building) => `${building.id}:${building.kind}:${building.assignedLabor}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
-      .sort()
-      .join('|');
+    syncPlacedBuildingTerrain({
+      sceneManager: this.sceneManager,
+      gameState: this.gameState,
+      buildingMarkers: this.buildingMarkers,
+      forceMeshUpdate: options?.forceMeshUpdate,
+    });
   }
 
   private syncResourceUi(): void {

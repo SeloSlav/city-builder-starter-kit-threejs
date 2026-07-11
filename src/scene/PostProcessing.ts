@@ -9,6 +9,11 @@ import { RenderPipeline, type WebGPURenderer } from 'three/webgpu';
 import { pass, uniform, uv, wgslFn } from 'three/tsl';
 import type { DayNightGrade } from '../world/dayNightPresentation.ts';
 import { applyDayNightGradeUniforms, DEFAULT_DAY_NIGHT_GRADE } from './postGrade.ts';
+import {
+  buildGradeGlslFragmentShader,
+  buildGradeGlslVertexShader,
+  buildGradeWgslFunctionBody,
+} from './postGradeShader.ts';
 import type { RendererBackend } from './RendererBackend.ts';
 
 type Disposable = {
@@ -32,40 +37,8 @@ const DAYLIGHT_GRADE_SHADER = {
     nightBlue: { value: DEFAULT_GRADE.nightBlue },
     vignette: { value: DEFAULT_GRADE.vignette },
   },
-  vertexShader: `
-    varying vec2 vUv;
-
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float saturation;
-    uniform float contrast;
-    uniform float warmth;
-    uniform float nightBlue;
-    uniform float vignette;
-    varying vec2 vUv;
-
-    vec3 adjustSaturation(vec3 color, float amount) {
-      float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-      return mix(vec3(luma), color, amount);
-    }
-
-    void main() {
-      vec3 color = texture2D(tDiffuse, vUv).rgb;
-      color = (color - 0.5) * contrast + 0.5;
-      color = adjustSaturation(color, saturation);
-      color = mix(color, color * vec3(1.03, 1.01, 0.97), warmth);
-      color = mix(color, color * vec3(0.82, 0.9, 1.12), nightBlue);
-      float distanceFromCenter = distance(vUv, vec2(0.5));
-      float edge = smoothstep(0.18, 0.78, distanceFromCenter);
-      color *= mix(1.0, 1.0 - vignette, edge);
-      gl_FragColor = vec4(max(color, vec3(0.0)), 1.0);
-    }
-  `,
+  vertexShader: buildGradeGlslVertexShader(),
+  fragmentShader: buildGradeGlslFragmentShader(),
 };
 
 export type ScenePostProcessor = {
@@ -147,15 +120,7 @@ class WebGPUPostProcessor implements ScenePostProcessor {
     this.bloomPass = bloom(sceneColor, 0.12, 0.38, 0.82);
     const gradeFn = wgslFn(`
       fn daylightGrade(inputColor: vec4<f32>, frameUv: vec2<f32>) -> vec4<f32> {
-        let luma = dot(inputColor.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-        let saturated = mix(vec3<f32>(luma), inputColor.rgb, gradeSaturation);
-        let contrasted = (saturated - vec3<f32>(0.5)) * gradeContrast + vec3<f32>(0.5);
-        let warmed = mix(contrasted, contrasted * vec3<f32>(1.03, 1.01, 0.97), gradeWarmth);
-        let nightTinted = mix(warmed, warmed * vec3<f32>(0.82, 0.9, 1.12), gradeNightBlue);
-        let distanceFromCenter = distance(frameUv, vec2<f32>(0.5));
-        let edge = smoothstep(0.18, 0.78, distanceFromCenter);
-        let graded = nightTinted * mix(1.0, 1.0 - gradeVignette, edge);
-        return vec4<f32>(max(graded, vec3<f32>(0.0)), inputColor.a);
+        ${buildGradeWgslFunctionBody()}
       }
     `, [
       this.gradeSaturation,

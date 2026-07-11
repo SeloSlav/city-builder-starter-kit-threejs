@@ -38,6 +38,11 @@ import { createEmptyStockpile } from '../resources/types.ts';
 import type { DeliveryTripState } from '../logistics/deliveryTrips.ts';
 import type { WorldLayout } from '../resources/WorldLayout.ts';
 import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
+import type { WorldGenerationSettings } from '../world/worldGenerationSettings.ts';
+import {
+  generationMatchesServer,
+  type AuthoritativeWorldGeneration,
+} from '../world/worldConfigAuthority.ts';
 import { inferNextBuildingId } from './spacetimeIds.ts';
 import * as spacetimeReducers from './spacetimeReducers.ts';
 import { GameTableSync } from './spacetimeTableSync/gameTableSync.ts';
@@ -59,6 +64,7 @@ export type SpacetimeGameSnapshot = {
   deliveryTrips: Map<string, DeliveryTripState>;
   roads: RoadNetworkSnapshot | null;
   simTick: number;
+  worldGeneration: AuthoritativeWorldGeneration | null;
 };
 
 export type SpacetimeGameStoreListener = (snapshot: SpacetimeGameSnapshot) => void;
@@ -67,6 +73,7 @@ function createEmptyTableState(): GameTableSyncState {
   return {
     identityHex: null,
     simTick: 0,
+    worldGeneration: null,
     stockpile: createEmptyStockpile(),
     economicActivityTaxRate: ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT,
     parishPolicy: { ...DEFAULT_PARISH_POLICY },
@@ -128,6 +135,7 @@ export class SpacetimeGameStore {
       deliveryTrips: new Map(state.deliveryTrips),
       roads: state.roads ? structuredClone(state.roads) : null,
       simTick: state.simTick,
+      worldGeneration: state.worldGeneration ? { ...state.worldGeneration } : null,
     };
   }
 
@@ -176,8 +184,9 @@ export class SpacetimeGameStore {
     return this.connectWithOptionalToken(token, false);
   }
 
-  toGameState(seed: number, registry: WorldLayoutRegistry): GameState {
+  toGameState(registry: WorldLayoutRegistry): GameState {
     const state = this.tableState;
+    const seed = state.worldGeneration?.seed ?? 0;
     const quarries = new Map(state.quarries);
     const foragingNodes = new Map(state.foragingNodes);
     if (!this.isConnected) {
@@ -293,6 +302,17 @@ export class SpacetimeGameStore {
 
   demolishBuilding(buildingId: string): Promise<void> {
     return spacetimeReducers.demolishBuilding(buildingId);
+  }
+
+  getAuthoritativeWorldGeneration(): AuthoritativeWorldGeneration | null {
+    return this.tableState.worldGeneration;
+  }
+
+  async configureWorld(settings: WorldGenerationSettings): Promise<void> {
+    if (generationMatchesServer(this.tableState.worldGeneration, settings)) {
+      return;
+    }
+    await spacetimeReducers.configureWorld(settings);
   }
 
   bootstrapWorld(registry: WorldLayoutRegistry, worldLayout: WorldLayout): Promise<void> {

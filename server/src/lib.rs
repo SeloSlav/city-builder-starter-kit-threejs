@@ -18,5 +18,6 @@ mod lifecycle;
 mod reducers;
 mod roads;
 mod simulation;
+mod world_entities;
 
 pub use constants::DEFAULT_WORLD_SEED;
