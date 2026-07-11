@@ -20,12 +20,33 @@ function fenceSignature(segments: FenceSegment[]): string {
     .join('|');
 }
 
-function collectFenceSegments(zones: Iterable<BurgageZoneState>): FenceSegment[] {
+function occupiedParcelIndicesByZone(
+  residences: Iterable<{ zoneId: string; parcelIndex: number }>,
+): Map<string, Set<number>> {
+  const byZone = new Map<string, Set<number>>();
+  for (const residence of residences) {
+    let parcelIndices = byZone.get(residence.zoneId);
+    if (!parcelIndices) {
+      parcelIndices = new Set();
+      byZone.set(residence.zoneId, parcelIndices);
+    }
+    parcelIndices.add(residence.parcelIndex);
+  }
+  return byZone;
+}
+
+function collectFenceSegments(
+  zones: Iterable<BurgageZoneState>,
+  residences: Iterable<{ zoneId: string; parcelIndex: number }>,
+): FenceSegment[] {
+  const occupiedByZone = occupiedParcelIndicesByZone(residences);
   const segments: FenceSegment[] = [];
   for (const zone of zones) {
     const layout = layoutFromBurgageZone(zone);
     if (!layout) continue;
-    segments.push(...getParcelFenceSegments(layout));
+    const occupied = occupiedByZone.get(zone.id);
+    if (!occupied || occupied.size === 0) continue;
+    segments.push(...getParcelFenceSegments(layout, occupied));
   }
   return segments;
 }
@@ -74,9 +95,10 @@ export class BurgageFencing {
 
   syncZones(
     zones: Iterable<BurgageZoneState>,
+    residences: Iterable<{ zoneId: string; parcelIndex: number }>,
     getHeightAt: (x: number, z: number) => number,
   ): void {
-    const segments = collectFenceSegments(zones);
+    const segments = collectFenceSegments(zones, residences);
     const signature = fenceSignature(segments);
     if (signature === this.lastSignature) return;
     this.lastSignature = signature;

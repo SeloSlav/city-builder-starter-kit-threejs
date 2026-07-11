@@ -15,7 +15,7 @@ import { RoadJunctionBuilder } from '../roads/RoadJunctionBuilder.ts';
 import { RoadMaterialFactory } from '../roads/RoadMaterialFactory.ts';
 import { RoadMeshBuilder } from '../roads/RoadMeshBuilder.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
-import type { BurgageZoneState } from '../resources/types.ts';
+import type { Point2 } from '../utils/polygonGeometry.ts';
 import type { BridgeSamplingContext } from '../roads/RiverBridgeSpans.ts';
 import { getStillWaterSurfaceY } from '../rivers/RiverWaterLevel.ts';
 import { SkyCloudMesh } from '../sky/SkyCloudMesh.ts';
@@ -56,7 +56,7 @@ export class SceneManager {
   private vegetationBuilt = false;
   private roadNetworkRef: RoadNetwork | null = null;
   private forestClearanceBuildings: BuildingTerrainSource[] = [];
-  private forestClearanceBurgageZones: BurgageZoneState[] = [];
+  private forestClearanceBurgageParcelPolygons: Point2[][] = [];
   private lastForestClearanceSourceSignature = '';
   private readonly riverSystem: RiverSystem;
   private readonly quarrySystem: QuarrySystem;
@@ -338,15 +338,15 @@ export class SceneManager {
 
   setForestClearanceSources(
     buildings: Iterable<BuildingTerrainSource>,
-    burgageZones: Iterable<BurgageZoneState>,
+    burgageParcelPolygons: Iterable<Point2[]>,
   ): void {
     const nextBuildings = [...buildings];
-    const nextZones = [...burgageZones];
-    const signature = forestClearanceSourceSignature(nextBuildings, nextZones);
+    const nextParcelPolygons = [...burgageParcelPolygons];
+    const signature = forestClearanceSourceSignature(nextBuildings, nextParcelPolygons);
     if (signature === this.lastForestClearanceSourceSignature) return;
     this.lastForestClearanceSourceSignature = signature;
     this.forestClearanceBuildings = nextBuildings;
-    this.forestClearanceBurgageZones = nextZones;
+    this.forestClearanceBurgageParcelPolygons = nextParcelPolygons;
     this.refreshForestClearance();
   }
 
@@ -426,7 +426,7 @@ export class SceneManager {
     this.forestManager?.syncPlacementClearance({
       roadNetwork: this.roadNetworkRef,
       buildings: this.forestClearanceBuildings,
-      burgageZones: this.forestClearanceBurgageZones,
+      burgageParcelPolygons: this.forestClearanceBurgageParcelPolygons,
     });
   }
 
@@ -527,22 +527,19 @@ export class SceneManager {
 
 function forestClearanceSourceSignature(
   buildings: BuildingTerrainSource[],
-  burgageZones: BurgageZoneState[],
+  burgageParcelPolygons: Point2[][],
 ): string {
   const buildingPart = buildings
     .map((building) => `${building.kind}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
     .sort()
     .join('|');
-  const zonePart = burgageZones
-    .map((zone) => (
-      `${zone.id}:${zone.cornerA.x.toFixed(2)},${zone.cornerA.z.toFixed(2)}`
-      + `-${zone.cornerB.x.toFixed(2)},${zone.cornerB.z.toFixed(2)}`
-      + `-${zone.cornerC.x.toFixed(2)},${zone.cornerC.z.toFixed(2)}`
-      + `-${zone.cornerD.x.toFixed(2)},${zone.cornerD.z.toFixed(2)}`
-    ))
+  const parcelPart = burgageParcelPolygons
+    .map((polygon) => polygon
+      .map((point) => `${point.x.toFixed(2)},${point.z.toFixed(2)}`)
+      .join('-'))
     .sort()
     .join('|');
-  return `${buildingPart}§${zonePart}`;
+  return `${buildingPart}§${parcelPart}`;
 }
 
 function projectPointToPathXZ(

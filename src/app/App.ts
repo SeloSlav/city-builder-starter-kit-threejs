@@ -8,6 +8,7 @@ import { BuildingTool } from '../buildings/BuildingTool.ts';
 import { BurgageTool } from '../residences/BurgageTool.ts';
 import { ResidenceMarkers } from '../residences/ResidenceMarkers.ts';
 import { BurgageFencing } from '../residences/BurgageFencing.ts';
+import { collectOccupiedParcelPolygons } from '../residences/burgageZoneLayout.ts';
 import { SpacetimeGameStore } from '../data/spacetimeGameStore.ts';
 import { InputManager } from '../input/InputManager.ts';
 import {
@@ -630,6 +631,7 @@ export class App {
     );
     this.burgageFencing?.syncZones(
       this.gameState.burgageZones.values(),
+      this.gameState.residences.values(),
       (x, z) => this.sceneManager?.terrain.getHeightAt(x, z) ?? 0,
     );
     this.syncPlacedBuildingTerrain({ forceMeshUpdate: true });
@@ -755,6 +757,7 @@ export class App {
     );
     this.burgageFencing?.syncZones(
       state.burgageZones.values(),
+      state.residences.values(),
       (x, z) => this.sceneManager?.terrain.getHeightAt(x, z) ?? 0,
     );
 
@@ -774,7 +777,10 @@ export class App {
     if (!this.sceneManager || !this.gameState) return;
     this.sceneManager.setForestClearanceSources(
       this.collectPlacedBuildingSources(),
-      this.gameState.burgageZones.values(),
+      collectOccupiedParcelPolygons(
+        this.gameState.burgageZones.values(),
+        this.gameState.residences.values(),
+      ),
     );
   }
 
@@ -827,16 +833,11 @@ export class App {
       .map((building) => `${building.id}:${building.kind}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
       .sort()
       .join('|');
-    const zones = [...state.burgageZones.values()]
-      .map((zone) => (
-        `${zone.id}:${zone.cornerA.x.toFixed(2)},${zone.cornerA.z.toFixed(2)}`
-        + `-${zone.cornerB.x.toFixed(2)},${zone.cornerB.z.toFixed(2)}`
-        + `-${zone.cornerC.x.toFixed(2)},${zone.cornerC.z.toFixed(2)}`
-        + `-${zone.cornerD.x.toFixed(2)},${zone.cornerD.z.toFixed(2)}`
-      ))
+    const residences = [...state.residences.values()]
+      .map((residence) => `${residence.id}:${residence.zoneId}:${residence.parcelIndex}`)
       .sort()
       .join('|');
-    return `${buildings}§${zones}`;
+    return `${buildings}§${residences}`;
   }
 
   private getPlacedBuildingSignature(buildings: Map<string, BuildingState>): string {

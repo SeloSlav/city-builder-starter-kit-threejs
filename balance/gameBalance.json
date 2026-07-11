@@ -4,7 +4,7 @@
     "tickDt": 0.2
   },
   "economy": {
-    "startingTimber": 120,
+    "startingTimber": 160,
     "startingStone": 140,
     "stoneSalvageFraction": 0.92,
     "timberSalvageFraction": 0.7,

@@ -330,9 +330,13 @@ function fenceEdgeKey(a: Point2, b: Point2): string {
 }
 
 /** Unique parcel perimeter edges — shared lot lines appear once between neighbors. */
-export function getParcelFenceSegments(layout: BurgageLayoutResult): Array<[Point2, Point2]> {
+export function getParcelFenceSegments(
+  layout: BurgageLayoutResult,
+  occupiedParcelIndices?: ReadonlySet<number>,
+): Array<[Point2, Point2]> {
   const seen = new Map<string, [Point2, Point2]>();
   for (const parcel of layout.parcels) {
+    if (occupiedParcelIndices && !occupiedParcelIndices.has(parcel.index)) continue;
     const poly = parcel.polygon;
     for (let i = 0; i < poly.length; i++) {
       const start = poly[i];

@@ -5,7 +5,7 @@ export type BuildingKind = (typeof BUILDING_KINDS)[number];
 
 export const SIM_TICK_SECONDS = 0.2;
 
-export const STARTING_TIMBER = 120;
+export const STARTING_TIMBER = 160;
 export const STARTING_STONE = 140;
 export const STONE_SALVAGE_FRACTION = 0.92;
 export const TIMBER_SALVAGE_FRACTION = 0.7;

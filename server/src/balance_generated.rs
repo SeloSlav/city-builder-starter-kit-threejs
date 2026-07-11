@@ -3,7 +3,7 @@
 pub const TICK_MICROS: i64 = 200000;
 pub const TICK_DT: f64 = 0.2;
 
-pub const STARTING_TIMBER: f64 = 120.0;
+pub const STARTING_TIMBER: f64 = 160.0;
 pub const STARTING_STONE: f64 = 140.0;
 pub const STONE_SALVAGE_FRACTION: f64 = 0.92;
 pub const TIMBER_SALVAGE_FRACTION: f64 = 0.7;
