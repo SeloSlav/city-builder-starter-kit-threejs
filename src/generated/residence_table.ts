@@ -19,6 +19,8 @@ export default __t.row({
   z: __t.f64(),
   yaw: __t.f64(),
   population: __t.u32(),
+  populationCapacity: __t.u32().name("population_capacity"),
+  settlementTicks: __t.u32().name("settlement_ticks"),
   firewoodStock: __t.f64().name("firewood_stock"),
   abandoned: __t.bool(),
   needsDeficitTicks: __t.u32().name("needs_deficit_ticks"),

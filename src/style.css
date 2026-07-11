@@ -196,7 +196,9 @@ button {
   bottom: 14px;
   z-index: 4;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  max-width: calc(100vw - 28px);
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -209,6 +211,7 @@ button {
   display: grid;
   gap: 2px;
   min-width: 64px;
+  cursor: help;
 }
 
 .resource-stockpile-label {

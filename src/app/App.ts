@@ -139,6 +139,7 @@ export class App {
     const buildingMarkers = new BuildingMarkers({
       terrain: sceneManager.terrain,
       parent: sceneManager.selectionGroup,
+      getRoadNetwork: () => this.roadNetwork ?? roadNetwork,
     });
     const placementGate: PlacementInteractionGate = {
       isRoadToolEnabled: () => false,

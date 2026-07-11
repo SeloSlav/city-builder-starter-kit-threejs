@@ -89,7 +89,7 @@ export function sampleBuildingFootprintPoints(
   z: number,
 ): Array<{ x: number; z: number }> {
   const params = PAD_PARAMS[kind];
-  const rotation = buildingPlacementYaw(x, z);
+  const rotation = buildingPlacementYaw(kind, x, z);
   const cos = Math.cos(rotation);
   const sin = Math.sin(rotation);
   const points: Array<{ x: number; z: number }> = [];
@@ -117,7 +117,7 @@ function createPadSite(
   sampleNaturalHeight: (x: number, z: number) => number,
 ): BuildingPadSite {
   const params = PAD_PARAMS[building.kind];
-  const rotation = buildingPlacementYaw(building.x, building.z);
+  const rotation = buildingPlacementYaw(building.kind, building.x, building.z);
   const footprintHeights = sampleBuildingFootprintHeights(building.kind, building.x, building.z, sampleNaturalHeight);
   const platformHeight = Math.max(...footprintHeights);
 

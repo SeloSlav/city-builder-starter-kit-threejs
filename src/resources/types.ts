@@ -88,6 +88,8 @@ export type ResidenceState = {
   z: number;
   yaw: number;
   population: number;
+  populationCapacity: number;
+  settlementTicks: number;
   firewoodStock: number;
   abandoned: boolean;
   needsDeficitTicks: number;

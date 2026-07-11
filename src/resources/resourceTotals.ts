@@ -5,6 +5,7 @@ import {
   POPULATION_PER_RESIDENCE,
   RESIDENCE_FIREWOOD_CAPACITY,
   RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC,
+  RESIDENCE_SETTLE_TICKS,
   SIM_TICK_SECONDS,
   STARTING_POPULATION,
   type StorageCaps,
@@ -26,6 +27,7 @@ export {
   residenceFirewoodRunwaySeconds,
   RESIDENCE_FIREWOOD_CAPACITY,
   RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC,
+  RESIDENCE_SETTLE_TICKS,
   SIM_TICK_SECONDS,
   STARTING_POPULATION,
 };
@@ -43,6 +45,9 @@ export type PopulationStats = {
   total: number;
   assigned: number;
   available: number;
+  housingCapacity: number;
+  housed: number;
+  vacant: number;
 };
 
 export function buildingStorageCaps(kind: BuildingKind): StorageCaps {
@@ -96,13 +101,15 @@ export function computeResourceTotals(state: GameState): ResourceTotals {
 }
 
 export function computePopulationStats(state: GameState): PopulationStats {
-  let fromResidences = 0;
+  let housed = 0;
+  let housingCapacity = 0;
   for (const residence of state.residences.values()) {
     if (residence.abandoned) continue;
-    fromResidences += residence.population;
+    housed += residence.population;
+    housingCapacity += residence.populationCapacity;
   }
 
-  const total = STARTING_POPULATION + fromResidences;
+  const total = STARTING_POPULATION + housed;
   let assigned = 0;
   for (const building of state.buildings.values()) {
     assigned += building.assignedLabor;
@@ -112,6 +119,9 @@ export function computePopulationStats(state: GameState): PopulationStats {
     total,
     assigned,
     available: Math.max(0, total - assigned),
+    housingCapacity,
+    housed,
+    vacant: Math.max(0, housingCapacity - housed),
   };
 }
 
@@ -132,7 +142,17 @@ export function residenceNeedsStatus(residence: ResidenceState): {
     return { label: 'Abandoned — firewood needs unmet', state: 'abandoned' };
   }
   if (residence.population === 0) {
-    return { label: 'Unoccupied', state: 'idle' };
+    const capacity = residence.populationCapacity;
+    const settleSeconds = Math.max(
+      1,
+      Math.round((RESIDENCE_SETTLE_TICKS - residence.settlementTicks) * SIM_TICK_SECONDS),
+    );
+    return {
+      label: capacity > 0
+        ? `Awaiting settlers — first arrival in ~${formatShortDuration(settleSeconds)}`
+        : 'Vacant — awaiting settlers',
+      state: 'idle',
+    };
   }
   if (residence.needsDeficitTicks > 0) {
     const remainingTicks = Math.max(0, ABANDON_AFTER_DEFICIT_TICKS - residence.needsDeficitTicks);

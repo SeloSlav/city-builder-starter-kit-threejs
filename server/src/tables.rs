@@ -99,6 +99,8 @@ pub struct Residence {
     pub z: f64,
     pub yaw: f64,
     pub population: u32,
+    pub population_capacity: u32,
+    pub settlement_ticks: u32,
     pub firewood_stock: f64,
     pub abandoned: bool,
     pub needs_deficit_ticks: u32,

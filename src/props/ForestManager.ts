@@ -460,7 +460,7 @@ function pointWithinBuildingPad(
   canopyRadius: number,
 ): boolean {
   const params = getBuildingPadParams(building.kind);
-  const rotation = buildingPlacementYaw(building.x, building.z);
+  const rotation = buildingPlacementYaw(building.kind, building.x, building.z);
   const dx = x - building.x;
   const dz = z - building.z;
   const cos = Math.cos(rotation);

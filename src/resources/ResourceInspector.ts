@@ -36,6 +36,8 @@ export class ResourceInspector {
   private readonly stockpileRoot: HTMLElement;
   private readonly stockpileValues: Record<'timber' | 'stone' | 'firewood', HTMLElement>;
   private readonly populationValue: HTMLElement;
+  private readonly housingValue: HTMLElement;
+  private readonly housingSub: HTMLElement;
   private readonly laborValue: HTMLElement;
   private readonly demolishSection: HTMLElement;
   private readonly demolishButton: HTMLButtonElement;
@@ -52,7 +54,14 @@ export class ResourceInspector {
   private selectedX = 0;
   private selectedZ = 0;
   private selectedRadius = 6;
-  private populationStats: PopulationStats = { total: 0, assigned: 0, available: 0 };
+  private populationStats: PopulationStats = {
+    total: 0,
+    assigned: 0,
+    available: 0,
+    housingCapacity: 0,
+    housed: 0,
+    vacant: 0,
+  };
 
   constructor(options: ResourceInspectorOptions) {
     this.options = options;
@@ -61,22 +70,31 @@ export class ResourceInspector {
       'beforeend',
       `
       <div class="resource-stockpile-hud" data-resource-stockpile aria-label="Resources">
-        <div class="resource-stockpile-item" data-resource="timber">
+        <div class="resource-stockpile-item" data-resource="timber" title="Timber across your treasury and building storage (mills, lodges). New construction spends treasury first, then pulls from buildings.">
           <span class="resource-stockpile-label">Timber</span>
           <strong data-stockpile="timber">0</strong>
         </div>
-        <div class="resource-stockpile-item" data-resource="stone">
+        <div class="resource-stockpile-item" data-resource="stone" title="Stone in your treasury and quarry camps. Construction spends treasury first, then quarry storage.">
           <span class="resource-stockpile-label">Stone</span>
           <strong data-stockpile="stone">0</strong>
         </div>
-        <div class="resource-stockpile-item" data-resource="firewood">
+        <div class="resource-stockpile-item" data-resource="firewood" title="Firewood in treasury, woodcutter lodges, and residence stocks combined.">
           <span class="resource-stockpile-label">Firewood</span>
           <strong data-stockpile="firewood">0</strong>
         </div>
-        <div class="resource-stockpile-item resource-stockpile-item--population" data-resource="population">
+        <div class="resource-stockpile-item resource-stockpile-item--population" data-resource="population" title="Total population: starting townsfolk plus residents who have moved into homes.">
           <span class="resource-stockpile-label">Population</span>
           <strong data-stockpile="population">0</strong>
-          <span class="resource-stockpile-sub" data-stockpile="labor">0 labor free</span>
+        </div>
+        <div class="resource-stockpile-item resource-stockpile-item--population" data-resource="housing" title="Residents housed versus total housing capacity. New homes start empty and attract settlers over time.">
+          <span class="resource-stockpile-label">Housing</span>
+          <strong data-stockpile="housing">0/0</strong>
+          <span class="resource-stockpile-sub" data-stockpile="housing-sub">0 vacant</span>
+        </div>
+        <div class="resource-stockpile-item resource-stockpile-item--population" data-resource="labor" title="Workers free to assign. Labor equals population minus workers already assigned to buildings.">
+          <span class="resource-stockpile-label">Labor</span>
+          <strong data-stockpile="labor">0</strong>
+          <span class="resource-stockpile-sub" data-stockpile="labor-sub">available</span>
         </div>
       </div>
 
@@ -128,6 +146,8 @@ export class ResourceInspector {
       firewood: this.mustElement(options.uiRoot, '[data-stockpile="firewood"]'),
     };
     this.populationValue = this.mustElement(options.uiRoot, '[data-stockpile="population"]');
+    this.housingValue = this.mustElement(options.uiRoot, '[data-stockpile="housing"]');
+    this.housingSub = this.mustElement(options.uiRoot, '[data-stockpile="housing-sub"]');
     this.laborValue = this.mustElement(options.uiRoot, '[data-stockpile="labor"]');
     this.demolishSection = this.mustElement(options.uiRoot, '[data-inspector-actions]');
     this.demolishButton = this.mustButton(options.uiRoot, '[data-action="demolish-primary"]');
@@ -188,7 +208,17 @@ export class ResourceInspector {
     this.stockpileValues.stone.textContent = Math.round(totals.stone).toString();
     this.stockpileValues.firewood.textContent = Math.round(totals.firewood).toString();
     this.populationValue.textContent = population.total.toString();
-    this.laborValue.textContent = `${population.available} labor free`;
+    this.housingValue.textContent = `${population.housed}/${population.housingCapacity}`;
+    this.housingSub.textContent = population.vacant === 1
+      ? '1 vacant'
+      : `${population.vacant} vacant`;
+    this.laborValue.textContent = population.available.toString();
+    const laborSub = this.stockpileRoot.querySelector<HTMLElement>('[data-stockpile="labor-sub"]');
+    if (laborSub) {
+      laborSub.textContent = population.assigned > 0
+        ? `${population.assigned} assigned`
+        : 'available';
+    }
   }
 
   selectQuarry(quarryId: string): void {

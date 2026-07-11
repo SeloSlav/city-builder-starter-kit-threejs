@@ -77,6 +77,8 @@ export const Residence = __t.object("Residence", {
   z: __t.f64(),
   yaw: __t.f64(),
   population: __t.u32(),
+  populationCapacity: __t.u32(),
+  settlementTicks: __t.u32(),
   firewoodStock: __t.f64(),
   abandoned: __t.bool(),
   needsDeficitTicks: __t.u32(),

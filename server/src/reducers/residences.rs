@@ -137,7 +137,7 @@ pub fn place_burgage_zone(
         .ok_or_else(|| "Failed to resolve residence zone id.".to_string())?;
 
     for residence in layout.residences {
-        let population = residence_population_for_parcel(residence.parcel_frontage);
+        let population_capacity = residence_population_for_parcel(residence.parcel_frontage);
         ctx.db.residence().insert(Residence {
             id: 0,
             zone_id,
@@ -146,7 +146,9 @@ pub fn place_burgage_zone(
             x: residence.x,
             z: residence.z,
             yaw: residence.yaw,
-            population,
+            population: 0,
+            population_capacity,
+            settlement_ticks: 0,
             firewood_stock: 0.0,
             abandoned: false,
             needs_deficit_ticks: 0,

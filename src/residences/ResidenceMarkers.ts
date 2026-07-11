@@ -248,6 +248,7 @@ export class ResidenceMarkers {
       yaw: number;
       firewoodStock: number;
       abandoned: boolean;
+      population: number;
     }>,
     getHeightAt: (x: number, z: number) => number,
   ): void {
@@ -274,7 +275,7 @@ export class ResidenceMarkers {
       marker.rotation.y = residence.yaw;
       this.smokeActive.set(
         residence.id,
-        !residence.abandoned && residence.firewoodStock > 0,
+        !residence.abandoned && residence.population > 0 && residence.firewoodStock > 0,
       );
       if (!marker.getObjectByName('Building shadow proxy')) {
         const shadowProxy = createResidenceShadowProxy();

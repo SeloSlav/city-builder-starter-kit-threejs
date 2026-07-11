@@ -8,8 +8,10 @@ import {
 import {
   formatFirewoodRunwayDays,
   RESIDENCE_FIREWOOD_CAPACITY,
+  RESIDENCE_SETTLE_TICKS,
   residenceFirewoodRunwayDays,
   residenceNeedsStatus,
+  SIM_TICK_SECONDS,
 } from '../resourceTotals.ts';
 import type { InspectableTarget } from '../types.ts';
 import type { InspectorRenderContext, InspectorView } from './renderInspectableTarget.ts';
@@ -35,6 +37,14 @@ export function renderResidenceInspector(
   const lodgeLabel = servingLodge
     ? context.worldQueries.getBuildingLabel(servingLodge.kind)
     : 'None on branch';
+  const capacity = residence.populationCapacity;
+  const settlersRemaining = Math.max(0, capacity - residence.population);
+  const settleEtaSeconds = settlersRemaining > 0
+    ? Math.max(
+        1,
+        Math.round((RESIDENCE_SETTLE_TICKS - residence.settlementTicks) * SIM_TICK_SECONDS),
+      )
+    : null;
 
   return {
     eyebrow: 'Residence',
@@ -49,7 +59,10 @@ export function renderResidenceInspector(
       <li><span>Plots</span><span>${zone.plotCount}</span></li>
       <li><span>Residences</span><span>${residenceCount}</span></li>
       <li><span>Parcel</span><span>#${residence.parcelIndex + 1}</span></li>
-      <li><span>Population</span><span>${residence.abandoned ? 0 : residence.population}</span></li>
+      <li><span>Population</span><span>${residence.abandoned ? 0 : residence.population} / ${capacity}</span></li>
+      ${settleEtaSeconds != null && !residence.abandoned
+        ? `<li><span>Settlers</span><span>${settlersRemaining} pending — next in ~${formatSettleEta(settleEtaSeconds)}</span></li>`
+        : ''}
       <li><span>Firewood stock</span><span>${Math.round(residence.firewoodStock)} / ${RESIDENCE_FIREWOOD_CAPACITY}</span></li>
       <li><span>Firewood runway</span><span>${firewoodRunwayLabel}</span></li>
       <li><span>Serving lodge</span><span>${lodgeLabel}</span></li>
@@ -70,4 +83,11 @@ export function renderResidenceInspector(
     },
     labor: hiddenLabor(),
   };
+}
+
+function formatSettleEta(seconds: number): string {
+  if (seconds >= 120) {
+    return `${Math.max(1, Math.round(seconds / 60))} min`;
+  }
+  return `${Math.max(1, Math.round(seconds))}s`;
 }

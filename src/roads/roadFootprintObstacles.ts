@@ -45,7 +45,7 @@ export function collectRoadFootprintObstaclesInBounds(
     obstacles.push({
       corners: orientedRectCorners2(
         { x: building.x, z: building.z },
-        buildingPlacementYaw(building.x, building.z),
+        buildingPlacementYaw(building.kind, building.x, building.z),
         params.radiusX + pad,
         params.radiusZ + pad,
       ),

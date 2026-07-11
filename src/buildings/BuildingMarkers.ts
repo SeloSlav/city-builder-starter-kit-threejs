@@ -3,6 +3,7 @@ import { disposeObject3D } from '../utils/dispose.ts';
 import type { BuildingKind, BuildingState } from '../resources/types.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
 import { areBuildingShadowsDisabled } from '../scene/shadowPreference.ts';
+import type { RoadNetwork } from '../roads/RoadNetwork.ts';
 import { buildingPlacementYaw } from './buildingPlacement.ts';
 import { createBuildingShadowProxy } from './buildingShadowProxy.ts';
 import { createBuildingMesh } from './BuildingMeshes.ts';
@@ -15,10 +16,12 @@ import {
 type BuildingMarkersOptions = {
   terrain: Terrain;
   parent: THREE.Group;
+  getRoadNetwork?: () => RoadNetwork | null;
 };
 
 export class BuildingMarkers {
   private readonly terrain: Terrain;
+  private readonly getRoadNetwork?: () => RoadNetwork | null;
   private readonly group = new THREE.Group();
   private readonly buildingMeshes = new Map<string, THREE.Group>();
   private selectedWorkExtentMesh: THREE.Mesh | null = null;
@@ -31,6 +34,7 @@ export class BuildingMarkers {
 
   constructor(options: BuildingMarkersOptions) {
     this.terrain = options.terrain;
+    this.getRoadNetwork = options.getRoadNetwork;
     this.group.name = 'Building markers';
     options.parent.add(this.group);
   }
@@ -111,7 +115,7 @@ export class BuildingMarkers {
       this.previewBuilding = createBuildingPreviewMesh(kind);
       this.previewKind = kind;
       this.previewValid = valid;
-      this.previewBuilding.rotation.y = buildingPlacementYaw(x, z);
+      this.previewBuilding.rotation.y = buildingPlacementYaw(kind, x, z, this.getRoadNetwork?.() ?? null);
       this.group.add(this.previewBuilding);
     } else if (this.previewValid !== valid) {
       updateBuildingPreviewAppearance(this.previewBuilding, valid);
@@ -119,7 +123,7 @@ export class BuildingMarkers {
     }
 
     const y = this.terrain.getHeightAt(x, z);
-    const yaw = buildingPlacementYaw(x, z);
+    const yaw = buildingPlacementYaw(kind, x, z, this.getRoadNetwork?.() ?? null);
     this.previewMesh.visible = radius > 0;
     this.previewMesh.position.set(x, y + 0.2, z);
     this.previewMesh.scale.set(radius, 1, radius);
@@ -157,7 +161,12 @@ export class BuildingMarkers {
       const shadowProxy = createBuildingShadowProxy(building.kind);
       shadowProxy.castShadow = !areBuildingShadowsDisabled();
       marker.add(shadowProxy);
-      marker.rotation.y = buildingPlacementYaw(building.x, building.z);
+      marker.rotation.y = buildingPlacementYaw(
+        building.kind,
+        building.x,
+        building.z,
+        this.getRoadNetwork?.() ?? null,
+      );
       this.buildingMeshes.set(building.id, marker);
       this.group.add(marker);
     }

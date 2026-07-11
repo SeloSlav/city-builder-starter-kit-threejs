@@ -463,6 +463,8 @@ export class SpacetimeGameStore {
           z: row.z,
           yaw: row.yaw,
           population: Number(row.population),
+          populationCapacity: Number(row.populationCapacity ?? row.population),
+          settlementTicks: Number(row.settlementTicks ?? 0),
           firewoodStock: row.firewoodStock,
           abandoned: row.abandoned,
           needsDeficitTicks: Number(row.needsDeficitTicks),
