@@ -66,6 +66,8 @@ export function describeBuilderHelp(mode: ToolbarStats['mode']): string {
           <li><span>Adjust plot count</span><span class="road-controls-key">+ / − or on-zone controls</span></li>
           <li><span>Rotate frontage</span><span class="road-controls-key">F</span> <span class="road-controls-hint">(after frontage is set)</span></li>
           <li><span>Undo last step</span><span class="road-controls-key">R-click or Backspace</span></li>
+          <li><span>Undo last placement</span><span class="road-controls-key">Ctrl + Z</span></li>
+          <li><span>Redo placement</span><span class="road-controls-key">Ctrl + Y</span></li>
           <li><span>Place residences</span><span class="road-controls-key">Hammer or Enter</span></li>
           <li><span>Cancel / exit</span><span class="road-controls-key">Esc</span></li>
         `;
@@ -75,6 +77,8 @@ export function describeBuilderHelp(mode: ToolbarStats['mode']): string {
       if (isBuildingToolMode(mode)) {
         return `
           <li><span>Place building</span><span class="road-controls-key">L-click</span></li>
+          <li><span>Undo placement</span><span class="road-controls-key">Ctrl + Z</span></li>
+          <li><span>Redo placement</span><span class="road-controls-key">Ctrl + Y</span></li>
           <li><span>Cancel tool</span><span class="road-controls-key">Esc</span></li>
         `;
       }

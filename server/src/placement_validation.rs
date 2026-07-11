@@ -1,14 +1,17 @@
 use spacetimedb::ReducerContext;
 use spacetimedb::Identity;
 
-use crate::burgage::{zone_corners_polygon, zone_overlaps_footprint, ZoneCorners};
+use crate::burgage::{zone_corners_polygon, zone_overlaps_footprint, Point2, ZoneCorners};
 use crate::building_defs::building_def;
 use crate::db::*;
+use crate::hydrology::sample_hydrology_score;
 use crate::roads::load_owner_road_network;
 
 const LARGE_QUARRY_PIT_RADIUS: f64 = 58.0;
 const SMALL_QUARRY_PIT_RADIUS: f64 = 30.0;
 const FOOTPRINT_SAMPLE_FRACTIONS: [f64; 3] = [0.0, 0.55, 0.82];
+const OPEN_WATER_THRESHOLD: f64 = 0.999;
+const MAX_ROAD_FRONTAGE_DISTANCE: f64 = 16.0;
 
 struct BuildingPadParams {
     radius_x: f64,
@@ -18,6 +21,58 @@ struct BuildingPadParams {
 
 pub fn building_pick_radius(kind: &str) -> Option<f64> {
     building_def(kind).map(|def| def.pick_radius)
+}
+
+pub fn is_open_water(x: f64, z: f64) -> bool {
+    sample_hydrology_score(x, z) >= OPEN_WATER_THRESHOLD
+}
+
+pub fn burgage_zone_on_water(corners: &ZoneCorners) -> bool {
+    for corner in zone_corners_polygon(corners) {
+        if is_open_water(corner.x, corner.z) {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn burgage_frontage_edge_distance(
+    ctx: &ReducerContext,
+    owner: Identity,
+    corners: &ZoneCorners,
+    frontage_edge: u8,
+) -> f64 {
+    let Some(network) = load_owner_road_network(ctx, owner) else {
+        return f64::INFINITY;
+    };
+    let (start, end) = zone_edge(corners, frontage_edge);
+    let samples = 10;
+    let mut min_distance = f64::INFINITY;
+    for i in 0..=samples {
+        let t = i as f64 / samples as f64;
+        let x = start.x + (end.x - start.x) * t;
+        let z = start.z + (end.z - start.z) * t;
+        min_distance = min_distance.min(network.nearest_distance(x, z));
+    }
+    min_distance
+}
+
+pub fn burgage_zone_has_road_frontage(
+    ctx: &ReducerContext,
+    owner: Identity,
+    corners: &ZoneCorners,
+    frontage_edge: u8,
+) -> bool {
+    burgage_frontage_edge_distance(ctx, owner, corners, frontage_edge) <= MAX_ROAD_FRONTAGE_DISTANCE
+}
+
+fn zone_edge(corners: &ZoneCorners, edge: u8) -> (Point2, Point2) {
+    match edge {
+        0 => (corners.a, corners.b),
+        1 => (corners.b, corners.c),
+        2 => (corners.c, corners.d),
+        _ => (corners.d, corners.a),
+    }
 }
 
 pub fn building_overlaps_residence_zone(

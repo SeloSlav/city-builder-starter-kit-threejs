@@ -328,6 +328,12 @@ export class SpacetimeGameStore {
     }
   }
 
+  private roadSyncFailedListener: ((error: unknown) => void) | null = null;
+
+  setRoadSyncFailedListener(listener: ((error: unknown) => void) | null): void {
+    this.roadSyncFailedListener = listener;
+  }
+
   bootstrapWorld(registry: WorldLayoutRegistry, worldLayout: WorldLayout): Promise<void> {
     return spacetimeReducers.bootstrapWorld(registry, worldLayout);
   }
@@ -350,7 +356,12 @@ export class SpacetimeGameStore {
     if (!this.connection || !this.pendingRoadSnapshot) return;
     const snapshotJson = this.pendingRoadSnapshot;
     this.pendingRoadSnapshot = null;
-    await spacetimeReducers.syncRoadNetwork(snapshotJson);
+    try {
+      await spacetimeReducers.syncRoadNetwork(snapshotJson);
+    } catch (error) {
+      console.error('[SpacetimeGameStore] Road sync failed:', error);
+      this.roadSyncFailedListener?.(error);
+    }
   }
 
   private startSubscriptions(): void {

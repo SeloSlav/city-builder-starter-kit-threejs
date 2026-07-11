@@ -10,7 +10,7 @@ use crate::economy::{
 };
 use crate::lifecycle::ensure_player_resources;
 use crate::hydrology::{sample_hydrology_score, well_capacity_from_hydrology};
-use crate::placement_validation::{building_overlaps_residence_zone, building_overlaps_road_surface, is_on_quarry_pit};
+use crate::placement_validation::{building_overlaps_residence_zone, building_overlaps_road_surface, is_on_quarry_pit, is_open_water};
 use crate::roads::has_building_road_access;
 use crate::simulation::drain_trips_for_building;
 use crate::tables::{Building, WorldConfig};
@@ -110,6 +110,14 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
         return Err("Cannot build on a quarry pit.".to_string());
     }
 
+    if is_open_water(x, z) {
+        return Err(if kind == "well" {
+            "Cannot build a well on open water.".to_string()
+        } else {
+            "Cannot build on water.".to_string()
+        });
+    }
+
     if building_overlaps_residence_zone(ctx, &kind, x, z) {
         return Err("Cannot build inside a residence plot.".to_string());
     }
@@ -144,10 +152,6 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
 
     if def.requires_road && !has_building_road_access(ctx, owner, x, z) {
         return Err("Building must be placed near a road.".to_string());
-    }
-
-    if kind == "well" && sample_hydrology_score(x, z) >= 0.999 {
-        return Err("Cannot build a well on open water.".to_string());
     }
 
     let cost = building_cost(&kind)?;

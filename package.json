@@ -22,6 +22,8 @@
     "test:landmark-access": "npx tsx scripts/testLandmarkAccessParity.mts",
     "test:economy-parity": "npx tsx scripts/testEconomyParity.mts",
     "test:chapel-parish": "npx tsx scripts/testChapelParish.mts",
+    "test:marketplace-gating": "npx tsx scripts/testMarketplaceGating.mts",
+    "test:marketplace-trade": "npx tsx scripts/testMarketplaceTrade.mts",
     "test:settlement-schedule": "npx tsx scripts/testSettlementSchedule.mts",
     "test:world-config": "npx tsx scripts/testWorldConfigAuthority.mts",
     "test": "npm run test:ci",

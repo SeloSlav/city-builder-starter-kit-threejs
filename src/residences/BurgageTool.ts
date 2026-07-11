@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { TerrainProjector } from '../terrain/TerrainProjector.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
-import type { GameState } from '../resources/types.ts';
+import type { BurgageZoneState, GameState } from '../resources/types.ts';
 import { computeResourceTotals } from '../resources/resourceTotals.ts';
 import type { BurgageFrontageEdge, BurgageLayoutResult } from './burgageLayout.ts';
 import { cornersFromPoints, getZoneEdge, MAX_ZONE_DEPTH, MIN_ZONE_DEPTH, resolveBurgageLayout, suggestPlotCount } from './burgageLayout.ts';
@@ -32,6 +32,22 @@ const MIN_POINT_DISTANCE = 1.2;
 const SNAP_DISTANCE = 6;
 const HOVER_PREVIEW_MOVE_THRESHOLD = 0.35;
 const VALIDATION_INTERVAL_MS = 180;
+const ZONE_CORNER_TOLERANCE = 1.0;
+const ZONE_SYNC_WAIT_MS = 2000;
+const ZONE_SYNC_POLL_MS = 50;
+
+type BurgagePlacementUndoEntry = {
+  zoneId: string;
+  commit: BurgageZoneCommit;
+};
+
+type BurgagePlacementRedoEntry = BurgageZoneCommit;
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  const element = target as HTMLElement | null;
+  const tag = element?.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || Boolean(element?.isContentEditable);
+}
 
 export type BurgageZoneCommit = {
   corners: THREE.Vector3[];
@@ -61,9 +77,12 @@ type BurgageToolOptions = {
   isWaterAt: (x: number, z: number) => boolean;
   isQuarryPitAt?: (x: number, z: number) => boolean;
   onCommit: (commit: BurgageZoneCommit) => void | Promise<void>;
+  onDemolishBurgageZone: (zoneId: string) => void | Promise<void>;
   onModeChanged: () => void;
   onPlacementRejected?: (reason: BurgagePlacementFailureReason) => void;
   onPlacementFailed?: (message: string) => void;
+  onUndoFailed?: (message: string) => void;
+  onRedoFailed?: (message: string) => void;
   onPickRejected?: (reason: 'missed_terrain' | 'too_close' | 'off_road' | 'invalid_depth') => void;
   isBlocked: () => boolean;
 };
@@ -95,6 +114,8 @@ export class BurgageTool {
   private frontageCenters: THREE.Vector3[] = [];
   private frontageOffsetSide: 1 | -1 | null = null;
   private hoverCenter: THREE.Vector3 | null = null;
+  private readonly undoStack: BurgagePlacementUndoEntry[] = [];
+  private readonly redoStack: BurgagePlacementRedoEntry[] = [];
 
   constructor(options: BurgageToolOptions) {
     this.options = options;
@@ -103,7 +124,11 @@ export class BurgageTool {
     options.domElement.addEventListener('mousemove', this.onPointerMove);
     options.domElement.addEventListener('mouseenter', this.onPointerEnter);
     options.domElement.addEventListener('mouseleave', this.onPointerLeave);
-    window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keydown', this.onKeyDown, { capture: true });
+  }
+
+  hasUndoRedo(): boolean {
+    return this.undoStack.length > 0 || this.redoStack.length > 0;
   }
 
   isEnabled(): boolean {
@@ -280,7 +305,7 @@ export class BurgageTool {
     this.options.domElement.removeEventListener('mousemove', this.onPointerMove);
     this.options.domElement.removeEventListener('mouseenter', this.onPointerEnter);
     this.options.domElement.removeEventListener('mouseleave', this.onPointerLeave);
-    window.removeEventListener('keydown', this.onKeyDown);
+    window.removeEventListener('keydown', this.onKeyDown, { capture: true });
     this.preview.dispose();
   }
 
@@ -415,8 +440,25 @@ export class BurgageTool {
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
-    if (!this.enabled || this.options.isBlocked()) return;
     if (isTypingTarget(event.target)) return;
+    const key = event.key.toLowerCase();
+
+    if (this.hasUndoRedo() && !this.options.isBlocked()) {
+      if ((event.ctrlKey || event.metaKey) && key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.undoCommitted();
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && (key === 'y' || (event.shiftKey && key === 'z'))) {
+        event.preventDefault();
+        event.stopPropagation();
+        void this.redoCommitted();
+        return;
+      }
+    }
+
+    if (!this.enabled || this.options.isBlocked()) return;
 
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -460,16 +502,56 @@ export class BurgageTool {
       this.rejectCommit(validation.reason);
       return;
     }
+    const commit: BurgageZoneCommit = {
+      corners: this.points.map((point) => point.clone()),
+      frontageEdge: this.frontageEdge,
+      plotCount: validation.layout.plotCount,
+    };
+    const beforeIds = new Set(this.options.getState().burgageZones.keys());
     try {
-      await this.options.onCommit({
-        corners: this.points.map((point) => point.clone()),
-        frontageEdge: this.frontageEdge,
-        plotCount: validation.layout.plotCount,
-      });
+      await this.options.onCommit(commit);
+      const zoneId = await waitForPlacedZone(this.options.getState, beforeIds, commit);
+      if (zoneId) {
+        this.undoStack.push({ zoneId, commit });
+        this.redoStack.length = 0;
+      }
       this.setEnabled(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Residence placement failed.';
       this.options.onPlacementFailed?.(message);
+    }
+  }
+
+  private async undoCommitted(): Promise<void> {
+    const entry = this.undoStack.pop();
+    if (!entry) return;
+    try {
+      await this.options.onDemolishBurgageZone(entry.zoneId);
+      this.redoStack.push(entry.commit);
+    } catch (error) {
+      this.undoStack.push(entry);
+      const message = error instanceof Error ? error.message : 'Residence undo failed.';
+      console.error('Residence undo failed:', error);
+      this.options.onUndoFailed?.(message);
+    }
+  }
+
+  private async redoCommitted(): Promise<void> {
+    const entry = this.redoStack.pop();
+    if (!entry) return;
+    const beforeIds = new Set(this.options.getState().burgageZones.keys());
+    try {
+      await this.options.onCommit(entry);
+      const zoneId = await waitForPlacedZone(this.options.getState, beforeIds, entry);
+      if (!zoneId) {
+        throw new Error('Redo could not find the placed residence zone.');
+      }
+      this.undoStack.push({ zoneId, commit: entry });
+    } catch (error) {
+      this.redoStack.push(entry);
+      const message = error instanceof Error ? error.message : 'Residence redo failed.';
+      console.error('Residence redo failed:', error);
+      this.options.onRedoFailed?.(message);
     }
   }
 
@@ -915,8 +997,44 @@ export class BurgageTool {
   }
 }
 
-function isTypingTarget(target: EventTarget | null): boolean {
-  const element = target as HTMLElement | null;
-  const tag = element?.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || Boolean(element?.isContentEditable);
+function zoneMatchesCommit(zone: BurgageZoneState, commit: BurgageZoneCommit): boolean {
+  if (zone.frontageEdge !== commit.frontageEdge) return false;
+  const zoneCorners = [zone.cornerA, zone.cornerB, zone.cornerC, zone.cornerD];
+  for (let i = 0; i < 4; i++) {
+    const corner = zoneCorners[i];
+    const commitCorner = commit.corners[i];
+    if (!commitCorner) return false;
+    if (Math.hypot(corner.x - commitCorner.x, corner.z - commitCorner.z) > ZONE_CORNER_TOLERANCE) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function findPlacedZoneId(
+  zones: Map<string, BurgageZoneState>,
+  beforeIds: Set<string>,
+  commit: BurgageZoneCommit,
+): string | null {
+  for (const zone of zones.values()) {
+    if (beforeIds.has(zone.id)) continue;
+    if (zoneMatchesCommit(zone, commit)) return zone.id;
+  }
+  return null;
+}
+
+async function waitForPlacedZone(
+  getState: () => GameState,
+  beforeIds: Set<string>,
+  commit: BurgageZoneCommit,
+): Promise<string | null> {
+  const deadline = performance.now() + ZONE_SYNC_WAIT_MS;
+  while (performance.now() < deadline) {
+    const zoneId = findPlacedZoneId(getState().burgageZones, beforeIds, commit);
+    if (zoneId) return zoneId;
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, ZONE_SYNC_POLL_MS);
+    });
+  }
+  return findPlacedZoneId(getState().burgageZones, beforeIds, commit);
 }

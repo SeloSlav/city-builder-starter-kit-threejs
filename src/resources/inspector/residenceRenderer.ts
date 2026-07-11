@@ -11,6 +11,12 @@ import {
   residenceFirewoodRunwayDays,
   SIM_TICK_SECONDS,
 } from '../resourceTotals.ts';
+import { RESIDENCE_FOOD_CAPACITY } from '../../generated/gameBalance.ts';
+import {
+  formatFoodRunwayDays,
+  residenceFoodRunwayDays,
+} from '../../logistics/foodLogistics.ts';
+import { formatWaterRunwayDays, residenceWaterRunwayDays } from '../../logistics/waterLogistics.ts';
 import { effectiveResidenceSettleTicks } from '../../economy/chapelCommunity.ts';
 import { formatHouseholdWealth } from '../../economy/householdWealth.ts';
 import { DEFAULT_PARISH_POLICY } from '../../economy/chapelParish.ts';
@@ -58,11 +64,22 @@ export function renderResidenceInspector(
   const firewoodRunwayLabel = runwayDays == null
     ? '—'
     : formatFirewoodRunwayDays(runwayDays);
+  const waterRunwayDays = residenceWaterRunwayDays(residence);
+  const waterRunwayLabel = waterRunwayDays == null
+    ? '—'
+    : formatWaterRunwayDays(waterRunwayDays);
+  const foodRunwayDays = residenceFoodRunwayDays(residence);
+  const foodRunwayLabel = foodRunwayDays == null
+    ? '—'
+    : formatFoodRunwayDays(foodRunwayDays);
   const lodgeLabel = servingLodge
     ? context.worldQueries.getBuildingLabel(servingLodge.kind)
     : 'None on branch';
   const wellLabel = servingWell
     ? context.worldQueries.getBuildingLabel(servingWell.kind)
+    : 'None on branch';
+  const foodSupplierLabel = servingFoodSupplier
+    ? context.worldQueries.getBuildingLabel(servingFoodSupplier.kind)
     : 'None on branch';
   const capacity = residence.populationCapacity;
   const settlersRemaining = Math.max(0, capacity - residence.population);
@@ -103,8 +120,12 @@ export function renderResidenceInspector(
       <li><span>Firewood stock</span><span>${Math.round(getNeedStock(residence.needs, 'firewood'))} / ${RESIDENCE_FIREWOOD_CAPACITY}</span></li>
       <li><span>Firewood runway</span><span>${firewoodRunwayLabel}</span></li>
       <li><span>Water stock</span><span>${Math.round(getNeedStock(residence.needs, 'water'))} / ${RESIDENCE_WATER_CAPACITY}</span></li>
+      <li><span>Water runway</span><span>${waterRunwayLabel}</span></li>
+      <li><span>Food stock</span><span>${Math.round(getNeedStock(residence.needs, 'food'))} / ${RESIDENCE_FOOD_CAPACITY}</span></li>
+      <li><span>Food runway</span><span>${foodRunwayLabel}</span></li>
       <li><span>Serving lodge</span><span>${lodgeLabel}</span></li>
       <li><span>Serving well</span><span>${wellLabel}</span></li>
+      <li><span>Serving food supplier</span><span>${foodSupplierLabel}</span></li>
       <li><span>Chapel link</span><span>${community.hasChapelAccess ? 'Staffed parish on the road' : 'None on branch'}</span></li>
       <li><span>Road access</span><span>${roadAccess}</span></li>
       <li><span>Build cost</span><span>${formatBuildingCost(singleCost)}</span></li>

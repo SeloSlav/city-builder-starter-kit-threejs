@@ -320,11 +320,23 @@ export async function bootstrapAppSession(
         plotCount: commit.plotCount,
       });
     },
+    onDemolishBurgageZone: async (zoneId) => {
+      if (!spacetimeStore.isConnected) {
+        throw new Error('SpacetimeDB is not connected. Start the local server and refresh.');
+      }
+      await spacetimeStore.demolishBurgageZone(zoneId);
+    },
     onModeChanged: () => bridge.syncToolbar(),
     onPlacementRejected: (reason) => {
       toastManager?.showMessageId(burgagePlacementReasonToToastId(reason), { variant: 'error' });
     },
     onPlacementFailed: (message) => {
+      toastManager?.show(message, { variant: 'error' });
+    },
+    onUndoFailed: (message) => {
+      toastManager?.show(message, { variant: 'error' });
+    },
+    onRedoFailed: (message) => {
       toastManager?.show(message, { variant: 'error' });
     },
     onPickRejected: (reason) => {
@@ -459,6 +471,10 @@ export async function bootstrapAppSession(
 
   const disposeTooltips = mountTooltips(uiRoot);
   toastManager = new ToastManager(uiRoot);
+  spacetimeStore.setRoadSyncFailedListener((error) => {
+    const message = error instanceof Error ? error.message : 'Road sync failed.';
+    toastManager?.show(`Road sync failed: ${message}`, { variant: 'error', durationMs: 6000 });
+  });
   const inspectorActions = createInspectorSpacetimeActions(
     () => spacetimeStore,
     toastManager,

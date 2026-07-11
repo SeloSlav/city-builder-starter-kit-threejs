@@ -58,7 +58,7 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 
 ### Residences
 
-- **Residence zone placement** — draw a frontage edge along a road, then a depth point to define a rectangular plot subdivided into residence parcels.
+- **Residence zone placement** — click two points along a road for the frontage edge, then a third point behind the road to set backyard depth; the plot subdivides into residence parcels.
 - **Residence layout HUD** — adjust plot count (+/−), rotate frontage edge (`F`), and see validity while placing.
 - **Road frontage requirement** — zones must sit within frontage distance of the road network; parcels face the selected frontage edge.
 - **Per-parcel costs** — each residence costs timber and stone on placement; narrow and wide parcels get 2 or 4 population capacity respectively (default 3).
@@ -143,7 +143,9 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 | Place building | Left-click on terrain (building tool active) |
 | Undo last building placement | `Ctrl+Z` / `Cmd+Z` |
 | Redo last building placement | `Ctrl+Y` / `Cmd+Y` |
-| Place residence zone | Click frontage edge, then depth point (residence tool active) |
+| Place residence zone | Click frontage start on road, frontage end on road, then depth behind road |
+| Undo last residence placement | `Ctrl+Z` / `Cmd+Z` |
+| Redo last residence placement | `Ctrl+Y` / `Cmd+Y` |
 | Adjust residence plot count | `+` / `−` buttons in the residence layout HUD |
 | Rotate residence frontage edge | `F` or click the frontage button in the residence layout HUD |
 | Inspect quarry / foraging / building / residence / backyard / river | Left-click on terrain (no tool active) |
@@ -161,7 +163,7 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 | Free look (walk mode) | Hold `Alt` |
 | Exit walk mode | `Escape` (walk mode) |
 | Open game menu | Click the menu button (top-left) or `Escape` (RTS mode) |
-| Start a new world | Game menu → **New world…** (clears the server database, local settings, and player identity) |
+| Start a new world | Game menu → **New world…** (resets the server database when connected; always clears local settings and player identity) |
 
 ## Quick Start
 
@@ -231,7 +233,7 @@ The client connects to `http://localhost:3000` with database name `city-builder`
 
 ### Anonymous identity
 
-No login is required for local dev. On first visit the client generates a random token, stores it in `localStorage`, and reconnects with the same SpacetimeDB identity on refresh. Treasury, buildings, roads, and residences are scoped to that identity.
+No login is required for local dev. On first connect SpacetimeDB issues a signed JWT; the client stores that token in `localStorage` (keyed by database name) and reconnects with the same player identity on refresh. Treasury, buildings, roads, and residences are scoped to that identity.
 
 When real auth is added later, swap the token source in `src/network/identityPersistence.ts` — the connection layer stays the same.
 

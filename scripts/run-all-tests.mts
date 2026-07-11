@@ -9,6 +9,8 @@ const tests = [
   'test:landmark-access',
   'test:economy-parity',
   'test:chapel-parish',
+  'test:marketplace-gating',
+  'test:marketplace-trade',
   'test:settlement-schedule',
   'test:world-config',
 ] as const;

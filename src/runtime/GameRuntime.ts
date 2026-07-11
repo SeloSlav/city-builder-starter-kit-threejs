@@ -15,6 +15,7 @@ export type GameRuntimeCallbacks = {
   onSnapshot: (snapshot: SpacetimeGameSnapshot, gameState: GameState) => void;
   onRoadsHydrated: (roads: RoadNetworkSnapshot) => void;
   onConnectError: (error: unknown) => void;
+  onBootstrapFailed?: (error: unknown) => void;
 };
 
 export class GameRuntime {
@@ -54,6 +55,7 @@ export class GameRuntime {
         this.worldBootstrapped = true;
         void this.ensureWorldBootstrap(snapshot).catch((error) => {
           console.warn('[GameRuntime] Failed to bootstrap world entities', error);
+          this.callbacks.onBootstrapFailed?.(error);
           this.worldBootstrapped = false;
         });
       }

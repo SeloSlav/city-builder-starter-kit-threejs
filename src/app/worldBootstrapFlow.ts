@@ -19,8 +19,11 @@ export async function resolveWorldGenerationSettings(
 }
 
 export async function beginNewWorld(options?: { connected?: boolean }): Promise<void> {
+  const offlineNote = options?.connected === false
+    ? '\n\nSpacetimeDB is offline — the shared server database will NOT be reset until you reconnect.'
+    : '';
   const confirmed = window.confirm(
-    'Start a new world? This clears the shared server database, your saved world settings, and local player identity, then reloads the page.',
+    `Start a new world? This clears your saved world settings and local player identity, then reloads the page.${offlineNote}`,
   );
   if (!confirmed) return;
 

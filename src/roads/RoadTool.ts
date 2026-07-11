@@ -6,7 +6,6 @@ import type { SceneManager } from '../scene/SceneManager.ts';
 import { RoadPreview } from './RoadPreview.ts';
 import {
   validateRoadPlacement,
-  isRoadPlacementValid,
   type RoadPlacementFailureReason,
   type RoadPlacementResult,
 } from './RoadPlacementValidation.ts';
@@ -35,7 +34,7 @@ export type RoadDeleteRequest = {
 
 export type RoadPlacementRejectedEvent = {
   reason: RoadPlacementFailureReason;
-  action: 'exit';
+  action: 'exit' | 'commit';
 };
 
 export class RoadTool {
@@ -159,7 +158,11 @@ export class RoadTool {
     const path = this.buildDraftPath();
     const meshBuilder = this.options.sceneManager.roadMeshBuilder;
     const sampledPath = meshBuilder.samplePath(path, COMMIT_VALIDATION_SAMPLE_SPACING);
-    if (!isRoadPlacementValid(path, this.options.sceneManager, ROAD_WIDTH, MIN_COMMIT_LENGTH, { sampledPath })) return;
+    const validation = validateRoadPlacement(path, this.options.sceneManager, ROAD_WIDTH, MIN_COMMIT_LENGTH, { sampledPath });
+    if (!validation.ok) {
+      this.options.onPlacementRejected?.({ reason: validation.reason, action: 'commit' });
+      return;
+    }
     const snapshot = this.options.network.snapshot();
     const added = this.options.network.addRoadPath(path, ROAD_WIDTH);
     if (added.length === 0) return;

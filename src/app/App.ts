@@ -29,6 +29,7 @@ import { ToastManager } from '../ui/ToastManager.ts';
 import { SettlementPresentationController } from './settlementSchedulePresentation.ts';
 import { SpacetimeSnapshotApplier, type SpacetimeSnapshotApplierDeps } from './spacetimeSnapshotApplier.ts';
 import { bootstrapAppSession, type BootstrappedSession, type SessionLiveContext } from './appBootstrap.ts';
+import { WorldGenerationMismatchError } from '../world/worldConfigAuthority.ts';
 import {
   disposeSettlementWorld,
   syncSettlementWorld,
@@ -153,6 +154,14 @@ export class App {
           clearAuthoritativeWorldGeneration();
           this.toastManager?.show('SpacetimeDB is offline. Run `spacetime start` and refresh.', { variant: 'error' });
         },
+        onBootstrapFailed: (error) => {
+          const message = error instanceof WorldGenerationMismatchError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : 'World bootstrap failed.';
+          this.toastManager?.show(message, { variant: 'error', durationMs: 8000 });
+        },
       },
     );
     this.gameRuntime.start();
@@ -181,6 +190,7 @@ export class App {
           this.onForestReady();
         } catch (error) {
           console.error('Vegetation build failed:', error);
+          this.toastManager?.show('Forest vegetation failed to load. Try refreshing the page.', { variant: 'error' });
         }
       })();
     }, 0);

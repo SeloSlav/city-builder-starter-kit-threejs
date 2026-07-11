@@ -184,6 +184,12 @@ export class BuildToolbar {
               <li><span>Stone camp</span><span class="road-controls-key">S</span></li>
               <li><span>Reforester</span><span class="road-controls-key">F</span></li>
               <li><span>Woodcutter</span><span class="road-controls-key">W</span></li>
+              <li><span>Well</span><span class="road-controls-key">E</span></li>
+              <li><span>Hunter's hall</span><span class="road-controls-key">K</span></li>
+              <li><span>Forager's shed</span><span class="road-controls-key">Y</span></li>
+              <li><span>Chapel</span><span class="road-controls-key">C</span></li>
+              <li><span>Marketplace</span><span class="road-controls-key">P</span></li>
+              <li><span>City admin</span><span class="road-controls-key">A</span></li>
               <li><span>Residence</span><span class="road-controls-key">H</span></li>
             </ul>
           </section>

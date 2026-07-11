@@ -12,7 +12,10 @@ use crate::economy::{
     TIMBER_SALVAGE_FRACTION, STONE_SALVAGE_FRACTION, ResourceAmount,
 };
 use crate::lifecycle::ensure_player_resources;
-use crate::placement_validation::{burgage_zone_overlaps_buildings, is_on_quarry_pit};
+use crate::placement_validation::{
+    burgage_zone_has_road_frontage, burgage_zone_on_water, burgage_zone_overlaps_buildings,
+    is_on_quarry_pit,
+};
 use crate::simulation::{
     cancel_trips_for_residence, clear_backyard_garden_for_residence, clear_residence_needs,
     ensure_residence_needs,
@@ -60,6 +63,14 @@ pub fn place_burgage_zone(
         if is_on_quarry_pit(ctx, corner.x, corner.z) {
             return Err("Cannot place residences on a quarry pit.".to_string());
         }
+    }
+
+    if burgage_zone_on_water(&corners) {
+        return Err("Cannot place residences on water.".to_string());
+    }
+
+    if !burgage_zone_has_road_frontage(ctx, owner, &corners, frontage_edge) {
+        return Err("Frontage must face a road.".to_string());
     }
 
     for existing in ctx.db.burgage_zone().iter() {

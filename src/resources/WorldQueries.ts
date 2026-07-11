@@ -17,6 +17,10 @@ import {
 import { findNearestResourceNodeWithRemaining } from './depletableNodes.ts';
 import { findActiveTripForBuilding, tripRemainingSeconds } from '../logistics/deliveryTrips.ts';
 import type { DeliveryTripState } from '../logistics/deliveryTrips.ts';
+import {
+  foodLaborSplit,
+  foodSupplierDeliveryTripSeconds,
+} from '../logistics/foodLogistics.ts';
 import { lodgeDeliveryTripSeconds, lodgeLaborSplit } from '../logistics/lodgeLogistics.ts';
 import {
   isResidenceInWellRange,
@@ -405,6 +409,22 @@ export class WorldQueries {
 
   getClaimedResidencesForFoodSupplier(supplier: BuildingState): ResidenceState[] {
     return this.foodClaims().getClaimedResidences(supplier);
+  }
+
+  getNextFoodDeliveryTargetForSupplier(supplier: BuildingState): ResidenceState | null {
+    return this.foodClaims().peekNextTarget(supplier);
+  }
+
+  getFoodDeliveryTripSeconds(
+    supplier: BuildingState,
+    target: ResidenceState | null,
+  ): number {
+    return foodSupplierDeliveryTripSeconds(
+      this.getRoadNetwork(),
+      supplier,
+      target,
+      foodLaborSplit(supplier.assignedLabor).delivering,
+    );
   }
 
   getLodgeDeliveryTripSeconds(

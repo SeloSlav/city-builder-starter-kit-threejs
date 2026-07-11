@@ -9,6 +9,7 @@ import {
   sortResidencesForDelivery,
   sortResidencesForWaterDelivery,
 } from './roadLogistics.ts';
+import { peekNextFoodDeliveryTarget } from './foodLogistics.ts';
 
 type ClaimFn = (
   network: RoadNetwork,
@@ -111,5 +112,9 @@ export class FoodDeliveryClaimQueries extends DeliveryClaimQueries {
       (building) => building.kind === 'hunters_hall' || building.kind === 'foragers_shed',
     );
     super(network, suppliers, residences, claimResidencesForFoodSuppliers);
+  }
+
+  protected override peekTarget(supplier: BuildingState, residences: ResidenceState[]): ResidenceState | null {
+    return peekNextFoodDeliveryTarget(this.network, supplier, residences);
   }
 }
