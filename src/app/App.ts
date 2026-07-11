@@ -20,10 +20,6 @@ import {
 } from '../input/PlacementInteractionGate.ts';
 import {
   createInitialGameState,
-  deserializeGameState,
-  gameStateToSnapshot,
-  restoreGameState,
-  serializeGameState,
 } from '../resources/GameState.ts';
 import type { SpacetimeGameSnapshot } from '../data/spacetimeGameStore.ts';
 import type { BuildingState, GameState } from '../resources/types.ts';
@@ -385,8 +381,6 @@ export class App {
         && !roadTool.isEnabled()
         && !buildingTool.isEnabled()
         && !burgageTool.isEnabled(),
-      onExportGameState: () => this.exportGameState(),
-      onImportGameState: () => this.importGameState(),
     });
     this.cityAdminPanel = new CityAdministrationPanel(uiRoot, {
       getGameState: () => this.gameState,
@@ -880,78 +874,16 @@ export class App {
     this.cityAdminPanel?.refresh();
   }
 
-  private exportGameState(): void {
-    if (!this.gameState || !this.roadNetwork) return;
-    const snapshot = gameStateToSnapshot(this.gameState, this.roadNetwork.snapshot());
-    const blob = new Blob([serializeGameState(snapshot)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `medieval-road-state-${Date.now()}.json`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-    this.toastManager?.show('Game state exported.', { variant: 'success' });
-  }
-
-  private importGameState(): void {
-    if (!this.layoutRegistry || !this.roadNetwork || !this.sceneManager) return;
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json,.json';
-    input.addEventListener('change', () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      void file.text().then((raw) => {
-        try {
-          const snapshot = deserializeGameState(raw);
-          if (snapshot.seed !== this.gameState!.seed) {
-            console.warn('Imported state seed differs from current world layout.');
-          }
-          this.gameState = restoreGameState(snapshot, this.layoutRegistry!, this.treeRegistry);
-          this.roadNetwork!.restore(snapshot.roads);
-          this.sceneManager!.syncRoadNetwork(this.roadNetwork!);
-          this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
-          this.syncPlacedBuildingTerrain({ forceMeshUpdate: true });
-          this.syncForestClearanceIfNeeded(this.gameState);
-          this.forestVisualSync?.syncAll(this.gameState.trees);
-          this.roadSelection?.refresh();
-          this.syncResourceUi();
-          this.syncToolbar();
-          this.toastManager?.show('Game state imported.', { variant: 'success' });
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Invalid game state file.';
-          this.toastManager?.show(message, { variant: 'error' });
-        }
-      });
-    });
-    input.click();
-  }
-
   private exposeDevHandles(): void {
-    if (!this.gameState || !this.roadNetwork || !this.layoutRegistry) return;
+    if (!this.gameState || !this.layoutRegistry) return;
     (window as typeof window & {
       __medievalGameState?: {
         getState: () => GameState;
-        export: () => string;
-        import: (raw: string) => void;
         registry: WorldLayoutRegistry;
         treeRegistry: TreeRegistry | null;
       };
     }).__medievalGameState = {
       getState: () => this.gameState!,
-      export: () => serializeGameState(gameStateToSnapshot(this.gameState!, this.roadNetwork!.snapshot())),
-      import: (raw: string) => {
-        const snapshot = deserializeGameState(raw);
-        this.gameState = restoreGameState(snapshot, this.layoutRegistry!, this.treeRegistry);
-        this.roadNetwork!.restore(snapshot.roads);
-        this.sceneManager?.syncRoadNetwork(this.roadNetwork!);
-        this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
-        this.syncPlacedBuildingTerrain({ forceMeshUpdate: true });
-        this.forestVisualSync?.syncAll(this.gameState.trees);
-        this.roadSelection?.refresh();
-        this.syncResourceUi();
-        this.syncToolbar();
-      },
       registry: this.layoutRegistry,
       treeRegistry: this.treeRegistry,
     };

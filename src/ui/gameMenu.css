@@ -89,26 +89,3 @@
   filter: brightness(1.05);
   outline: none;
 }
-
-.game-menu-actions {
-  display: grid;
-  gap: 8px;
-}
-
-.game-menu-action {
-  justify-self: stretch;
-  padding: 10px 14px;
-  color: var(--ink);
-  font-weight: 600;
-  text-align: left;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.game-menu-action:hover,
-.game-menu-action:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
-  outline: none;
-}

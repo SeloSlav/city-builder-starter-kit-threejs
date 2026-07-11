@@ -1,5 +1,3 @@
-import type { RoadNetworkSnapshot } from '../roads/RoadNetwork.ts';
-
 export const RESOURCE_KINDS = ['timber', 'stone', 'firewood', 'water', 'game', 'berries', 'food'] as const;
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];
 
@@ -112,27 +110,6 @@ export type BackyardGardenState = {
 };
 
 export type ResourceStockpile = Record<ResourceKind, number> & { gold: number };
-
-export type GameStateSnapshotV1 = {
-  version: 1;
-  seed: number;
-  tick: number;
-  stockpile: ResourceStockpile;
-  nodes: QuarryNodeState[];
-  roads: RoadNetworkSnapshot;
-};
-
-export type GameStateSnapshot = {
-  version: 2;
-  seed: number;
-  tick: number;
-  stockpile: ResourceStockpile;
-  quarries: QuarryNodeState[];
-  foragingNodes: ForagingNodeState[];
-  trees: TreeEntityState[];
-  buildings: BuildingState[];
-  roads: RoadNetworkSnapshot;
-};
 
 export type GameState = {
   seed: number;

@@ -35,25 +35,30 @@ const BASE_ROCK_COUNT = 86;
 const BASE_UNDERGROWTH_COUNT = 720;
 const BASE_SAPLING_COUNT = 148;
 
-export function createForestSpawnConfig(playableSize: number, terrainSize: number): ForestSpawnConfig {
+export function createForestSpawnConfig(
+  playableSize: number,
+  terrainSize: number,
+  densityScale = 1,
+): ForestSpawnConfig {
   const extent = playableSize * 0.5;
   const terrainExtent = terrainSize * 0.5;
   const areaScale = (playableSize / LEGACY_PLAYABLE_SIZE) ** 2;
   const hillRingAreaScale =
     (terrainSize ** 2 - playableSize ** 2) / (LEGACY_TERRAIN_SIZE ** 2 - LEGACY_PLAYABLE_SIZE ** 2);
+  const density = Math.max(0.25, densityScale);
 
   return {
     extent,
     terrainExtent,
     playableSize,
     terrainSize,
-    treeTargetCount: Math.round(BASE_TREE_COUNT * areaScale),
-    hillEdgeTreeTargetCount: Math.round(BASE_HILL_EDGE_TREE_COUNT * hillRingAreaScale),
-    rockTargetCount: Math.round(BASE_ROCK_COUNT * areaScale),
-    forestCoreCount: Math.round(20 + areaScale * 5),
-    rockOutcropCount: Math.round(9 + areaScale * 5),
-    undergrowthTargetCount: Math.round(BASE_UNDERGROWTH_COUNT * areaScale),
-    saplingTargetCount: Math.round(BASE_SAPLING_COUNT * areaScale),
+    treeTargetCount: Math.round(BASE_TREE_COUNT * areaScale * density),
+    hillEdgeTreeTargetCount: Math.round(BASE_HILL_EDGE_TREE_COUNT * hillRingAreaScale * density),
+    rockTargetCount: Math.round(BASE_ROCK_COUNT * areaScale * Math.sqrt(density)),
+    forestCoreCount: Math.round((20 + areaScale * 5) * Math.sqrt(density)),
+    rockOutcropCount: Math.round((9 + areaScale * 5) * Math.sqrt(density)),
+    undergrowthTargetCount: Math.round(BASE_UNDERGROWTH_COUNT * areaScale * density),
+    saplingTargetCount: Math.round(BASE_SAPLING_COUNT * areaScale * density),
   };
 }
 

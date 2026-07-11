@@ -8,33 +8,63 @@ import {
   mulberry32,
   type ForestCore,
 } from '../props/forestField.ts';
+import {
+  deriveSubSeed,
+  hydrologyRiverCount,
+  hydrologyTributaryCount,
+  resolveWorldDimensions,
+  scaledRiverDrain,
+  forestDensityScale,
+  type WorldGenerationSettings,
+} from './worldGenerationSettings.ts';
+import { DEFAULT_WORLD_GENERATION_SETTINGS } from './worldGenerationSettings.ts';
 
-export const DEFAULT_WORLD_SEED = 0x71a2e0d;
-export const FOREST_LAYOUT_SEED = 0x6a55b1ade;
+export { DEFAULT_WORLD_SEED } from './worldGenerationSettings.ts';
 
 export type WorldLayout = {
+  settings: WorldGenerationSettings;
   seed: number;
   quarryLayout: QuarryLayout;
   foragingLayout: ForagingLayout;
   riverLayout: RiverLayout;
   forestCores: ForestCore[];
+  treeSeed: number;
 };
 
-export function createWorldLayout(seed = DEFAULT_WORLD_SEED): WorldLayout {
-  const riverBounds = Terrain.fullBounds();
-  const riverLayout = RiverLayout.create({ bounds: riverBounds });
+export function createWorldLayout(settings: WorldGenerationSettings = DEFAULT_WORLD_GENERATION_SETTINGS): WorldLayout {
+  const dims = resolveWorldDimensions(settings.mapSize);
+  const riverBounds = Terrain.fullBounds(dims.terrainSize);
+  const riverSeed = deriveSubSeed(settings.seed, 'river');
+  const forestSeed = deriveSubSeed(settings.seed, 'forest');
+  const treeSeed = deriveSubSeed(settings.seed, 'trees');
+  const riverLayout = RiverLayout.create({
+    bounds: riverBounds,
+    seed: riverSeed,
+    riverCount: hydrologyRiverCount(settings.hydrology),
+    tributaryCount: hydrologyTributaryCount(settings.hydrology),
+    drain: scaledRiverDrain(dims.playableHalf),
+  });
   const quarryLayout = QuarryLayout.create({
     bounds: riverBounds,
-    seed,
+    seed: settings.seed,
     riverLayout,
-    playableHalf: 410,
+    playableHalf: dims.playableHalf,
   });
-  const spawnConfig = createForestSpawnConfig(820, 1080);
-  const forestCores = createForestCores(mulberry32(FOREST_LAYOUT_SEED), spawnConfig);
+  const densityScale = forestDensityScale(settings.forestDensity);
+  const spawnConfig = createForestSpawnConfig(dims.playableSize, dims.terrainSize, densityScale);
+  const forestCores = createForestCores(mulberry32(forestSeed), spawnConfig);
   const foragingLayout = ForagingLayout.create({
     forestCores,
-    playableHalf: 410,
-    seed: seed ^ 0x4f0d21,
+    playableHalf: dims.playableHalf,
+    seed: settings.seed ^ 0x4f0d21,
   });
-  return { seed, quarryLayout, foragingLayout, riverLayout, forestCores };
+  return {
+    settings,
+    seed: settings.seed,
+    quarryLayout,
+    foragingLayout,
+    riverLayout,
+    forestCores,
+    treeSeed,
+  };
 }

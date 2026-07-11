@@ -3,7 +3,6 @@
 use spacetimedb::ReducerContext;
 
 use crate::constants::TICK_DT;
-use crate::constants::MIN_DELIVERY_TRIP_SEC;
 use crate::db::*;
 use crate::simulation::delivery_cargo::{
     building_delivery_stock, credit_undeposited_delivery_cargo, deposit_delivery_cargo,
@@ -256,47 +255,4 @@ fn return_trip_cargo_to_building(ctx: &ReducerContext, trip: &DeliveryTrip) {
         credit_undeposited_delivery_cargo(ctx, building.owner, need_kind, remainder);
     }
     ctx.db.building().id().update(building);
-}
-
-/// Remaining round-trip time from authoritative trip state and live path distance.
-pub fn active_trip_remaining_seconds(trip: &DeliveryTrip, path_distance: f64) -> f64 {
-    if path_distance <= 1e-6 {
-        return f64::INFINITY;
-    }
-
-    let workers = trip.delivery_workers.max(1) as f64;
-    let travel_speed = trip.speed_mps * workers;
-    if travel_speed <= 1e-9 {
-        return f64::INFINITY;
-    }
-
-    let travel_per_leg = path_distance / travel_speed;
-    let unload_total = trip.unload_seconds / workers;
-    let progress = trip.progress.clamp(0.0, path_distance);
-
-    let phase = DeliveryTripPhase::from_u8(trip.phase).unwrap_or(DeliveryTripPhase::Outbound);
-    match phase {
-        DeliveryTripPhase::Outbound => {
-            (path_distance - progress) / travel_speed + unload_total + travel_per_leg
-        }
-        DeliveryTripPhase::Unloading => trip.unload_remaining.max(0.0) + travel_per_leg,
-        DeliveryTripPhase::Inbound => (path_distance - progress) / travel_speed,
-    }
-}
-
-pub fn planned_delivery_trip_seconds(
-    one_way_meters: f64,
-    speed_mps: f64,
-    delivery_workers: u32,
-    unload_seconds: f64,
-) -> f64 {
-    if delivery_workers == 0 || speed_mps <= 1e-9 || one_way_meters <= 1e-6 {
-        return f64::INFINITY;
-    }
-
-    let workers = delivery_workers.max(1) as f64;
-    let round_trip_meters = one_way_meters * 2.0;
-    let travel_seconds = round_trip_meters / (speed_mps * workers);
-    let trip_seconds = travel_seconds + unload_seconds / workers;
-    trip_seconds.max(MIN_DELIVERY_TRIP_SEC)
 }

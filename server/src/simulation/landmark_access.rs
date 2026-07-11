@@ -51,25 +51,3 @@ pub fn residence_has_chapel_access(
 ) -> bool {
     find_serving_chapel(tick, owner, residence, chapels).is_some()
 }
-
-pub fn linked_chapel_population(
-    tick: &SimTickContext,
-    owner: Identity,
-    chapel: &Building,
-    residences: &[Residence],
-) -> u32 {
-    if chapel.owner != owner || !is_chapel_staffed(chapel) {
-        return 0;
-    }
-
-    residences
-        .iter()
-        .filter(|residence| {
-            !residence.abandoned
-                && residence.owner == owner
-                && residence.population > 0
-                && tick.road_connected(owner, residence.x, residence.z, chapel.x, chapel.z)
-        })
-        .map(|residence| residence.population)
-        .sum()
-}

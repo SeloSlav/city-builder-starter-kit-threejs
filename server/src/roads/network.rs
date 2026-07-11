@@ -51,7 +51,6 @@ pub struct RoadPathRoute {
 }
 
 struct ShortestPathSolve {
-    distance: f64,
     node_path: Vec<String>,
 }
 
@@ -144,12 +143,6 @@ impl RoadNetwork {
         self.road_path_route(ax, az, bx, bz).map(|route| route.distance)
     }
 
-    /// Full one-way polyline from origin to destination along the road graph.
-    pub fn road_path_polyline(&self, ax: f64, az: f64, bx: f64, bz: f64) -> Option<Vec<[f64; 2]>> {
-        self.road_path_route(ax, az, bx, bz)
-            .map(|route| route.polyline)
-    }
-
     /// Canonical shortest route — distance matches sampled polyline length for movement.
     pub fn road_path_route(&self, ax: f64, az: f64, bx: f64, bz: f64) -> Option<RoadPathRoute> {
         let solve = self.shortest_path_solve(ax, az, bx, bz)?;
@@ -236,10 +229,7 @@ impl RoadNetwork {
             return None;
         }
 
-        Some(ShortestPathSolve {
-            distance: best_total,
-            node_path,
-        })
+        Some(ShortestPathSolve { node_path })
     }
 
     fn build_weighted_graph(&self) -> HashMap<String, Vec<(String, f64)>> {

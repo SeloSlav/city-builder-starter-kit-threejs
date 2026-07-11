@@ -55,6 +55,7 @@ export function generateMarketplaceTradeRust(balance: BalanceWithMarketplaceTrad
     '#[derive(Clone, Copy, Debug, PartialEq, Eq)]',
     'pub enum TradeResourceSpendScope {',
     '    Aggregate,',
+    '    #[allow(dead_code)]',
     '    Treasury,',
     '}',
     '',

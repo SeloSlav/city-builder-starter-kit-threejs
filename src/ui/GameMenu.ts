@@ -13,8 +13,6 @@ type GameMenuOptions = {
   onTipsPreferenceChange: () => void;
   onShadowPreferenceChange: () => void;
   onOpenChange?: (open: boolean) => void;
-  onExportGameState?: () => void;
-  onImportGameState?: () => void;
   showButton?: boolean;
   /** When false, Escape will not open the menu (e.g. first-person walk mode). */
   canOpenFromKeyboard?: () => boolean;
@@ -31,8 +29,6 @@ export class GameMenu {
   private readonly onTipsPreferenceChange: () => void;
   private readonly onShadowPreferenceChange: () => void;
   private readonly onOpenChange?: (open: boolean) => void;
-  private readonly onExportGameState?: () => void;
-  private readonly onImportGameState?: () => void;
   private readonly canOpenFromKeyboard?: () => boolean;
   private readonly onKeyDown: (event: KeyboardEvent) => void;
 
@@ -40,8 +36,6 @@ export class GameMenu {
     this.onTipsPreferenceChange = options.onTipsPreferenceChange;
     this.onShadowPreferenceChange = options.onShadowPreferenceChange;
     this.onOpenChange = options.onOpenChange;
-    this.onExportGameState = options.onExportGameState;
-    this.onImportGameState = options.onImportGameState;
     this.canOpenFromKeyboard = options.canOpenFromKeyboard;
 
     this.menuButton = document.createElement('button');
@@ -74,10 +68,6 @@ export class GameMenu {
           <input type="checkbox" data-building-shadows-checkbox />
           <span>Building shadows</span>
         </label>
-        <div class="game-menu-actions">
-          <button type="button" class="game-menu-action" data-export-state>Export game state</button>
-          <button type="button" class="game-menu-action" data-import-state>Import game state</button>
-        </div>
         <button type="button" class="game-menu-return" data-return-button>Return to game</button>
       </div>
     `;
@@ -87,8 +77,6 @@ export class GameMenu {
     this.treeShadowsCheckbox = this.backdrop.querySelector<HTMLInputElement>('[data-tree-shadows-checkbox]')!;
     this.buildingShadowsCheckbox = this.backdrop.querySelector<HTMLInputElement>('[data-building-shadows-checkbox]')!;
     const returnButton = this.backdrop.querySelector<HTMLButtonElement>('[data-return-button]')!;
-    const exportButton = this.backdrop.querySelector<HTMLButtonElement>('[data-export-state]')!;
-    const importButton = this.backdrop.querySelector<HTMLButtonElement>('[data-import-state]')!;
 
     if (options.showButton !== false) parent.appendChild(this.menuButton);
     parent.appendChild(this.backdrop);
@@ -98,14 +86,6 @@ export class GameMenu {
     this.buildingShadowsCheckbox.checked = areBuildingShadowsEnabled();
     this.menuButton.addEventListener('click', () => this.toggle());
     returnButton.addEventListener('click', () => this.close());
-    exportButton.addEventListener('click', () => {
-      this.onExportGameState?.();
-      this.close();
-    });
-    importButton.addEventListener('click', () => {
-      this.onImportGameState?.();
-      this.close();
-    });
     this.backdrop.addEventListener('click', () => this.close());
     this.dialog.addEventListener('click', (event) => event.stopPropagation());
     this.tipsCheckbox.addEventListener('change', () => {

@@ -18,6 +18,7 @@ export type RiverLayoutOptions = {
   seed?: number;
   riverCount?: number;
   tributaryCount?: number;
+  drain?: { x: number; z: number };
 };
 
 const TAU = Math.PI * 2;
@@ -46,7 +47,7 @@ export class RiverLayout {
     const bounds = options.bounds;
     const riverCount = options.riverCount ?? 4;
     const tributaryCount = options.tributaryCount ?? 1;
-    const drain = { x: 0, z: -88 };
+    const drain = options.drain ?? { x: 0, z: -88 };
 
     const corridors: RiverCorridor[] = [];
     for (let i = 0; i < riverCount; i++) {

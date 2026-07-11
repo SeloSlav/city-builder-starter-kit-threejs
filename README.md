@@ -53,7 +53,6 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 - Building and residence demolish actions from the inspector panel.
 - Click-to-inspect resource panel for quarries, foraging nodes, buildings, residences, backyards, and river access — yields, storage, labor controls, runway days, delivery status, and hydrology grades.
 - Map icons at zoomed-out camera levels for quarries, foraging nodes, and backyard gardens; click an icon to inspect the site.
-- Game state export/import (JSON v2) from the game menu for backups and sharing layouts offline (roads, buildings, trees, quarries, and treasury — residences are server-owned and not included in snapshots).
 
 ### Residences
 
@@ -155,7 +154,6 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 | Free look (walk mode) | Hold `Alt` |
 | Exit walk mode | `Escape` (walk mode) |
 | Open game menu | Click the menu button (top-left) or `Escape` (RTS mode) |
-| Export / import game state | Game menu → **Export game state** / **Import game state** |
 
 ## Quick Start
 
@@ -252,7 +250,6 @@ When real auth is added later, swap the token source in `src/network/identityPer
 
 - **Roads** — drawing, editing, and undo/redo work locally; changes queue and sync to SpacetimeDB when connected.
 - **Buildings & economy** — require SpacetimeDB. If the server is offline, the client shows a toast and building or residence placement is blocked.
-- **Export/import** — JSON game state snapshots (v2) can be saved and restored from the game menu regardless of server status (local client state for roads, buildings, trees, and treasury; residences live on the server and are not in export files).
 
 ## Project Structure
 
@@ -363,5 +360,5 @@ Texture assets are stored under `public/assets/textures`. The road surface uses 
 - WebGPU is attempted first; if initialization fails or the browser lacks support, the app falls back to WebGL automatically.
 - A Vite chunk-size warning may appear because Three.js and post-processing code are bundled into the main client chunk. The build still completes successfully.
 - Forest and grass vegetation build asynchronously after the first frame to keep initial load responsive.
-- `window.__medievalGameState` exposes dev helpers for get/export/import state in the browser console.
+- `window.__medievalGameState` exposes dev helpers for inspecting live client state in the browser console.
 - `dist/`, `node_modules/`, logs, and local editor files are ignored by Git.

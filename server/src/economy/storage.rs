@@ -10,7 +10,6 @@ pub struct StorageCaps {
     pub timber: f64,
     pub firewood: f64,
     pub stone: f64,
-    pub food: f64,
 }
 
 pub fn building_storage_caps(kind: &str) -> StorageCaps {
@@ -21,7 +20,6 @@ pub fn building_storage_caps(kind: &str) -> StorageCaps {
         timber: def.storage_timber,
         firewood: def.storage_firewood,
         stone: def.storage_stone,
-        food: def.storage_food,
     }
 }
 
@@ -44,18 +42,6 @@ pub fn total_timber(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
 
 pub fn total_stone(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
     treasury_stone(ctx, owner) + building_sum(ctx, owner, |building| building.stone)
-}
-
-pub fn total_firewood(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
-    treasury_firewood(ctx, owner)
-        + building_sum(ctx, owner, |building| building.firewood)
-        + residence_need_sum(ctx, owner, 0)
-}
-
-pub fn total_food(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
-    treasury_food(ctx, owner)
-        + building_sum(ctx, owner, |building| building.food)
-        + residence_need_sum(ctx, owner, 2)
 }
 
 pub fn deposit_building(
@@ -225,36 +211,6 @@ fn treasury_stone(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
         .find(&owner)
         .map(|row| row.stone)
         .unwrap_or(0.0)
-}
-
-fn treasury_firewood(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
-    ctx.db
-        .player_resources()
-        .owner()
-        .find(&owner)
-        .map(|row| row.firewood)
-        .unwrap_or(0.0)
-}
-
-fn treasury_food(ctx: &ReducerContext, owner: spacetimedb::Identity) -> f64 {
-    ctx.db
-        .player_resources()
-        .owner()
-        .find(&owner)
-        .map(|row| row.food)
-        .unwrap_or(0.0)
-}
-
-fn residence_need_sum(ctx: &ReducerContext, owner: spacetimedb::Identity, need_kind: u8) -> f64 {
-    let mut total = 0.0;
-    for residence in ctx.db.residence().owner().filter(&owner) {
-        for need in ctx.db.residence_need().residence_id().filter(&residence.id) {
-            if need.need_kind == need_kind {
-                total += need.stock;
-            }
-        }
-    }
-    total
 }
 
 fn building_sum<F>(ctx: &ReducerContext, owner: spacetimedb::Identity, pick: F) -> f64

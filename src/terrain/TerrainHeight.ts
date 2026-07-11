@@ -1,9 +1,9 @@
 import { BuildingTerrainLayout } from '../buildings/BuildingTerrainLayout.ts';
 import type { RiverLayout } from '../rivers/RiverLayout.ts';
 import type { QuarryLayout } from '../quarries/QuarryLayout.ts';
-
-const PLAYABLE_SIZE = 820;
-const TERRAIN_SIZE = 1080;
+import { getActiveWorldDimensions } from '../world/worldGenerationContext.ts';
+import { topographyScale, getActiveWorldGeneration } from '../world/worldGenerationContext.ts';
+import { getActiveWorldGeneration as readSettings } from '../world/worldGenerationContext.ts';
 
 let activeRiverLayout: RiverLayout | null = null;
 let activeQuarryLayout: QuarryLayout | null = null;

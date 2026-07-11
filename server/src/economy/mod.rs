@@ -16,8 +16,8 @@ pub use aggregate_spend::{
     spend_aggregate_firewood, spend_aggregate_food, spend_aggregate_stone, spend_aggregate_timber,
 };
 pub use chapel_coffer::{
-    chapel_coffer_capacity, chapel_coffer_gold, clear_coffer_in_place, collect_chapel_coffer,
-    deposit_chapel_coffer, deposit_coffer_in_place, withdraw_chapel_coffer, withdraw_coffer_in_place,
+    chapel_coffer_gold, collect_chapel_coffer, deposit_chapel_coffer, deposit_coffer_in_place,
+    withdraw_coffer_in_place,
 };
 pub use parish_accounting::{clamp_chapel_coffer_reserve_gold, record_parish_ledger, ParishLedgerKind};
 pub use garden_market_activity::garden_market_activity;
@@ -27,12 +27,11 @@ pub use storage::{
     building_food_storage_cap, building_storage_caps, building_water_storage_cap, credit_treasury_firewood,
     credit_treasury_food, credit_treasury_gold, credit_treasury_stone, credit_treasury_timber, credit_treasury_water,
     deposit_building, deposit_building_food, deposit_building_water, residence_firewood_capacity, residence_food_capacity,
-    residence_water_capacity, spend_treasury_gold, total_firewood, total_food, total_stone, total_timber,
+    residence_water_capacity, spend_treasury_gold, total_stone, total_timber,
     withdraw_building, withdraw_building_food, withdraw_building_water,
 };
 pub use village_economy::{
-    clamp_economic_activity_tax_rate, economic_activity_productivity_multiplier,
-    player_economic_activity_tax_rate, taxed_economic_activity,
+    clamp_economic_activity_tax_rate, player_economic_activity_tax_rate, taxed_economic_activity,
 };
 
 pub use crate::balance_generated::{

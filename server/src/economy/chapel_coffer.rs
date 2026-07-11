@@ -27,7 +27,7 @@ pub fn deposit_coffer_in_place(chapel: &mut Building, amount: f64) -> f64 {
         return 0.0;
     }
 
-    let room = (CHAPEL_COFFER_CAPACITY - chapel_coffer_gold(chapel)).max(0.0);
+    let room = (chapel_coffer_capacity() - chapel_coffer_gold(chapel)).max(0.0);
     let deposited = amount.min(room);
     if deposited <= 1e-9 {
         return 0.0;
@@ -72,21 +72,6 @@ pub fn deposit_chapel_coffer(ctx: &ReducerContext, chapel_id: u64, amount: f64) 
 
     ctx.db.building().id().update(chapel);
     deposited
-}
-
-/// Withdraw gold from a chapel coffer. Returns amount actually removed.
-pub fn withdraw_chapel_coffer(ctx: &ReducerContext, chapel_id: u64, amount: f64) -> f64 {
-    let Some(mut chapel) = ctx.db.building().id().find(&chapel_id) else {
-        return 0.0;
-    };
-
-    let withdrawn = withdraw_coffer_in_place(&mut chapel, amount);
-    if withdrawn <= 1e-9 {
-        return 0.0;
-    }
-
-    ctx.db.building().id().update(chapel);
-    withdrawn
 }
 
 pub fn collect_chapel_coffer(
