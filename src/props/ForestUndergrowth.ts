@@ -515,10 +515,7 @@ function createUndergrowthCardMaterial(
   material.thicknessAttenuationNode = tsl.uniform(1.0);
   material.thicknessPowerNode = tsl.uniform(5.0);
   material.thicknessScaleNode = tsl.uniform(1.5);
-  const tone = tsl.uniform(new THREE.Vector3(0.72, 0.76, 0.64));
-  material.colorNode = tsl
-    .texture(textures.albedo)
-    .mul(tsl.vec4(tsl.attribute('aTint', 'vec3').mul(tone), tsl.float(1)));
+  material.colorNode = tsl.texture(textures.albedo).mul(tsl.vec4(tsl.attribute('aTint', 'vec3'), tsl.float(1)));
   material.positionNode = createRootedFoliageWindPosition(0.16);
 
   const upView = tsl.cameraViewMatrix.mul(tsl.vec4(0, 1, 0, 0)).xyz;

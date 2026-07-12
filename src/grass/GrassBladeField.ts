@@ -496,15 +496,18 @@ function writeSeedThreeChunkInstances(
     const entry = streamMeshes[variantIndex];
     if (!entry?.variant || meshWriteIndices[variantIndex]! - startIndex >= maxInstancesPerMesh) return false;
 
+    const density = forestDensityAt(x, z, forestCores, extent, terrainExtent);
+    if (!micro) {
+      if (density > 0.5 && rng() > 0.55) return false;
+      if (density > 0.34 && rng() > 0.78) return false;
+    } else if (density > 0.3 && rng() > 0.62) {
+      return false;
+    }
+
     localPlacements.push({ x, z, micro });
 
-    const density = forestDensityAt(x, z, forestCores, extent, terrainExtent);
-    if (density > 0.48 && rng() > 0.4) return false;
-    if (density > 0.3 && rng() > 0.66) return false;
-    if (density > 0.22 && micro && rng() > 0.52) return false;
-
     const dry = Math.min(1, Math.max(0, (1 - density - 0.15) * 1.2)) + (rng() < 0.1 ? 0.3 : 0);
-    const forestHeightMul = density > 0.35 ? THREE.MathUtils.lerp(0.72, 0.92, density) : 1;
+    const forestHeightMul = density > 0.38 ? THREE.MathUtils.lerp(0.78, 0.94, density) : 1;
     const heightMul =
       (micro ? THREE.MathUtils.lerp(0.42, 0.72, rng()) : THREE.MathUtils.lerp(0.55, 1.15, rng())) *
       forestHeightMul;

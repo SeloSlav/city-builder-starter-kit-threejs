@@ -198,10 +198,7 @@ export function createSeedThreeGrassMaterial(textures: SeedThreeGrassTextures): 
   mat.thicknessAttenuationNode = tsl.uniform(1.0);
   mat.thicknessPowerNode = tsl.uniform(5.0);
   mat.thicknessScaleNode = tsl.uniform(1.45);
-  const tone = tsl.uniform(new THREE.Vector3(0.74, 0.78, 0.66));
-  mat.colorNode = tsl
-    .texture(textures.tuft)
-    .mul(tsl.vec4(tsl.attribute('aTint', 'vec3').mul(tone), tsl.float(1)));
+  mat.colorNode = tsl.texture(textures.tuft).mul(tsl.vec4(tsl.attribute('aTint', 'vec3'), tsl.float(1)));
   if (textures.tuftRoughness) {
     mat.roughnessMap = textures.tuftRoughness;
     mat.roughness = 1.0;
