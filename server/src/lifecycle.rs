@@ -5,7 +5,7 @@ use crate::balance_generated::{
 };
 use crate::constants::TICK_MICROS;
 use crate::reducers::world_configuration::default_world_config;
-use crate::economy::{STARTING_GOLD, STARTING_STONE, STARTING_TIMBER};
+use crate::economy::{ensure_market_state, STARTING_GOLD, STARTING_STONE, STARTING_TIMBER};
 use crate::db::*;
 use crate::schedule::SimTickSchedule;
 use crate::tables::{ForagingNode, PlayerResources, Quarry, TreeEntity};
@@ -97,6 +97,7 @@ pub fn ensure_player_resources(ctx: &ReducerContext, owner: Identity) {
         parish_upkeep_paid_total: 0.0,
         parish_charity_paid_total: 0.0,
     });
+    ensure_market_state(ctx, owner);
 }
 
 fn ensure_sim_schedule(ctx: &ReducerContext) {

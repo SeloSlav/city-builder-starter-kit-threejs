@@ -45,13 +45,13 @@ export const GRASS_BLADE_REVEAL = {
 } as const;
 
 /** Horizontal radius where 3D grass tufts render — fades before dirt ends. */
-export const GRASS_BLADE_NEAR_RADIUS = 54;
+export const GRASS_BLADE_NEAR_RADIUS = 62;
 
 /** Spatial chunk size for streamed grass batches (larger = fewer pan hitches). */
 export const GRASS_BLADE_CHUNK_SIZE = 8;
 
 /** Target tufts scattered per chunk (organic placement, not a rigid grid). */
-export const GRASS_TUFTS_PER_CHUNK = 78;
+export const GRASS_TUFTS_PER_CHUNK = 96;
 
 /** Extra scatter attempts budget per chunk. */
 export const GRASS_TUFT_SCATTER_ATTEMPTS = GRASS_TUFTS_PER_CHUNK + 56;

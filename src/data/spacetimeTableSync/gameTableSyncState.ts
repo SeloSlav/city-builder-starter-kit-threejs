@@ -1,4 +1,5 @@
 import type { DeliveryTripState } from '../../logistics/deliveryTrips.ts';
+import type { RegionalMarketState } from '../../economy/regionalMarket.ts';
 import type { ParishPolicyState } from '../../economy/chapelParish.ts';
 import type { RoadNetworkSnapshot } from '../../roads/RoadNetwork.ts';
 import type { AuthoritativeWorldGeneration } from '../../world/worldConfigAuthority.ts';
@@ -20,6 +21,7 @@ export type GameTableSyncState = {
   stockpile: ResourceStockpile;
   economicActivityTaxRate: number;
   parishPolicy: ParishPolicyState;
+  marketState: RegionalMarketState;
   quarries: Map<string, QuarryNodeState>;
   foragingNodes: Map<string, ForagingNodeState>;
   trees: Map<string, TreeEntityState>;

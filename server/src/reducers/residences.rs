@@ -166,6 +166,7 @@ pub fn place_burgage_zone(
             settlement_ticks: 0,
             abandoned: false,
             household_wealth: 0.0,
+            last_household_market_tick: 0,
         });
         ensure_residence_needs(ctx, inserted.id);
     }

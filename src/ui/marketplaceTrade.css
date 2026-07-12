@@ -3,6 +3,26 @@
   gap: 12px;
 }
 
+.marketplace-trade-bulletin {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(210, 178, 108, 0.28);
+  background: rgba(210, 178, 108, 0.08);
+  font-size: 0.82rem;
+  color: rgba(238, 232, 220, 0.82);
+  line-height: 1.45;
+  font-style: italic;
+}
+
+.marketplace-trade-option--provender {
+  border-color: rgba(186, 142, 88, 0.22);
+}
+
+.marketplace-trade-option--water {
+  border-color: rgba(88, 142, 186, 0.22);
+}
+
 .marketplace-trade-intro,
 .marketplace-trade-stock {
   margin: 0;

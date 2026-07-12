@@ -212,6 +212,9 @@ export function createSeedThreeGrassMaterial(textures: SeedThreeGrassTextures): 
   mat.normalNode = relief ? tsl.normalize(upView.add(relief.mul(0.45))) : tsl.normalize(upView);
 
   mat.name = 'SeedThree grass clump';
+  mat.polygonOffset = true;
+  mat.polygonOffsetFactor = -2;
+  mat.polygonOffsetUnits = -2;
   return mat;
 }
 

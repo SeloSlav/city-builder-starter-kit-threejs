@@ -63,6 +63,7 @@ import BuildingRow from "./building_table";
 import BurgageZoneRow from "./burgage_zone_table";
 import DeliveryTripRow from "./delivery_trip_table";
 import ForagingNodeRow from "./foraging_node_table";
+import MarketStateRow from "./market_state_table";
 import PlayerResourcesRow from "./player_resources_table";
 import QuarryRow from "./quarry_table";
 import ResidenceRow from "./residence_table";
@@ -155,6 +156,17 @@ const tablesSchema = __schema({
       { name: 'foraging_node_node_id_key', constraint: 'unique', columns: ['nodeId'] },
     ],
   }, ForagingNodeRow),
+  market_state: __table({
+    name: 'market_state',
+    indexes: [
+      { name: 'owner', algorithm: 'btree', columns: [
+        'owner',
+      ] },
+    ],
+    constraints: [
+      { name: 'market_state_owner_key', constraint: 'unique', columns: ['owner'] },
+    ],
+  }, MarketStateRow),
   player_resources: __table({
     name: 'player_resources',
     indexes: [

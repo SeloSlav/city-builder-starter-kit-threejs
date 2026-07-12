@@ -13,6 +13,8 @@ import type { WorldQueries } from './WorldQueries.ts';
 import { renderInspectableTarget } from './inspector/renderInspectableTarget.ts';
 import { handleSupplementalPanelClick } from './inspector/supplementalPanel.ts';
 import type { ParishPolicyState } from '../economy/chapelParish.ts';
+import type { RegionalMarketState } from '../economy/regionalMarket.ts';
+import { DEFAULT_REGIONAL_MARKET_STATE } from '../economy/regionalMarket.ts';
 import type { BackyardGardenKind } from '../residences/backyardGarden.ts';
 import { backyardIconPosition } from '../residences/backyardPosition.ts';
 
@@ -25,6 +27,7 @@ type ResourceInspectorOptions = {
   getState: () => GameState;
   getEconomicActivityTaxRate?: () => number;
   getParishPolicy?: () => ParishPolicyState;
+  getMarketState?: () => RegionalMarketState;
   onDemolishBuilding?: (buildingId: string) => void | Promise<void>;
   onDemolishResidence?: (residenceId: string) => void | Promise<void>;
   onDemolishBurgageZone?: (zoneId: string) => void | Promise<void>;
@@ -369,6 +372,7 @@ export class ResourceInspector {
         ? { getParishPolicy: this.options.getParishPolicy }
         : {}),
       getTradeAvailability: () => computeTradeAvailability(this.options.getState()),
+      getMarketState: () => this.options.getMarketState?.() ?? DEFAULT_REGIONAL_MARKET_STATE,
     });
 
     this.eyebrow.textContent = view.eyebrow;

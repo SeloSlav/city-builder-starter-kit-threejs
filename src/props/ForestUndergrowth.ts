@@ -206,10 +206,10 @@ export function createUndergrowthPlacements(
     const { x, z } = sampled;
 
     if (!isInsidePlayableExtent(x, z, spawnConfig.extent)) continue;
-    if (Math.hypot(x, z) < CENTRAL_CLEARING_RADIUS + rng() * 12) continue;
+    if (Math.hypot(x, z) < CENTRAL_CLEARING_RADIUS * 0.35 + rng() * 10) continue;
 
     const density = forestDensityAt(x, z, forestCores, spawnConfig.extent, spawnConfig.terrainExtent);
-    if (density < 0.18 || rng() > density * 1.12) continue;
+    if (density < 0.12 || rng() > density * 1.05) continue;
 
     const kind = pickUndergrowthKind(rng, density);
     const minDistance =
@@ -396,7 +396,7 @@ function composeUndergrowthMatrix(
   position: THREE.Vector3,
   scaleVector: THREE.Vector3,
 ): number {
-  const y = terrain.getHeightAt(placement.x, placement.z) + 0.05;
+  const y = terrain.getHeightAt(placement.x, placement.z) + 0.08;
   const yaw = placement.yaw + (rng() - 0.5) * 0.24;
   const leanDirection = rng() * TAU;
   const lean = placement.kind === 'fern'
@@ -429,14 +429,14 @@ function pickUndergrowthKind(rng: () => number, density: number): UndergrowthKin
 }
 
 function sampleUndergrowthScale(kind: UndergrowthKind, density: number, rng: () => number): number {
-  const densityMul = THREE.MathUtils.lerp(0.98, 1.14, density) * 1.16;
+  const densityMul = THREE.MathUtils.lerp(1.02, 1.22, density) * 1.24;
   switch (kind) {
     case 'bush':
-      return THREE.MathUtils.lerp(0.52, 0.92, Math.pow(rng(), 0.78)) * densityMul;
+      return THREE.MathUtils.lerp(0.62, 1.08, Math.pow(rng(), 0.78)) * densityMul;
     case 'fern':
-      return THREE.MathUtils.lerp(0.68, 1.18, Math.pow(rng(), 0.7)) * THREE.MathUtils.lerp(0.9, 1.1, density);
+      return THREE.MathUtils.lerp(0.82, 1.36, Math.pow(rng(), 0.7)) * THREE.MathUtils.lerp(0.96, 1.16, density);
     case 'juniper':
-      return THREE.MathUtils.lerp(0.54, 1.04, Math.pow(rng(), 0.84)) * THREE.MathUtils.lerp(1.04, 0.9, density);
+      return THREE.MathUtils.lerp(0.66, 1.18, Math.pow(rng(), 0.84)) * THREE.MathUtils.lerp(1.08, 0.96, density);
     default: {
       const exhaustive: never = kind;
       return exhaustive;
@@ -504,6 +504,9 @@ function createUndergrowthCardMaterial(
   });
   material.name = name;
   material.forceSinglePass = true;
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = -2;
+  material.polygonOffsetUnits = -2;
   material.roughnessMap = textures.roughness;
   if (textures.roughness) material.roughness = 1.0;
 

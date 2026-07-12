@@ -319,10 +319,10 @@ const MARKETPLACE: BuildingDef = BuildingDef {
     storage_timber: 0.0,
     storage_firewood: 0.0,
     storage_stone: 0.0,
-    storage_water: 0.0,
-    storage_food: 0.0,
-    accepts_labor: false,
-    max_labor: 0,
+    storage_water: 48.0,
+    storage_food: 96.0,
+    accepts_labor: true,
+    max_labor: 2,
     work_radius: 0.0,
     action_interval: 0.0,
     pick_radius: 8.0,
@@ -546,15 +546,6 @@ const TRADE_SELL_FIREWOOD: MarketplaceTradeOffer = MarketplaceTradeOffer {
     },
 };
 
-const TRADE_BUY_FOOD: MarketplaceTradeOffer = MarketplaceTradeOffer {
-    id: "buy_food",
-    kind: MarketplaceTradeKind::GoldBuy {
-        resource: TradeResource::Food,
-        amount: 10.0,
-        gold_cost: 12.0,
-    },
-};
-
 const TRADE_SELL_FOOD: MarketplaceTradeOffer = MarketplaceTradeOffer {
     id: "sell_food",
     kind: MarketplaceTradeKind::GoldSell {
@@ -594,8 +585,125 @@ const TRADE_TIMBER_FOR_FIREWOOD: MarketplaceTradeOffer = MarketplaceTradeOffer {
     },
 };
 
-const ALL_MARKETPLACE_TRADES: &[MarketplaceTradeOffer] = &[TRADE_BUY_TIMBER, TRADE_SELL_TIMBER, TRADE_BUY_STONE, TRADE_SELL_STONE, TRADE_BUY_FIREWOOD, TRADE_SELL_FIREWOOD, TRADE_BUY_FOOD, TRADE_SELL_FOOD, TRADE_TIMBER_FOR_STONE, TRADE_STONE_FOR_TIMBER, TRADE_TIMBER_FOR_FIREWOOD];
+const ALL_MARKETPLACE_TRADES: &[MarketplaceTradeOffer] = &[TRADE_BUY_TIMBER, TRADE_SELL_TIMBER, TRADE_BUY_STONE, TRADE_SELL_STONE, TRADE_BUY_FIREWOOD, TRADE_SELL_FIREWOOD, TRADE_SELL_FOOD, TRADE_TIMBER_FOR_STONE, TRADE_STONE_FOR_TIMBER, TRADE_TIMBER_FOR_FIREWOOD];
 
 pub fn marketplace_trade_offer(id: &str) -> Option<&'static MarketplaceTradeOffer> {
     ALL_MARKETPLACE_TRADES.iter().find(|offer| offer.id == id)
+}
+
+pub const MARKET_PRICE_UPDATE_INTERVAL_TICKS: u64 = 150;
+pub const MARKET_PRICE_MULTIPLIER_MIN: f64 = 0.78;
+pub const MARKET_PRICE_MULTIPLIER_MAX: f64 = 1.38;
+pub const MARKET_REGIONAL_INDEX_DRIFT: f64 = 0.014;
+pub const MARKET_LOCAL_FOOD_DEMAND_WEIGHT: f64 = 0.32;
+pub const MARKET_CARAVAN_DELIVERY_WORKERS: u32 = 1;
+pub const MARKET_CARAVAN_LABOR_PER_WORKER: u32 = 1;
+pub const MARKET_CARAVAN_FOOD_PER_DELIVERY: f64 = 4.0;
+pub const MARKET_CARAVAN_WATER_PER_DELIVERY: f64 = 3.0;
+pub const HOUSEHOLD_AUTO_BUY_RUNWAY_DAYS: f64 = 0.75;
+pub const HOUSEHOLD_AUTO_BUY_COOLDOWN_TICKS: u64 = 450;
+pub const CHAPEL_CHARITY_WEALTH_FRACTION: f64 = 0.4;
+pub const CHAPEL_CHARITY_RELIEF_FRACTION: f64 = 0.6;
+
+#[derive(Clone, Copy, Debug)]
+pub struct MarketCommodityOffer {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub origin: &'static str,
+    pub description: &'static str,
+    pub food_amount: f64,
+    pub base_gold_cost: f64,
+}
+
+const COMMODITY_BUY_PORK: MarketCommodityOffer = MarketCommodityOffer {
+    id: "buy_pork",
+    label: "Smoked pork",
+    origin: "Kvarner lowlands",
+    description: "Salt-cured pork — staple provender for hungry households",
+    food_amount: 8.0,
+    base_gold_cost: 10.0,
+};
+
+const COMMODITY_BUY_LAMB: MarketCommodityOffer = MarketCommodityOffer {
+    id: "buy_lamb",
+    label: "Gorski Kotar lamb",
+    origin: "Mountain pastures",
+    description: "Pastured lamb from the highland flocks — a regional specialty",
+    food_amount: 6.0,
+    base_gold_cost: 13.0,
+};
+
+const COMMODITY_BUY_VEAL: MarketCommodityOffer = MarketCommodityOffer {
+    id: "buy_veal",
+    label: "Istrian veal",
+    origin: "Coastal caravans",
+    description: "Tender veal from Istrian herds — premium but nourishing",
+    food_amount: 5.0,
+    base_gold_cost: 15.0,
+};
+
+const COMMODITY_BUY_KOBASICA: MarketCommodityOffer = MarketCommodityOffer {
+    id: "buy_kobasica",
+    label: "Dried sausage",
+    origin: "Lika smokehouses",
+    description: "Smoked kobasica — keeps well on the road",
+    food_amount: 4.0,
+    base_gold_cost: 8.0,
+};
+
+const COMMODITY_BUY_CHEESE: MarketCommodityOffer = MarketCommodityOffer {
+    id: "buy_cheese",
+    label: "Mountain cheese",
+    origin: "Gorski Kotar dairies",
+    description: "Hard sheep's cheese from upland dairies",
+    food_amount: 3.0,
+    base_gold_cost: 7.0,
+};
+
+const ALL_MARKET_COMMODITIES: &[MarketCommodityOffer] = &[COMMODITY_BUY_PORK, COMMODITY_BUY_LAMB, COMMODITY_BUY_VEAL, COMMODITY_BUY_KOBASICA, COMMODITY_BUY_CHEESE];
+
+pub fn all_market_food_commodities() -> &'static [MarketCommodityOffer] {
+    ALL_MARKET_COMMODITIES
+}
+
+pub fn market_commodity_offer(id: &str) -> Option<&'static MarketCommodityOffer> {
+    ALL_MARKET_COMMODITIES.iter().find(|offer| offer.id == id)
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct MarketWaterCommodityOffer {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub origin: &'static str,
+    pub description: &'static str,
+    pub water_amount: f64,
+    pub base_gold_cost: f64,
+}
+
+const WATER_COMMODITY_BUY_WATER_CASK: MarketWaterCommodityOffer = MarketWaterCommodityOffer {
+    id: "buy_water_cask",
+    label: "Water cask",
+    origin: "Plitvice springs",
+    description: "Oak casks of spring water from the karst highlands",
+    water_amount: 6.0,
+    base_gold_cost: 5.0,
+};
+
+const WATER_COMMODITY_BUY_WATER_BARREL: MarketWaterCommodityOffer = MarketWaterCommodityOffer {
+    id: "buy_water_barrel",
+    label: "Spring water barrel",
+    origin: "Gorski Kotar wells",
+    description: "Barrelled well water hauled by mule train",
+    water_amount: 10.0,
+    base_gold_cost: 8.0,
+};
+
+const ALL_MARKET_WATER_COMMODITIES: &[MarketWaterCommodityOffer] = &[WATER_COMMODITY_BUY_WATER_CASK, WATER_COMMODITY_BUY_WATER_BARREL];
+
+pub fn all_market_water_commodities() -> &'static [MarketWaterCommodityOffer] {
+    ALL_MARKET_WATER_COMMODITIES
+}
+
+pub fn market_water_commodity_offer(id: &str) -> Option<&'static MarketWaterCommodityOffer> {
+    ALL_MARKET_WATER_COMMODITIES.iter().find(|offer| offer.id == id)
 }

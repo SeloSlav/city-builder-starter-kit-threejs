@@ -2,8 +2,10 @@
 
 mod aggregate_spend;
 mod chapel_coffer;
+mod marketplace_orders;
 mod marketplace_trade;
 mod marketplace_trade_policy;
+mod regional_market;
 mod garden_market_activity;
 mod household_wealth;
 mod population;
@@ -12,6 +14,13 @@ mod parish_accounting;
 mod village_economy;
 
 pub use marketplace_trade::execute_marketplace_trade;
+pub use marketplace_orders::{
+    best_affordable_food_commodity, best_affordable_water_commodity,
+    nearest_marketplace_for_residence, order_food_commodity, order_water_commodity, MarketGoldPayer,
+};
+pub use regional_market::{
+    ensure_market_state, scaled_gold_cost, step_regional_markets,
+};
 pub use aggregate_spend::{
     spend_aggregate_firewood, spend_aggregate_food, spend_aggregate_stone, spend_aggregate_timber,
 };

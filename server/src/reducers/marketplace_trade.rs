@@ -28,7 +28,7 @@ pub fn marketplace_trade(
         return Err("Only marketplaces can broker foreign trade.".to_string());
     }
 
-    execute_marketplace_trade(ctx, owner, trade_id.trim())?;
+    execute_marketplace_trade(ctx, owner, building_id, trade_id.trim())?;
 
     Ok(())
 }

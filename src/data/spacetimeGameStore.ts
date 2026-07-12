@@ -21,6 +21,10 @@ import type { RoadNetworkSnapshot } from '../roads/RoadNetwork.ts';
 import type { BackyardGardenKind } from '../residences/backyardGarden.ts';
 import { ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT } from '../economy/villageEconomy.ts';
 import { DEFAULT_PARISH_POLICY, type ParishPolicyState } from '../economy/chapelParish.ts';
+import {
+  DEFAULT_REGIONAL_MARKET_STATE,
+  type RegionalMarketState,
+} from '../economy/regionalMarket.ts';
 import type {
   BackyardGardenState,
   BuildingKind,
@@ -57,6 +61,7 @@ export type SpacetimeGameSnapshot = {
   stockpile: ResourceStockpile;
   economicActivityTaxRate: number;
   parishPolicy: ParishPolicyState;
+  marketState: RegionalMarketState;
   quarries: Map<string, QuarryNodeState>;
   foragingNodes: Map<string, ForagingNodeState>;
   trees: Map<string, TreeEntityState>;
@@ -80,6 +85,7 @@ function createEmptyTableState(): GameTableSyncState {
     stockpile: createEmptyStockpile(),
     economicActivityTaxRate: ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT,
     parishPolicy: { ...DEFAULT_PARISH_POLICY },
+    marketState: { ...DEFAULT_REGIONAL_MARKET_STATE },
     quarries: new Map(),
     foragingNodes: new Map(),
     trees: new Map(),
@@ -129,6 +135,7 @@ export class SpacetimeGameStore {
       stockpile: { ...state.stockpile },
       economicActivityTaxRate: state.economicActivityTaxRate,
       parishPolicy: { ...state.parishPolicy },
+      marketState: { ...state.marketState },
       quarries: new Map(state.quarries),
       foragingNodes: new Map(state.foragingNodes),
       trees: new Map(state.trees),

@@ -45,13 +45,87 @@
       { "id": "sell_stone", "kind": "goldSell", "resource": "stone", "amount": 10, "goldYield": 14 },
       { "id": "buy_firewood", "kind": "goldBuy", "resource": "firewood", "amount": 10, "goldCost": 8 },
       { "id": "sell_firewood", "kind": "goldSell", "resource": "firewood", "amount": 10, "goldYield": 5 },
-      { "id": "buy_food", "kind": "goldBuy", "resource": "food", "amount": 10, "goldCost": 12 },
       { "id": "sell_food", "kind": "goldSell", "resource": "food", "amount": 10, "goldYield": 8 },
       { "id": "timber_for_stone", "kind": "barter", "give": "timber", "giveAmount": 25, "receive": "stone", "receiveAmount": 10 },
       { "id": "stone_for_timber", "kind": "barter", "give": "stone", "giveAmount": 10, "receive": "timber", "receiveAmount": 20 },
       { "id": "timber_for_firewood", "kind": "barter", "give": "timber", "giveAmount": 10, "receive": "firewood", "receiveAmount": 18 }
     ]
   },
+  "regionalMarket": {
+    "priceUpdateIntervalTicks": 150,
+    "priceMultiplierMin": 0.78,
+    "priceMultiplierMax": 1.38,
+    "regionalIndexDrift": 0.014,
+    "localFoodDemandWeight": 0.32,
+    "caravanDeliveryWorkers": 1,
+    "caravanLaborPerWorker": 1,
+    "caravanFoodPerDelivery": 4,
+    "caravanWaterPerDelivery": 3,
+    "householdAutoBuyRunwayDays": 0.75,
+    "householdAutoBuyCooldownTicks": 450,
+    "chapelCharityWealthFraction": 0.4,
+    "chapelCharityReliefFraction": 0.6
+  },
+  "marketCommodities": [
+    {
+      "id": "buy_pork",
+      "label": "Smoked pork",
+      "origin": "Kvarner lowlands",
+      "description": "Salt-cured pork — staple provender for hungry households",
+      "foodAmount": 8,
+      "baseGoldCost": 10
+    },
+    {
+      "id": "buy_lamb",
+      "label": "Gorski Kotar lamb",
+      "origin": "Mountain pastures",
+      "description": "Pastured lamb from the highland flocks — a regional specialty",
+      "foodAmount": 6,
+      "baseGoldCost": 13
+    },
+    {
+      "id": "buy_veal",
+      "label": "Istrian veal",
+      "origin": "Coastal caravans",
+      "description": "Tender veal from Istrian herds — premium but nourishing",
+      "foodAmount": 5,
+      "baseGoldCost": 15
+    },
+    {
+      "id": "buy_kobasica",
+      "label": "Dried sausage",
+      "origin": "Lika smokehouses",
+      "description": "Smoked kobasica — keeps well on the road",
+      "foodAmount": 4,
+      "baseGoldCost": 8
+    },
+    {
+      "id": "buy_cheese",
+      "label": "Mountain cheese",
+      "origin": "Gorski Kotar dairies",
+      "description": "Hard sheep's cheese from upland dairies",
+      "foodAmount": 3,
+      "baseGoldCost": 7
+    }
+  ],
+  "marketWaterCommodities": [
+    {
+      "id": "buy_water_cask",
+      "label": "Water cask",
+      "origin": "Plitvice springs",
+      "description": "Oak casks of spring water from the karst highlands",
+      "waterAmount": 6,
+      "baseGoldCost": 5
+    },
+    {
+      "id": "buy_water_barrel",
+      "label": "Spring water barrel",
+      "origin": "Gorski Kotar wells",
+      "description": "Barrelled well water hauled by mule train",
+      "waterAmount": 10,
+      "baseGoldCost": 8
+    }
+  ],
   "population": {
     "starting": 5,
     "perResidence": 3,
@@ -266,13 +340,13 @@
     "marketplace": {
       "label": "Marketplace",
       "cost": { "timber": 32, "stone": 26 },
-      "storage": { "timber": 0, "firewood": 0, "stone": 0, "water": 0, "food": 0 },
+      "storage": { "timber": 0, "firewood": 0, "stone": 0, "water": 48, "food": 96 },
       "workRadius": 0,
       "pickRadius": 8,
       "harvestInterval": 0,
       "regrowRatePerSecond": 0,
-      "maxLabor": 0,
-      "acceptsLabor": false,
+      "maxLabor": 2,
+      "acceptsLabor": true,
       "requiresRoad": true,
       "facesRoad": true,
       "requiresMatureTrees": false,

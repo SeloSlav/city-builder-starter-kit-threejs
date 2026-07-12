@@ -230,8 +230,8 @@ export const BUILDING_DEFINITIONS = {
     pickRadius: 8,
     harvestInterval: 0,
     regrowRatePerSecond: 0,
-    maxLabor: 0,
-    acceptsLabor: false,
+    maxLabor: 2,
+    acceptsLabor: true,
     requiresRoad: true,
     facesRoad: true,
   },
@@ -258,7 +258,7 @@ export const BUILDING_STORAGE_CAPS = {
   hunters_hall: { timber: 0, firewood: 0, stone: 0, food: 100 },
   foragers_shed: { timber: 0, firewood: 0, stone: 0, food: 80 },
   chapel: { timber: 0, firewood: 0, stone: 0 },
-  marketplace: { timber: 0, firewood: 0, stone: 0 },
+  marketplace: { timber: 0, firewood: 0, stone: 0, water: 48, food: 96 },
 } as const satisfies Record<BuildingKind, StorageCaps>;
 
 export const BACKYARD_GARDEN_KINDS = ["apple_orchard","cherry_orchard","vegetable_garden","flower_garden","herb_garden"] as const;
@@ -367,7 +367,6 @@ export const MARKETPLACE_TRADE_OFFERS = [
   {"id":"sell_stone","kind":"goldSell","resource":"stone","amount":10,"goldYield":14},
   {"id":"buy_firewood","kind":"goldBuy","resource":"firewood","amount":10,"goldCost":8},
   {"id":"sell_firewood","kind":"goldSell","resource":"firewood","amount":10,"goldYield":5},
-  {"id":"buy_food","kind":"goldBuy","resource":"food","amount":10,"goldCost":12},
   {"id":"sell_food","kind":"goldSell","resource":"food","amount":10,"goldYield":8},
   {"id":"timber_for_stone","kind":"barter","give":"timber","giveAmount":25,"receive":"stone","receiveAmount":10},
   {"id":"stone_for_timber","kind":"barter","give":"stone","giveAmount":10,"receive":"timber","receiveAmount":20},
@@ -375,3 +374,47 @@ export const MARKETPLACE_TRADE_OFFERS = [
 ] as const satisfies readonly MarketplaceTradeOffer[];
 
 export type MarketplaceTradeOfferId = (typeof MARKETPLACE_TRADE_OFFERS)[number]['id'];
+
+export const MARKET_PRICE_UPDATE_INTERVAL_TICKS = 150;
+export const MARKET_PRICE_MULTIPLIER_MIN = 0.78;
+export const MARKET_PRICE_MULTIPLIER_MAX = 1.38;
+export const MARKET_CARAVAN_FOOD_PER_DELIVERY = 4;
+export const MARKET_CARAVAN_WATER_PER_DELIVERY = 3;
+export const MARKET_CARAVAN_DELIVERY_WORKERS = 1;
+export const MARKET_CARAVAN_LABOR_PER_WORKER = 1;
+export const HOUSEHOLD_AUTO_BUY_RUNWAY_DAYS = 0.75;
+
+export type MarketCommodityOffer = {
+  id: string;
+  label: string;
+  origin: string;
+  description: string;
+  foodAmount: number;
+  baseGoldCost: number;
+};
+
+export const MARKET_COMMODITIES = [
+  {"id":"buy_pork","label":"Smoked pork","origin":"Kvarner lowlands","description":"Salt-cured pork — staple provender for hungry households","foodAmount":8,"baseGoldCost":10},
+  {"id":"buy_lamb","label":"Gorski Kotar lamb","origin":"Mountain pastures","description":"Pastured lamb from the highland flocks — a regional specialty","foodAmount":6,"baseGoldCost":13},
+  {"id":"buy_veal","label":"Istrian veal","origin":"Coastal caravans","description":"Tender veal from Istrian herds — premium but nourishing","foodAmount":5,"baseGoldCost":15},
+  {"id":"buy_kobasica","label":"Dried sausage","origin":"Lika smokehouses","description":"Smoked kobasica — keeps well on the road","foodAmount":4,"baseGoldCost":8},
+  {"id":"buy_cheese","label":"Mountain cheese","origin":"Gorski Kotar dairies","description":"Hard sheep's cheese from upland dairies","foodAmount":3,"baseGoldCost":7},
+] as const satisfies readonly MarketCommodityOffer[];
+
+export type MarketCommodityId = (typeof MARKET_COMMODITIES)[number]['id'];
+
+export type MarketWaterCommodityOffer = {
+  id: string;
+  label: string;
+  origin: string;
+  description: string;
+  waterAmount: number;
+  baseGoldCost: number;
+};
+
+export const MARKET_WATER_COMMODITIES = [
+  {"id":"buy_water_cask","label":"Water cask","origin":"Plitvice springs","description":"Oak casks of spring water from the karst highlands","waterAmount":6,"baseGoldCost":5},
+  {"id":"buy_water_barrel","label":"Spring water barrel","origin":"Gorski Kotar wells","description":"Barrelled well water hauled by mule train","waterAmount":10,"baseGoldCost":8},
+] as const satisfies readonly MarketWaterCommodityOffer[];
+
+export type MarketWaterCommodityId = (typeof MARKET_WATER_COMMODITIES)[number]['id'];

@@ -169,6 +169,9 @@ pub struct Residence {
     /// Gold saved by the household from marketplace garden sales (capped).
     #[default(0.0)]
     pub household_wealth: f64,
+    /// Last sim tick this household auto-ordered provender from the marketplace.
+    #[default(0u64)]
+    pub last_household_market_tick: u64,
 }
 
 #[spacetimedb::table(
@@ -185,6 +188,37 @@ pub struct BackyardGarden {
     pub owner: Identity,
     /// Matches `BackyardGardenKind` in balance_generated.
     pub kind: u8,
+}
+
+/// Simulated regional market prices and neighbor trade conditions for a player.
+#[spacetimedb::table(accessor = market_state, public)]
+pub struct MarketState {
+    #[primary_key]
+    pub owner: Identity,
+    /// Buy/sell price multipliers per tradable resource (1.0 = base balance price).
+    #[default(1.0)]
+    pub timber_price_mult: f64,
+    #[default(1.0)]
+    pub stone_price_mult: f64,
+    #[default(1.0)]
+    pub firewood_price_mult: f64,
+    #[default(1.0)]
+    pub food_price_mult: f64,
+    /// Simulated neighboring-region supply/demand indices (0–1).
+    #[default(0.5)]
+    pub regional_timber_supply: f64,
+    #[default(0.5)]
+    pub regional_stone_supply: f64,
+    #[default(0.5)]
+    pub regional_firewood_demand: f64,
+    #[default(0.5)]
+    pub regional_food_demand: f64,
+    #[default(0.5)]
+    pub regional_food_supply: f64,
+    #[default(0u64)]
+    pub last_price_tick: u64,
+    /// Flavor bulletin for the marketplace UI.
+    pub bulletin: String,
 }
 
 /// Active road delivery agent — position and phase are authoritative; cargo unloads on arrival.

@@ -5,6 +5,19 @@ import {
   type MarketplaceTradeOffer,
   type TradeResourceKind,
 } from '../generated/gameBalance.ts';
+import type { RegionalMarketState } from './regionalMarket.ts';
+import {
+  DEFAULT_REGIONAL_MARKET_STATE,
+  describeCommodityOffer,
+  describeMarketplaceTradeOfferWithPrices,
+  describeWaterCommodityOffer,
+  effectiveCommodityGoldCost,
+  effectiveTradeGoldCost,
+  effectiveWaterCommodityGoldCost,
+  MARKET_COMMODITIES,
+  MARKET_WATER_COMMODITIES,
+} from './regionalMarket.ts';
+import type { MarketCommodityOffer, MarketWaterCommodityOffer } from '../generated/gameBalance.ts';
 
 export type MarketplaceTradeAvailability = Record<TradeResourceKind | 'gold', number>;
 
@@ -21,26 +34,23 @@ export function tradeResourceLabel(resource: TradeResourceKind | 'gold'): string
 }
 
 export function describeMarketplaceTradeOffer(offer: MarketplaceTradeOffer): string {
-  switch (offer.kind) {
-    case 'goldBuy':
-      return `Buy ${offer.amount} ${tradeResourceLabel(offer.resource).toLowerCase()} for ${offer.goldCost} gold`;
-    case 'goldSell':
-      return `Sell ${offer.amount} ${tradeResourceLabel(offer.resource).toLowerCase()} for ${offer.goldYield} gold`;
-    case 'barter':
-      return `Trade ${offer.giveAmount} ${tradeResourceLabel(offer.give).toLowerCase()} for ${offer.receiveAmount} ${tradeResourceLabel(offer.receive).toLowerCase()}`;
-    default: {
-      const unhandled: never = offer;
-      return unhandled;
-    }
-  }
+  return describeMarketplaceTradeOfferWithPrices(offer, DEFAULT_REGIONAL_MARKET_STATE, tradeResourceLabel);
+}
+
+export function describeMarketplaceTradeOfferForMarket(
+  offer: MarketplaceTradeOffer,
+  marketState: RegionalMarketState,
+): string {
+  return describeMarketplaceTradeOfferWithPrices(offer, marketState, tradeResourceLabel);
 }
 
 export function marketplaceTradeOfferCost(
   offer: MarketplaceTradeOffer,
+  marketState: RegionalMarketState = DEFAULT_REGIONAL_MARKET_STATE,
 ): { resource: TradeResourceKind | 'gold'; amount: number } {
   switch (offer.kind) {
     case 'goldBuy':
-      return { resource: 'gold', amount: offer.goldCost };
+      return { resource: 'gold', amount: effectiveTradeGoldCost(offer, marketState) };
     case 'goldSell':
       return { resource: offer.resource, amount: offer.amount };
     case 'barter':
@@ -52,6 +62,20 @@ export function marketplaceTradeOfferCost(
   }
 }
 
+export function commodityOfferCost(
+  commodity: MarketCommodityOffer,
+  marketState: RegionalMarketState = DEFAULT_REGIONAL_MARKET_STATE,
+): { resource: 'gold'; amount: number } {
+  return { resource: 'gold', amount: effectiveCommodityGoldCost(commodity, marketState) };
+}
+
+export function waterCommodityOfferCost(
+  commodity: MarketWaterCommodityOffer,
+  marketState: RegionalMarketState = DEFAULT_REGIONAL_MARKET_STATE,
+): { resource: 'gold'; amount: number } {
+  return { resource: 'gold', amount: effectiveWaterCommodityGoldCost(commodity, marketState) };
+}
+
 function tradeStock(availability: MarketplaceTradeAvailability, resource: TradeResourceKind | 'gold'): number {
   return availability[resource];
 }
@@ -59,8 +83,27 @@ function tradeStock(availability: MarketplaceTradeAvailability, resource: TradeR
 export function canAffordMarketplaceTrade(
   availability: MarketplaceTradeAvailability,
   offer: MarketplaceTradeOffer,
+  marketState: RegionalMarketState = DEFAULT_REGIONAL_MARKET_STATE,
 ): boolean {
-  const cost = marketplaceTradeOfferCost(offer);
+  const cost = marketplaceTradeOfferCost(offer, marketState);
+  return tradeStock(availability, cost.resource) + 1e-6 >= cost.amount;
+}
+
+export function canAffordCommodityTrade(
+  availability: MarketplaceTradeAvailability,
+  commodity: MarketCommodityOffer,
+  marketState: RegionalMarketState = DEFAULT_REGIONAL_MARKET_STATE,
+): boolean {
+  const cost = commodityOfferCost(commodity, marketState);
+  return tradeStock(availability, cost.resource) + 1e-6 >= cost.amount;
+}
+
+export function canAffordWaterCommodityTrade(
+  availability: MarketplaceTradeAvailability,
+  commodity: MarketWaterCommodityOffer,
+  marketState: RegionalMarketState = DEFAULT_REGIONAL_MARKET_STATE,
+): boolean {
+  const cost = waterCommodityOfferCost(commodity, marketState);
   return tradeStock(availability, cost.resource) + 1e-6 >= cost.amount;
 }
 
@@ -98,3 +141,10 @@ export function parseMarketplaceTradeId(button: HTMLElement): string | null {
 export function tradeResourceSpendScope(resource: TradeResourceKind): (typeof TRADE_RESOURCE_SPEND_SCOPES)[TradeResourceKind] {
   return TRADE_RESOURCE_SPEND_SCOPES[resource];
 }
+
+export {
+  describeCommodityOffer,
+  describeWaterCommodityOffer,
+  MARKET_COMMODITIES,
+  MARKET_WATER_COMMODITIES,
+};

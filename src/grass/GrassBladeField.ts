@@ -59,7 +59,13 @@ const SLOT_CAPACITY = GRASS_TUFTS_PER_CHUNK + 14;
 const MAX_STREAM_INSTANCES = GRID_SIDE * GRID_SIDE * SLOT_CAPACITY;
 const MIN_TUFT_SPACING_SQ = 0.26 * 0.26;
 const MIN_MICRO_TUFT_SPACING_SQ = 0.16 * 0.16;
-const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+/** Park culled tufts far below the world — zero-scale at origin alpha-tests into a visible orb. */
+const HIDDEN_INSTANCE_Y = -4096;
+const hiddenMatrix = new THREE.Matrix4().compose(
+  new THREE.Vector3(0, HIDDEN_INSTANCE_Y, 0),
+  new THREE.Quaternion(),
+  new THREE.Vector3(0.001, 0.001, 0.001),
+);
 
 /** Muted olive — aligned with forest undergrowth. */
 const BLADE_BASE = new THREE.Color(0x3a5032);
@@ -128,6 +134,7 @@ export async function createGrassBladeField(
     const textures = await loadSeedThreeGrassTextures(options?.maxAnisotropy ?? 4);
     const variants = createSeedThreeTuftVariants();
     material = createSeedThreeGrassMaterial(textures);
+    applyGrassDepthOffset(material);
     streamMeshes = variants.map((variant, index) => {
       const geometry = variant.geometry;
       const tintAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_STREAM_INSTANCES * 3), 3);
@@ -140,7 +147,7 @@ export async function createGrassBladeField(
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.frustumCulled = false;
-      mesh.renderOrder = 0;
+      mesh.renderOrder = 2;
       mesh.visible = false;
       return { mesh, variant, tintAttr, anchorAttr };
     });
@@ -151,6 +158,7 @@ export async function createGrassBladeField(
     };
   } else {
     material = createGrassBladeMaterial();
+    applyGrassDepthOffset(material);
     const geometry = createGrassTuftGeometry();
     const mesh = new THREE.InstancedMesh(geometry, material, MAX_STREAM_INSTANCES);
     mesh.name = 'Grass blade stream';
@@ -158,6 +166,7 @@ export async function createGrassBladeField(
     mesh.castShadow = false;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
+    mesh.renderOrder = 2;
     mesh.visible = false;
     streamMeshes = [{ mesh }];
     disposeResources = () => {
@@ -498,9 +507,9 @@ function writeSeedThreeChunkInstances(
 
     const density = forestDensityAt(x, z, forestCores, extent, terrainExtent);
     if (!micro) {
-      if (density > 0.5 && rng() > 0.55) return false;
-      if (density > 0.34 && rng() > 0.78) return false;
-    } else if (density > 0.3 && rng() > 0.62) {
+      if (density > 0.62 && rng() > 0.42) return false;
+      if (density > 0.42 && rng() > 0.68) return false;
+    } else if (density > 0.48 && rng() > 0.55) {
       return false;
     }
 
@@ -517,7 +526,7 @@ function writeSeedThreeChunkInstances(
       entry.variant.tall;
     const widthScale = (height * THREE.MathUtils.lerp(micro ? 1.2 : 1.4, micro ? 1.6 : 2.1, rng())) / entry.variant.tall;
 
-    const rootY = heightAt(x, z) - 0.02;
+    const rootY = heightAt(x, z) + 0.04;
     composeSeedThreeTuftMatrix(x, z, rootY, height, widthScale, rng, writeMatrix, writeQuaternion, writePosition, writeScale);
     const instanceIndex = meshWriteIndices[variantIndex]!;
     entry.mesh.setMatrixAt(instanceIndex, writeMatrix);
@@ -690,13 +699,19 @@ function composeTuftMatrix(
   const tiltZ = Math.sin(leanDir) * leanAmount * 0.75;
   const roll = (rng() - 0.5) * 0.22;
 
-  position.set(x, heightAt(x, z), z);
+  position.set(x, heightAt(x, z) + 0.04, z);
   euler.set(tiltX, yaw, tiltZ + roll);
   quaternion.setFromEuler(euler);
   const widthScale = scale * THREE.MathUtils.lerp(0.92, 1.14, rng());
   const heightScale = scale * THREE.MathUtils.lerp(0.96, 1.18, rng());
   scaleVector.set(widthScale, heightScale, widthScale);
   matrix.compose(position, quaternion, scaleVector);
+}
+
+function applyGrassDepthOffset(material: THREE.Material): void {
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = -2;
+  material.polygonOffsetUnits = -2;
 }
 
 function createGrassBladeMaterial(): MeshStandardNodeMaterial {

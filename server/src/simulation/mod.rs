@@ -8,6 +8,8 @@ mod backyard_garden;
 mod delivery_cargo;
 mod delivery_supplier;
 mod delivery_trips;
+mod household_market_orders;
+mod marketplace_caravan;
 mod food_supplier;
 mod foraging_respawn;
 mod lodge_logistics;
@@ -28,6 +30,10 @@ pub use backyard_garden::{clear_backyard_garden_for_residence, step_backyard_gar
 pub use delivery_trips::{
     cancel_trips_for_residence, drain_trips_for_building, step_delivery_trips,
 };
+pub use game_calendar::GameClock;
+pub use road_logistics::road_path_distance;
+pub use household_market_orders::step_household_market_orders;
+pub use marketplace_caravan::{step_marketplace_caravans, try_dispatch_marketplace_caravan, MarketCaravanDispatch};
 pub use food_supplier::{step_foragers_shed, step_hunters_hall};
 pub use foraging_respawn::step_foraging_respawn;
 pub use lumber_mill::step_lumber_mill;

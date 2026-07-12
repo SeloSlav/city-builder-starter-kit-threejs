@@ -515,6 +515,7 @@ export async function bootstrapAppSession(
       spacetimeStore.snapshot.economicActivityTaxRate ?? ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT,
     getParishPolicy: () =>
       spacetimeStore.snapshot.parishPolicy ?? DEFAULT_PARISH_POLICY,
+    getMarketState: () => spacetimeStore.snapshot.marketState,
     ...inspectorActions,
     onSelectionChange: (target) => {
       buildingMarkers.setSelectedWorkExtent(

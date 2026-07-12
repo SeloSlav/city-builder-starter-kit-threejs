@@ -5,6 +5,7 @@ import { syncBuildings } from './syncBuildings.ts';
 import { syncBurgageZones } from './syncBurgageZones.ts';
 import { syncDeliveryTrips } from './syncDeliveryTrips.ts';
 import { syncForagingNodes } from './syncForagingNodes.ts';
+import { syncMarketState } from './syncMarketState.ts';
 import { syncPlayerResources } from './syncPlayerResources.ts';
 import { syncQuarries } from './syncQuarries.ts';
 import { syncResidences } from './syncResidences.ts';
@@ -32,6 +33,7 @@ export class GameTableSync {
 
     syncWorldConfig(db.world_config ? db.world_config.iter() : [], this.state);
     syncPlayerResources(db.player_resources ? db.player_resources.iter() : [], this.state);
+    syncMarketState(db.market_state ? db.market_state.iter() : [], this.state);
     this.state.quarries = syncQuarries(db.quarry ? db.quarry.iter() : []);
     this.state.foragingNodes = syncForagingNodes(db.foraging_node ? db.foraging_node.iter() : []);
     this.state.trees = syncTrees(db.tree_entity ? db.tree_entity.iter() : []);
@@ -99,6 +101,10 @@ export class GameTableSync {
 
     bindTable(db.player_resources, () => {
       syncPlayerResources(db.player_resources ? db.player_resources.iter() : [], this.state);
+    }, false);
+
+    bindTable(db.market_state, () => {
+      syncMarketState(db.market_state ? db.market_state.iter() : [], this.state);
     }, false);
 
     bindTable(db.quarry, () => {

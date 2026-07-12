@@ -6,6 +6,15 @@ import {
   generateMarketplaceTradeRust,
   generateMarketplaceTradeTypeScript,
 } from './generateMarketplaceTradeBalance.mts';
+import type {
+  MarketCommodityBalance,
+  MarketWaterCommodityBalance,
+  RegionalMarketBalance,
+} from './generateRegionalMarketBalance.mts';
+import {
+  generateRegionalMarketRust,
+  generateRegionalMarketTypeScript,
+} from './generateRegionalMarketBalance.mts';
 
 type BuildingBalance = {
   label: string;
@@ -167,6 +176,9 @@ export type GameBalance = {
   buildings: Record<string, BuildingBalance>;
   backyardGardens: Record<string, BackyardGardenBalance>;
   marketplaceTrade: MarketplaceTradeBalance;
+  regionalMarket: RegionalMarketBalance;
+  marketCommodities: MarketCommodityBalance[];
+  marketWaterCommodities: MarketWaterCommodityBalance[];
 };
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -451,6 +463,7 @@ function generateRust(): string {
   lines.push('}');
   lines.push('');
   lines.push(...generateMarketplaceTradeRust(balance));
+  lines.push(...generateRegionalMarketRust(balance));
 
   return lines.join('\n');
 }
@@ -659,6 +672,7 @@ function generateTypeScript(): string {
   lines.push('} as const satisfies Record<BackyardGardenKind, BuildingResourceCost>;');
   lines.push('');
   lines.push(...generateMarketplaceTradeTypeScript(balance));
+  lines.push(...generateRegionalMarketTypeScript(balance));
 
   return lines.join('\n');
 }

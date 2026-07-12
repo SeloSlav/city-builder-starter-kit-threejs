@@ -23,4 +23,5 @@ export default __t.row({
   settlementTicks: __t.u32().name("settlement_ticks"),
   abandoned: __t.bool(),
   householdWealth: __t.f64().name("household_wealth"),
+  lastHouseholdMarketTick: __t.u64().name("last_household_market_tick"),
 });

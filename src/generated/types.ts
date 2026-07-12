@@ -97,6 +97,22 @@ export const ForagingNode = __t.object("ForagingNode", {
 });
 export type ForagingNode = __Infer<typeof ForagingNode>;
 
+export const MarketState = __t.object("MarketState", {
+  owner: __t.identity(),
+  timberPriceMult: __t.f64(),
+  stonePriceMult: __t.f64(),
+  firewoodPriceMult: __t.f64(),
+  foodPriceMult: __t.f64(),
+  regionalTimberSupply: __t.f64(),
+  regionalStoneSupply: __t.f64(),
+  regionalFirewoodDemand: __t.f64(),
+  regionalFoodDemand: __t.f64(),
+  regionalFoodSupply: __t.f64(),
+  lastPriceTick: __t.u64(),
+  bulletin: __t.string(),
+});
+export type MarketState = __Infer<typeof MarketState>;
+
 export const PlayerResources = __t.object("PlayerResources", {
   owner: __t.identity(),
   timber: __t.f64(),
@@ -147,6 +163,7 @@ export const Residence = __t.object("Residence", {
   settlementTicks: __t.u32(),
   abandoned: __t.bool(),
   householdWealth: __t.f64(),
+  lastHouseholdMarketTick: __t.u64(),
 });
 export type Residence = __Infer<typeof Residence>;
 
