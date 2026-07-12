@@ -32,8 +32,8 @@ import { RoadSelection } from '../roads/RoadSelection.ts';
 import { RoadTool } from '../roads/RoadTool.ts';
 import { SceneManager } from '../scene/SceneManager.ts';
 import { createInspectorSpacetimeActions } from './inspectorSpacetimeActions.ts';
-import { createWorldMapIcons, type WorldMapIconsBundle } from './worldMapIcons.ts';
-import { TerrainMinimapOverlay } from '../map/TerrainMinimapOverlay.ts';
+import { createWorldMapUi, resolveWorldMapFocus, type WorldMapUiBundle } from './worldMapIcons.ts';
+import { buildBuildingWorldMapMarkers } from '../map/worldMapMarkers.ts';
 import { DeliveryAgentRenderer } from '../logistics/DeliveryAgentRenderer.ts';
 import { VillagerRenderer } from '../settlement/VillagerRenderer.ts';
 import { beginStartupTextureLoad } from '../scene/startupTextures.ts';
@@ -95,8 +95,7 @@ export type BootstrappedSession = {
   toastManager: ToastManager;
   disposeTooltips: () => void;
   resourceInspector: ResourceInspector;
-  worldMapIcons: WorldMapIconsBundle;
-  terrainMinimap: TerrainMinimapOverlay;
+  worldMapUi: WorldMapUiBundle;
   ambientAudio: AmbientAudioController;
   spacetimeStore: SpacetimeGameStore;
   sessionGate: SessionConnectionGate;
@@ -531,19 +530,6 @@ export async function bootstrapAppSession(
     computePopulationStats(gameState),
   );
 
-  const worldMapIcons = createWorldMapIcons({
-    uiRoot,
-    domElement: sceneManager.renderer.domElement,
-    terrain: sceneManager.terrain,
-    registry: layoutRegistry,
-    getCamera: () => sceneManager.camera,
-    getZoomPercent: () => cameraController.getZoomPercent(),
-    getGameState: () => liveContext.gameState,
-    onQuarrySelect: (quarryId) => resourceInspector.selectQuarry(quarryId),
-    onForagingSelect: (nodeId) => resourceInspector.selectForaging(nodeId),
-    isBlocked: () => isWorldInspectionBlocked(placementGate),
-  });
-
   firstPersonController = new FirstPersonController({
     camera: sceneManager.camera,
     domElement: sceneManager.renderer.domElement,
@@ -576,29 +562,21 @@ export async function bootstrapAppSession(
   placementGate.isFirstPersonActive = () => firstPersonController.isActive();
   placementGate.isMenuOpen = () => toolbar.isGameMenuOpen();
 
-  const terrainMinimap = new TerrainMinimapOverlay({
+  const worldMapUi = createWorldMapUi({
     uiRoot,
+    domElement: sceneManager.renderer.domElement,
+    terrain: sceneManager.terrain,
     riverField: sceneManager.riverField,
     registry: layoutRegistry,
+    getCamera: () => sceneManager.camera,
+    getZoomPercent: () => cameraController.getZoomPercent(),
     getGameState: () => liveContext.gameState,
-    getFocus: () => {
-      if (firstPersonController.isActive()) {
-        const position = firstPersonController.getPosition();
-        return {
-          x: position.x,
-          z: position.z,
-          yaw: firstPersonController.getBodyYaw(),
-        };
-      }
-      const target = cameraController.getTargetPosition();
-      return {
-        x: target.x,
-        z: target.z,
-        yaw: cameraController.getYaw(),
-      };
-    },
-    isBlocked: () => !placementGate.isSessionReady() || placementGate.isMenuOpen(),
+    getFocus: () => resolveWorldMapFocus(cameraController, firstPersonController),
+    placementGate,
+    onQuarrySelect: (quarryId) => resourceInspector.selectQuarry(quarryId),
+    onForagingSelect: (nodeId) => resourceInspector.selectForaging(nodeId),
   });
+  worldMapUi.minimap.syncBuildings(buildBuildingWorldMapMarkers(liveContext.gameState.buildings.values()));
 
   toolbar.setWaterOverlayActive(isHydrologyOverlayEnabled());
   toolbar.setGameplayEnabled(false);
@@ -628,8 +606,7 @@ export async function bootstrapAppSession(
     toastManager,
     disposeTooltips,
     resourceInspector,
-    worldMapIcons,
-    terrainMinimap,
+    worldMapUi,
     ambientAudio,
     spacetimeStore,
     sessionGate,

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { RiverField } from '../rivers/RiverField.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
+import { forEachRiverFieldSample, mapRiverFieldRowForPlaneGeometry } from '../map/rasterizeRiverFieldBounds.ts';
 import { sampleHydrologyMapScore } from './sampleHydrology.ts';
 
 const OVERLAY_RESOLUTION = 512;
@@ -70,23 +71,17 @@ export class HydrologyOverlay {
 function createHydrologyTexture(riverField: RiverField): THREE.DataTexture {
   const resolution = OVERLAY_RESOLUTION;
   const data = new Uint8Array(resolution * resolution * 4);
-  const { startX, startZ, spanX, spanZ } = riverField;
 
-  for (let iz = 0; iz < resolution; iz++) {
-    const z = startZ + (iz / (resolution - 1)) * spanZ;
-    for (let ix = 0; ix < resolution; ix++) {
-      const x = startX + (ix / (resolution - 1)) * spanX;
-      const score = sampleHydrologyMapScore(riverField, x, z);
-      const color = hydrologyColor(score);
-      // PlaneGeometry UV v=0 maps to +Z after the X rotation — flip rows so minZ aligns with rivers.
-      const dataRow = resolution - 1 - iz;
-      const index = (dataRow * resolution + ix) * 4;
-      data[index] = color.r;
-      data[index + 1] = color.g;
-      data[index + 2] = color.b;
-      data[index + 3] = Math.round(180 + score * 55);
-    }
-  }
+  forEachRiverFieldSample(riverField, resolution, ({ x, z, row, column }) => {
+    const score = sampleHydrologyMapScore(riverField, x, z);
+    const color = hydrologyColor(score);
+    const dataRow = mapRiverFieldRowForPlaneGeometry(row, resolution);
+    const index = (dataRow * resolution + column) * 4;
+    data[index] = color.r;
+    data[index + 1] = color.g;
+    data[index + 2] = color.b;
+    data[index + 3] = Math.round(180 + score * 55);
+  });
 
   const texture = new THREE.DataTexture(data, resolution, resolution, THREE.RGBAFormat, THREE.UnsignedByteType);
   texture.colorSpace = THREE.SRGBColorSpace;

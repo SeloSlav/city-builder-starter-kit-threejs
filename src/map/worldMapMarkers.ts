@@ -14,6 +14,7 @@ export type WorldMapMarker = {
   label: string;
   x: number;
   z: number;
+  quarryKind?: 'large' | 'small';
 };
 
 export function buildLayoutWorldMapMarkers(registry: WorldLayoutRegistry): WorldMapMarker[] {
@@ -30,6 +31,7 @@ export function buildLayoutWorldMapMarkers(registry: WorldLayoutRegistry): World
       label: definition.label,
       x: definition.x,
       z: definition.z,
+      quarryKind: definition.quarryKind,
     }));
 }
 

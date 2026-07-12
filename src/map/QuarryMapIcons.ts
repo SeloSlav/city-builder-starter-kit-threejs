@@ -1,6 +1,5 @@
 import * as THREE from 'three';
-import type { ResourceNodeDefinition } from '../resources/types.ts';
-import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
+import type { WorldMapMarker } from './worldMapMarkers.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
 import {
   beginMapIconFrame,
@@ -12,7 +11,7 @@ type QuarryMapIconsOptions = {
   uiRoot: HTMLElement;
   domElement: HTMLElement;
   terrain: Terrain;
-  registry: WorldLayoutRegistry;
+  markers: readonly WorldMapMarker[];
   getCamera: () => THREE.PerspectiveCamera | null;
   getZoomPercent: () => number;
   onQuarrySelect: (quarryId: string) => void;
@@ -20,7 +19,7 @@ type QuarryMapIconsOptions = {
 };
 
 type QuarryIconEntry = {
-  definition: ResourceNodeDefinition;
+  marker: WorldMapMarker;
   button: HTMLButtonElement;
   worldPoint: THREE.Vector3;
 };
@@ -41,13 +40,11 @@ export class QuarryMapIcons {
     this.options = options;
     this.root = createMapIconRoot(options.uiRoot, 'quarry-map-icons');
 
-    this.entries = options.registry.definitionList
-      .filter((definition) => definition.kind === 'quarry' && definition.resource === 'stone')
-      .map((definition) => ({
-        definition,
-        button: this.createIconButton(definition),
-        worldPoint: new THREE.Vector3(),
-      }));
+    this.entries = options.markers.map((marker) => ({
+      marker,
+      button: this.createIconButton(marker),
+      worldPoint: new THREE.Vector3(),
+    }));
 
     for (const entry of this.entries) {
       this.root.appendChild(entry.button);
@@ -66,8 +63,8 @@ export class QuarryMapIcons {
     if (!frame) return;
 
     for (const entry of this.entries) {
-      const { definition, button, worldPoint } = entry;
-      placeProjectedMapButton(button, definition.x, definition.z, worldPoint, frame);
+      const { marker, button, worldPoint } = entry;
+      placeProjectedMapButton(button, marker.x, marker.z, worldPoint, frame);
     }
   }
 
@@ -75,16 +72,16 @@ export class QuarryMapIcons {
     this.root.remove();
   }
 
-  private createIconButton(definition: ResourceNodeDefinition): HTMLButtonElement {
+  private createIconButton(marker: WorldMapMarker): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'quarry-map-icon';
-    button.dataset.quarryId = definition.id;
-    button.title = definition.label;
-    button.setAttribute('aria-label', definition.label);
+    button.dataset.quarryId = marker.id;
+    button.title = marker.label;
+    button.setAttribute('aria-label', marker.label);
     button.hidden = true;
 
-    if (definition.quarryKind === 'large') {
+    if (marker.quarryKind === 'large') {
       button.classList.add('quarry-map-icon--large');
     }
 
@@ -94,7 +91,7 @@ export class QuarryMapIcons {
       if (this.options.isBlocked()) return;
       event.preventDefault();
       event.stopPropagation();
-      this.options.onQuarrySelect(definition.id);
+      this.options.onQuarrySelect(marker.id);
     });
 
     return button;

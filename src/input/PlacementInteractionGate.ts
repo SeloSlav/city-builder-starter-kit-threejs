@@ -43,3 +43,7 @@ export function isWorldInspectionBlocked(gate: PlacementInteractionGate): boolea
     || gate.isFirstPersonActive()
     || gate.isMenuOpen();
 }
+
+export function isOverlayBlocked(gate: PlacementInteractionGate): boolean {
+  return isSessionGameplayBlocked(gate) || gate.isMenuOpen();
+}

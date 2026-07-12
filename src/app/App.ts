@@ -21,8 +21,8 @@ import { RoadSelection } from '../roads/RoadSelection.ts';
 import { RoadTool } from '../roads/RoadTool.ts';
 import { GameRuntime } from '../runtime/GameRuntime.ts';
 import { SceneManager } from '../scene/SceneManager.ts';
-import type { WorldMapIconsBundle } from './worldMapIcons.ts';
-import type { TerrainMinimapOverlay } from '../map/TerrainMinimapOverlay.ts';
+import type { WorldMapUiBundle } from './worldMapIcons.ts';
+import { buildBuildingWorldMapMarkers } from '../map/worldMapMarkers.ts';
 import { DeliveryAgentRenderer } from '../logistics/DeliveryAgentRenderer.ts';
 import { VillagerRenderer } from '../settlement/VillagerRenderer.ts';
 import { BuildToolbar, type ToolbarStats } from '../ui/BuildToolbar.ts';
@@ -70,8 +70,7 @@ export class App {
   private toastManager: ToastManager | null = null;
   private disposeTooltips: (() => void) | null = null;
   private resourceInspector: ResourceInspector | null = null;
-  private worldMapIcons: WorldMapIconsBundle | null = null;
-  private terrainMinimap: TerrainMinimapOverlay | null = null;
+  private worldMapUi: WorldMapUiBundle | null = null;
   private deliveryAgents: DeliveryAgentRenderer | null = null;
   private villagers: VillagerRenderer | null = null;
   private gameState: GameState | null = null;
@@ -130,8 +129,7 @@ export class App {
     this.toastManager = session.toastManager;
     this.disposeTooltips = session.disposeTooltips;
     this.resourceInspector = session.resourceInspector;
-    this.worldMapIcons = session.worldMapIcons;
-    this.terrainMinimap = session.terrainMinimap;
+    this.worldMapUi = session.worldMapUi;
     this.ambientAudio = session.ambientAudio;
     this.spacetimeStore = session.spacetimeStore;
     this.sessionGate = session.sessionGate;
@@ -200,6 +198,7 @@ export class App {
     this.snapshotApplierDeps = {
       sceneManager: this.sceneManager,
       buildingMarkers: this.buildingMarkers,
+      terrainMinimap: this.worldMapUi?.minimap ?? null,
       burgageFencing: this.burgageFencing,
       forestVisualSync: this.forestVisualSync,
       settlementWorld: {
@@ -274,9 +273,9 @@ export class App {
     this.sessionLifecycle?.dispose();
     this.connectionOverlay?.dispose();
     this.resourceInspector?.dispose();
-    this.worldMapIcons?.quarry.dispose();
-    this.worldMapIcons?.foraging.dispose();
-    this.terrainMinimap?.dispose();
+    this.worldMapUi?.quarry.dispose();
+    this.worldMapUi?.foraging.dispose();
+    this.worldMapUi?.minimap.dispose();
     this.toastManager?.dispose();
     this.disposeTooltips?.();
     this.disposeTooltips = null;
@@ -309,7 +308,7 @@ export class App {
       sceneManager: this.sceneManager,
       residenceMarkers: this.residenceMarkers,
     });
-    this.syncTerrainMinimap();
+    this.worldMapUi?.minimap.tick({ keyHeld: this.input?.isDown('g') ?? false });
     if (firstPersonActive) {
       this.firstPersonController?.update(dt);
       this.toolbar?.setFirstPersonMode(true);
@@ -317,8 +316,8 @@ export class App {
       this.buildingTool?.update();
       this.burgageTool?.update();
       this.updateBuildButtonPosition();
-      this.worldMapIcons?.quarry.update();
-      this.worldMapIcons?.foraging.update();
+      this.worldMapUi?.quarry.update();
+      this.worldMapUi?.foraging.update();
       this.sceneManager?.render(dt, 12, true);
     } else {
       this.cameraController?.update(dt);
@@ -328,8 +327,8 @@ export class App {
       this.buildingTool?.update();
       this.burgageTool?.update();
       this.updateBuildButtonPosition();
-      this.worldMapIcons?.quarry.update();
-      this.worldMapIcons?.foraging.update();
+      this.worldMapUi?.quarry.update();
+      this.worldMapUi?.foraging.update();
       this.sceneManager?.render(dt, this.cameraController?.getOrbitDistance());
     }
     this.updateFps(time, dt);
@@ -356,6 +355,9 @@ export class App {
       this.snapshotApplierDeps.forestVisualSync = this.forestVisualSync;
     }
     this.buildingMarkers?.syncBuildings(this.gameState.buildings.values());
+    this.worldMapUi?.minimap.syncBuildings(
+      buildBuildingWorldMapMarkers(this.gameState.buildings.values()),
+    );
     if (this.snapshotApplierDeps) {
       syncSettlementWorld(this.snapshotApplierDeps.settlementWorld, this.gameState);
     }
@@ -373,15 +375,6 @@ export class App {
     this.syncForestClearance();
     this.syncResourceUi();
     this.exposeDevHandles();
-  }
-
-  private syncTerrainMinimap(): void {
-    if (!this.input || !this.terrainMinimap) return;
-    const shouldShow = this.terrainMinimap.shouldShow(this.input.isDown('g'));
-    this.terrainMinimap.setVisible(shouldShow);
-    if (shouldShow) {
-      this.terrainMinimap.update();
-    }
   }
 
   private readonly onResize = (): void => {

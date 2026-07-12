@@ -1,62 +1,113 @@
 import { ForagingMapIcons } from '../map/ForagingMapIcons.ts';
 import { QuarryMapIcons } from '../map/QuarryMapIcons.ts';
+import { TerrainMinimapOverlay } from '../map/TerrainMinimapOverlay.ts';
+import type { MinimapFocus } from '../map/TerrainMinimapOverlay.ts';
+import {
+  buildLayoutWorldMapMarkers,
+  filterWorldMapForagingMarkers,
+  filterWorldMapMarkersByKind,
+} from '../map/worldMapMarkers.ts';
+import type { CameraController } from '../camera/CameraController.ts';
+import type { FirstPersonController } from '../camera/FirstPersonController.ts';
+import type { PlacementInteractionGate } from '../input/PlacementInteractionGate.ts';
+import { isOverlayBlocked, isWorldInspectionBlocked } from '../input/PlacementInteractionGate.ts';
 import type { GameState } from '../resources/types.ts';
 import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
+import type { RiverField } from '../rivers/RiverField.ts';
+import type { PerspectiveCamera } from 'three';
 import type { Terrain } from '../terrain/Terrain.ts';
-import type * as THREE from 'three';
 
-export type WorldMapIconsBundle = {
+export type WorldMapUiBundle = {
   quarry: QuarryMapIcons;
   foraging: ForagingMapIcons;
+  minimap: TerrainMinimapOverlay;
 };
 
-export function createWorldMapIcons(options: {
+export function createWorldMapUi(options: {
   uiRoot: HTMLElement;
   domElement: HTMLElement;
   terrain: Terrain;
+  riverField: RiverField;
   registry: WorldLayoutRegistry;
-  getCamera: () => THREE.PerspectiveCamera | null;
+  getCamera: () => PerspectiveCamera | null;
   getZoomPercent: () => number;
   getGameState: () => GameState;
+  getFocus: () => MinimapFocus;
+  placementGate: PlacementInteractionGate;
   onQuarrySelect: (quarryId: string) => void;
   onForagingSelect: (nodeId: string) => void;
-  isBlocked: () => boolean;
-}): WorldMapIconsBundle {
+}): WorldMapUiBundle {
   const {
     uiRoot,
     domElement,
     terrain,
+    riverField,
     registry,
     getCamera,
     getZoomPercent,
     getGameState,
+    getFocus,
+    placementGate,
     onQuarrySelect,
     onForagingSelect,
-    isBlocked,
   } = options;
+
+  const layoutMarkers = buildLayoutWorldMapMarkers(registry);
+  const quarryMarkers = filterWorldMapMarkersByKind(layoutMarkers, 'quarry');
+  const foragingMarkers = filterWorldMapForagingMarkers(layoutMarkers);
 
   const quarry = new QuarryMapIcons({
     uiRoot,
     domElement,
     terrain,
-    registry,
+    markers: quarryMarkers,
     getCamera,
     getZoomPercent,
     onQuarrySelect,
-    isBlocked,
+    isBlocked: () => isWorldInspectionBlocked(placementGate),
   });
 
   const foraging = new ForagingMapIcons({
     uiRoot,
     domElement,
     terrain,
-    registry,
+    markers: foragingMarkers,
     getCamera,
     getZoomPercent,
     getForagingNodes: () => getGameState().foragingNodes,
     onForagingSelect,
-    isBlocked,
+    isBlocked: () => isWorldInspectionBlocked(placementGate),
   });
 
-  return { quarry, foraging };
+  const minimap = TerrainMinimapOverlay.create({
+    uiRoot,
+    riverField,
+    layoutMarkers,
+    getGameState,
+    getFocus,
+    isBlocked: () => isOverlayBlocked(placementGate),
+  });
+
+  return { quarry, foraging, minimap };
+}
+
+export function resolveWorldMapFocus(
+  cameraController: CameraController,
+  firstPersonController: FirstPersonController,
+): MinimapFocus {
+  if (firstPersonController.isActive()) {
+    const position = firstPersonController.getPosition();
+    return {
+      x: position.x,
+      z: position.z,
+      yaw: firstPersonController.getBodyYaw(),
+    };
+  }
+
+  const target = cameraController.getTargetPosition();
+  return {
+    x: target.x,
+    z: target.z,
+    yaw: cameraController.getYaw(),
+  };
 }

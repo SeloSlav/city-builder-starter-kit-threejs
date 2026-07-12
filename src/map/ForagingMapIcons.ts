@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { ForagingNodeState } from '../resources/types.ts';
-import type { ResourceNodeDefinition } from '../resources/types.ts';
-import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
+import type { WorldMapMarker } from './worldMapMarkers.ts';
+import { isWorldMapForagingMarkerVisible } from './worldMapMarkers.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
 import {
   beginMapIconFrame,
@@ -13,16 +13,16 @@ type ForagingMapIconsOptions = {
   uiRoot: HTMLElement;
   domElement: HTMLElement;
   terrain: Terrain;
-  registry: WorldLayoutRegistry;
+  markers: readonly WorldMapMarker[];
+  getForagingNodes: () => Map<string, ForagingNodeState>;
   getCamera: () => THREE.PerspectiveCamera | null;
   getZoomPercent: () => number;
-  getForagingNodes: () => Map<string, ForagingNodeState>;
   onForagingSelect: (nodeId: string) => void;
   isBlocked: () => boolean;
 };
 
 type ForagingIconEntry = {
-  definition: ResourceNodeDefinition;
+  marker: WorldMapMarker;
   button: HTMLButtonElement;
   worldPoint: THREE.Vector3;
 };
@@ -54,13 +54,11 @@ export class ForagingMapIcons {
     this.options = options;
     this.root = createMapIconRoot(options.uiRoot, 'foraging-map-icons');
 
-    this.entries = options.registry.definitionList
-      .filter((definition) => definition.kind === 'game' || definition.kind === 'berries')
-      .map((definition) => ({
-        definition,
-        button: this.createIconButton(definition),
-        worldPoint: new THREE.Vector3(),
-      }));
+    this.entries = options.markers.map((marker) => ({
+      marker,
+      button: this.createIconButton(marker),
+      worldPoint: new THREE.Vector3(),
+    }));
 
     for (const entry of this.entries) {
       this.root.appendChild(entry.button);
@@ -81,14 +79,13 @@ export class ForagingMapIcons {
     const nodes = this.options.getForagingNodes();
 
     for (const entry of this.entries) {
-      const { definition, button, worldPoint } = entry;
-      const state = nodes.get(definition.id);
-      if (!state || state.remaining <= 0) {
+      const { marker, button, worldPoint } = entry;
+      if (!isWorldMapForagingMarkerVisible(marker, nodes)) {
         button.hidden = true;
         continue;
       }
 
-      placeProjectedMapButton(button, definition.x, definition.z, worldPoint, frame);
+      placeProjectedMapButton(button, marker.x, marker.z, worldPoint, frame);
     }
   }
 
@@ -96,16 +93,16 @@ export class ForagingMapIcons {
     this.root.remove();
   }
 
-  private createIconButton(definition: ResourceNodeDefinition): HTMLButtonElement {
+  private createIconButton(marker: WorldMapMarker): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'foraging-map-icon';
-    button.dataset.foragingId = definition.id;
-    button.title = definition.label;
-    button.setAttribute('aria-label', definition.label);
+    button.dataset.foragingId = marker.id;
+    button.title = marker.label;
+    button.setAttribute('aria-label', marker.label);
     button.hidden = true;
 
-    if (definition.kind === 'game') {
+    if (marker.kind === 'game') {
       button.classList.add('foraging-map-icon--game');
       button.innerHTML = GAME_ICON_SVG;
     } else {
@@ -118,7 +115,7 @@ export class ForagingMapIcons {
       if (this.options.isBlocked()) return;
       event.preventDefault();
       event.stopPropagation();
-      this.options.onForagingSelect(definition.id);
+      this.options.onForagingSelect(marker.id);
     });
 
     return button;

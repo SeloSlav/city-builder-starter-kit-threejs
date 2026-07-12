@@ -3,6 +3,8 @@ import type { BurgageFencing } from '../residences/BurgageFencing.ts';
 import type { ForestVisualSync } from '../resources/ForestVisualSync.ts';
 import type { GameState } from '../resources/types.ts';
 import type { SceneManager } from '../scene/SceneManager.ts';
+import type { TerrainMinimapOverlay } from '../map/TerrainMinimapOverlay.ts';
+import { buildBuildingWorldMapMarkers } from '../map/worldMapMarkers.ts';
 import { collectOccupiedParcelPolygons } from '../residences/burgageZoneLayout.ts';
 import { syncSettlementWorld, type SettlementWorldSyncTargets } from './settlementWorldSync.ts';
 import {
@@ -15,6 +17,7 @@ import {
 export type SpacetimeSnapshotApplierDeps = {
   sceneManager: SceneManager | null;
   buildingMarkers: BuildingMarkers | null;
+  terrainMinimap: TerrainMinimapOverlay | null;
   burgageFencing: BurgageFencing | null;
   forestVisualSync: ForestVisualSync | null;
   settlementWorld: SettlementWorldSyncTargets;
@@ -56,6 +59,7 @@ export class SpacetimeSnapshotApplier {
     if (buildingSignature !== this.lastPlacedBuildingSignature) {
       this.lastPlacedBuildingSignature = buildingSignature;
       deps.buildingMarkers?.syncBuildings(state.buildings.values());
+      deps.terrainMinimap?.syncBuildings(buildBuildingWorldMapMarkers(state.buildings.values()));
       syncPlacedBuildingTerrain({
         sceneManager: deps.sceneManager,
         gameState: state,
