@@ -14,6 +14,10 @@ export type SeedThreeSpeciesPreset = {
   params?: Record<string, unknown>;
 };
 
+export type SeedThreeCanopyCenterUniform = {
+  value: THREE.Vector3;
+};
+
 export type SeedThreeSpeciesAssets = {
   barkTexture: THREE.Texture | null;
   barkNormal: THREE.Texture | null;
@@ -25,8 +29,8 @@ export type SeedThreeSpeciesAssets = {
   barkMat: THREE.Material;
   leafMat: THREE.Material;
   clusterMat: THREE.Material;
-  leafCenter: THREE.Vector3;
-  clusterCenter: THREE.Vector3;
+  leafCenter: SeedThreeCanopyCenterUniform;
+  clusterCenter: SeedThreeCanopyCenterUniform;
 };
 
 const loader = new THREE.TextureLoader();
@@ -100,8 +104,8 @@ export async function loadSeedThreeSpeciesAssets(
     barkMat,
     leafMat: leafFol.material,
     clusterMat: clusterFol.material,
-    leafCenter: leafFol.centerUniform.value as THREE.Vector3,
-    clusterCenter: clusterFol.centerUniform.value as THREE.Vector3,
+    leafCenter: leafFol.centerUniform as SeedThreeCanopyCenterUniform,
+    clusterCenter: clusterFol.centerUniform as SeedThreeCanopyCenterUniform,
   };
 
   assetCache.set(species.name, assets);
