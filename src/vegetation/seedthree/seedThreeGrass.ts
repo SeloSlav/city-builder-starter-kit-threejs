@@ -7,15 +7,11 @@ import {
   normalMap,
   normalView,
   normalize,
-  positionGeometry,
-  sin,
   texture,
-  time,
   uniform,
-  vec3,
   vec4,
 } from 'three/tsl';
-import { windSpeed, windStrength, WIND_DIR } from '@seedthree/core/wind.js';
+import { grassWindPosition, WIND_DIR } from '@seedthree/core/wind.js';
 import { seedThreeLeafUrl } from './seedThreeTextures.ts';
 
 export { WIND_DIR as SEEDTHREE_GRASS_WIND_DIR };
@@ -24,10 +20,7 @@ type TslNode = {
   mul: (value: unknown) => TslNode;
   add: (value: unknown) => TslNode;
   sub: (value: unknown) => TslNode;
-  div: (value: unknown) => TslNode;
-  x: TslNode;
   y: TslNode;
-  z: TslNode;
   xyz: TslNode;
 };
 
@@ -35,54 +28,14 @@ const tsl = {
   attribute: attribute as (name: string, type: string) => TslNode,
   cameraViewMatrix: cameraViewMatrix as TslNode,
   float: float as (value: number) => TslNode,
+  grassWindPosition: grassWindPosition as (bladeHeight?: number) => TslNode,
   normalMap: normalMap as (sample: unknown) => TslNode,
   normalView: normalView as TslNode,
   normalize: normalize as (value: unknown) => TslNode,
-  positionGeometry: positionGeometry as TslNode,
-  sin: sin as (value: unknown) => TslNode,
   texture: texture as (map: THREE.Texture) => TslNode,
-  time: time as TslNode,
   uniform: uniform as <T>(value: T) => { value: T },
-  vec3: vec3 as (x: unknown, y: unknown, z: unknown) => TslNode,
   vec4: vec4 as (...values: unknown[]) => TslNode,
-  windSpeed: windSpeed as unknown as TslNode,
-  windStrength: windStrength as unknown as TslNode,
 };
-
-function swayAt(phaseWorld: TslNode, phaseScale: number): TslNode {
-  const t = tsl.time.mul(tsl.windSpeed);
-  const phase = phaseWorld.x.mul(0.35).add(phaseWorld.z.mul(0.27)).mul(phaseScale);
-  return tsl.sin(t.mul(1.15).add(phase))
-    .mul(0.72)
-    .add(tsl.sin(t.mul(2.63).add(phase.mul(1.9))).mul(0.28));
-}
-
-/** Instanced grass: bend xz from raw geometry height; y stays pinned at the rooted base. */
-function createInstancedGrassWindPosition(bladeHeight = 1): TslNode {
-  const geo = tsl.positionGeometry;
-  const heightNorm = geo.y.div(tsl.float(bladeHeight));
-  const k = heightNorm.mul(heightNorm);
-  const amp = tsl.windStrength.mul(0.18);
-  const anchorWorld = tsl.attribute('aAnchorPos', 'vec3');
-  const gust = swayAt(anchorWorld, 2.2).mul(amp);
-  const jitterT = tsl.time
-    .mul(tsl.windSpeed)
-    .mul(3.1)
-    .add(anchorWorld.z.mul(1.7))
-    .add(anchorWorld.x.mul(1.3));
-  const jitter = tsl.sin(jitterT).mul(amp).mul(0.2);
-  const bend = gust.add(jitter).mul(k);
-  const windLocal = tsl.attribute('aWindVec', 'vec3');
-  return tsl.vec3(
-    geo.x.add(windLocal.x.mul(bend)),
-    geo.y,
-    geo.z.add(windLocal.z.mul(bend)),
-  );
-}
-
-const Y_AXIS = new THREE.Vector3(0, 1, 0);
-const windQuat = new THREE.Quaternion();
-const windVecScratch = new THREE.Vector3();
 
 export type SeedThreeGrassTextures = {
   tuft: THREE.Texture;
@@ -199,7 +152,8 @@ export function createSeedThreeGrassMaterial(textures: SeedThreeGrassTextures): 
     mat.roughnessMap = textures.tuftRoughness;
     mat.roughness = 1.0;
   }
-  mat.positionNode = createInstancedGrassWindPosition(1);
+  // Vendor grassWindPosition: y^2 pins the base, uniform windDir — no per-instance attrs.
+  mat.positionNode = tsl.grassWindPosition(1);
 
   const upView = tsl.cameraViewMatrix.mul(tsl.vec4(0, 1, 0, 0)).xyz;
   const relief = textures.tuftNormal
@@ -209,20 +163,6 @@ export function createSeedThreeGrassMaterial(textures: SeedThreeGrassTextures): 
 
   mat.name = 'SeedThree grass clump';
   return mat;
-}
-
-/** R⁻¹S⁻¹·WIND_DIR — instance matrix maps this back to the true world heading. */
-export function seedThreeGrassWindVecForYaw(
-  yaw: number,
-  scale: THREE.Vector3,
-  out = windVecScratch,
-): THREE.Vector3 {
-  windQuat.setFromAxisAngle(Y_AXIS, -yaw);
-  out.copy(WIND_DIR).applyQuaternion(windQuat);
-  if (scale.x !== 0) out.x /= scale.x;
-  if (scale.y !== 0) out.y /= scale.y;
-  if (scale.z !== 0) out.z /= scale.z;
-  return out;
 }
 
 export function sampleSeedThreeGrassTint(rng: () => number, dry = 0): THREE.Vector3 {

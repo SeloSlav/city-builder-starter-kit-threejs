@@ -129,7 +129,9 @@ export async function bootstrapAppSession(
       detail: 'Choose map size, landscape, and seed',
     });
   }
-  const worldSettings = await resolveWorldGenerationSettings(root);
+  const worldSettings = await resolveWorldGenerationSettings(root, (progress) => {
+    loadingScreen?.setProgress(progress);
+  });
   setDraftWorldGeneration(worldSettings);
   saveWorldGenerationSettings(worldSettings);
 

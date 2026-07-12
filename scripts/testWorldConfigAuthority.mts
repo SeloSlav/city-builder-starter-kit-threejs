@@ -8,6 +8,7 @@ import {
   MAP_SIZE_BY_CODE,
   MAP_SIZE_CODES,
   settingsToConfigurePayload,
+  shouldRequireWorldRegeneration,
   WorldGenerationMismatchError,
   worldConfigRowToGeneration,
 } from '../src/world/worldConfigAuthority.ts';
@@ -60,6 +61,36 @@ assert.doesNotThrow(
     generation,
     0,
   ),
+);
+
+const unconfigured = { ...generation, configured: false };
+assert.equal(
+  shouldRequireWorldRegeneration(unconfigured, 0, DEFAULT_WORLD_GENERATION_SETTINGS),
+  true,
+);
+
+assert.equal(
+  shouldRequireWorldRegeneration(generation, 0, DEFAULT_WORLD_GENERATION_SETTINGS),
+  true,
+);
+
+assert.equal(
+  shouldRequireWorldRegeneration(generation, 0, null),
+  false,
+);
+
+assert.equal(
+  shouldRequireWorldRegeneration(generation, 42, DEFAULT_WORLD_GENERATION_SETTINGS),
+  false,
+);
+
+assert.equal(
+  shouldRequireWorldRegeneration(
+    { ...DEFAULT_WORLD_GENERATION_SETTINGS, configured: true },
+    0,
+    DEFAULT_WORLD_GENERATION_SETTINGS,
+  ),
+  false,
 );
 
 console.log('world config authority tests passed');

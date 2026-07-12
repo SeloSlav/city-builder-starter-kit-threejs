@@ -61,6 +61,21 @@ export function generationMatchesServer(
     && server.forestDensity === local.forestDensity;
 }
 
+/**
+ * True when a fresh or reset server no longer matches cached client world settings
+ * and the player should pick generation settings again.
+ */
+export function shouldRequireWorldRegeneration(
+  server: AuthoritativeWorldGeneration,
+  simTick: number,
+  local: WorldGenerationSettings | null,
+): boolean {
+  if (!server.configured) return true;
+  if (simTick > 0) return false;
+  if (!local) return false;
+  return !generationMatchesServer(server, local);
+}
+
 /** Blocks bootstrap when a running server world was generated with different settings. */
 export function assertWorldGenerationCompatible(
   local: WorldGenerationSettings,

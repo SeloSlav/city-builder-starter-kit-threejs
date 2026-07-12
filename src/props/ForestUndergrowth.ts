@@ -16,6 +16,7 @@ import {
   vec4,
 } from 'three/tsl';
 import { windSpeed, windStrength, WIND_DIR } from '@seedthree/core/wind.js';
+import { createRootedFoliageWindPosition } from '../vegetation/seedthree/seedThreeFoliageWind.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
 import { applyFoliageDoubleSideNormals } from '../scene/foliageDoubleSideNormals.ts';
 import { TREE_SHADOW_CAST_LAYER } from '../scene/SceneLayers.ts';
@@ -354,7 +355,7 @@ function placeUndergrowthBucket(bucket: UndergrowthBucket, terrain: Terrain, rng
     const tint = sampleUndergrowthTint(placement.kind, rng);
     bucket.tintAttr.setXYZ(index, tint.x, tint.y, tint.z);
     bucket.anchorAttr.setXYZ(index, position.x, position.y, position.z);
-    const windVec = undergrowthWindVecForYaw(yaw);
+    const windVec = undergrowthWindVecForYaw(yaw, scaleVector);
     bucket.windVecAttr.setXYZ(index, windVec.x, windVec.y, windVec.z);
     color.setRGB(tint.x, tint.y, tint.z);
     bucket.mesh.setColorAt(index, color);
@@ -513,7 +514,7 @@ function createUndergrowthCardMaterial(
   material.thicknessPowerNode = tsl.uniform(5.0);
   material.thicknessScaleNode = tsl.uniform(2.25);
   material.colorNode = tsl.texture(textures.albedo).mul(tsl.vec4(tsl.attribute('aTint', 'vec3'), tsl.float(1)));
-  material.positionNode = createUndergrowthWindPosition(1);
+  material.positionNode = createRootedFoliageWindPosition(1, 0.18);
 
   const upView = tsl.cameraViewMatrix.mul(tsl.vec4(0, 1, 0, 0)).xyz;
   const relief = textures.normal ? tsl.normalMap(tsl.texture(textures.normal)).sub(tsl.normalView) : null;
@@ -521,22 +522,13 @@ function createUndergrowthCardMaterial(
   return material;
 }
 
-function createUndergrowthWindPosition(bladeHeight = 1): TslNode {
-  const heightNorm = tsl.positionLocal.y.div(tsl.float(bladeHeight));
-  const k = heightNorm.mul(heightNorm);
-  const amp = tsl.windStrength.mul(0.18);
-  const anchorWorld = tsl.modelWorldMatrix.mul(tsl.vec4(tsl.attribute('aAnchorPos', 'vec3'), tsl.float(1))).xyz;
-  const phase = anchorWorld.x.mul(0.35).add(anchorWorld.z.mul(0.27)).mul(2.0);
-  const gust = tsl.sin(tsl.time.mul(tsl.windSpeed).mul(1.15).add(phase)).mul(amp);
-  const jitter = tsl.sin(tsl.time.mul(tsl.windSpeed).mul(3.0).add(anchorWorld.x.mul(1.3)).add(anchorWorld.z.mul(1.7)))
-    .mul(amp)
-    .mul(0.2);
-  return tsl.positionLocal.add(tsl.attribute('aWindVec', 'vec3').mul(gust.add(jitter)).mul(k));
-}
-
-function undergrowthWindVecForYaw(yaw: number, out = windVecScratch): THREE.Vector3 {
+function undergrowthWindVecForYaw(yaw: number, scale: THREE.Vector3, out = windVecScratch): THREE.Vector3 {
   windQuat.setFromAxisAngle(Y_AXIS, -yaw);
-  return out.copy(WIND_DIR).applyQuaternion(windQuat);
+  out.copy(WIND_DIR).applyQuaternion(windQuat);
+  if (scale.x !== 0) out.x /= scale.x;
+  if (scale.y !== 0) out.y /= scale.y;
+  if (scale.z !== 0) out.z /= scale.z;
+  return out;
 }
 
 type CardGeometrySpec = {

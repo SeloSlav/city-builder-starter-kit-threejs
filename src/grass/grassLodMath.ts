@@ -51,10 +51,10 @@ export const GRASS_BLADE_NEAR_RADIUS = 54;
 export const GRASS_BLADE_CHUNK_SIZE = 8;
 
 /** Target tufts scattered per chunk (organic placement, not a rigid grid). */
-export const GRASS_TUFTS_PER_CHUNK = 54;
+export const GRASS_TUFTS_PER_CHUNK = 78;
 
 /** Extra scatter attempts budget per chunk. */
-export const GRASS_TUFT_SCATTER_ATTEMPTS = GRASS_TUFTS_PER_CHUNK + 28;
+export const GRASS_TUFT_SCATTER_ATTEMPTS = GRASS_TUFTS_PER_CHUNK + 56;
 
 /** Blade stalks in each tuft mesh (shared geometry). */
 export const GRASS_BLADES_PER_TUFT = 9;
@@ -64,7 +64,7 @@ export const GRASS_STREAM_CHUNK_RADIUS =
   Math.ceil(GRASS_BLADE_NEAR_RADIUS / GRASS_BLADE_CHUNK_SIZE) + 2;
 
 /** Slot columns/rows refreshed per frame when the stream recenters. */
-export const GRASS_STREAM_SLOTS_PER_FRAME = 8;
+export const GRASS_STREAM_SLOTS_PER_FRAME = 14;
 
 /** Recentre the grass stream when focus drifts this far (world units). */
 export const GRASS_STREAM_FOCUS_DRIFT = 3.5;
