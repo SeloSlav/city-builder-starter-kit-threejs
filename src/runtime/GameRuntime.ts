@@ -17,10 +17,7 @@ export type GameRuntimeCallbacks = {
   onConnectError: (error: unknown) => void;
   onBootstrapFailed?: (error: unknown) => void;
   onSessionReady?: () => void;
-  onSessionLost?: () => void;
 };
-
-const DISCONNECT_GRACE_MS = 2_000;
 
 export class GameRuntime {
   readonly store: SpacetimeGameStore;
@@ -32,8 +29,6 @@ export class GameRuntime {
   private bootstrapComplete = false;
   private bootstrapInFlight = false;
   private sessionReadyEmitted = false;
-  private awaitingSessionRecovery = false;
-  private pendingLossTimer: number | null = null;
 
   constructor(
     store: SpacetimeGameStore,
@@ -59,12 +54,13 @@ export class GameRuntime {
       const gameState = this.store.toGameState(this.registry);
       this.callbacks.onSnapshot(snapshot, gameState);
 
-      if (!snapshot.connected) {
-        this.scheduleSessionLoss();
+      if (!snapshot.connected || !snapshot.identityHex) {
+        if (!snapshot.connected && (this.sessionReadyEmitted || this.roadsHydrated)) {
+          this.sessionReadyEmitted = false;
+          this.roadsHydrated = false;
+        }
         return;
       }
-
-      this.cancelPendingSessionLoss();
 
       if (!this.bootstrapComplete && !this.bootstrapInFlight) {
         this.bootstrapInFlight = true;
@@ -78,7 +74,7 @@ export class GameRuntime {
           });
       }
 
-      this.hydrateRoadsIfNeeded(snapshot);
+      this.syncRoads(snapshot);
       this.tryEmitSessionReady();
     });
   }
@@ -86,49 +82,39 @@ export class GameRuntime {
   /** Re-evaluate session readiness after transport reconnects. */
   recoverSession(): void {
     const snapshot = this.store.snapshot;
-    if (!snapshot.connected || !snapshot.identityHex || !this.bootstrapComplete) return;
-    this.cancelPendingSessionLoss();
-    if (this.awaitingSessionRecovery) {
-      this.roadsHydrated = false;
+    if (!snapshot.connected || !snapshot.identityHex) return;
+
+    if (this.bootstrapComplete) {
+      this.syncRoads(snapshot);
+      this.tryEmitSessionReady();
+      return;
     }
-    this.hydrateRoadsIfNeeded(snapshot);
-    this.tryEmitSessionReady();
+
+    if (!this.bootstrapInFlight) {
+      this.bootstrapInFlight = true;
+      void this.ensureWorldBootstrap(snapshot)
+        .catch((error) => {
+          console.warn('[GameRuntime] Failed to bootstrap world entities', error);
+          this.callbacks.onBootstrapFailed?.(error);
+        })
+        .finally(() => {
+          this.bootstrapInFlight = false;
+        });
+    }
   }
 
   dispose(): void {
-    this.cancelPendingSessionLoss();
     this.unsubscribe?.();
     this.unsubscribe = null;
   }
 
-  private scheduleSessionLoss(): void {
-    if (!this.sessionReadyEmitted && !this.awaitingSessionRecovery) return;
-    if (this.pendingLossTimer !== null) return;
-
-    this.pendingLossTimer = window.setTimeout(() => {
-      this.pendingLossTimer = null;
-      if (this.store.isConnected) {
-        this.recoverSession();
-        return;
-      }
-
-      this.roadsHydrated = false;
-      this.sessionReadyEmitted = false;
-      this.awaitingSessionRecovery = true;
-      this.callbacks.onSessionLost?.();
-    }, DISCONNECT_GRACE_MS);
-  }
-
-  private cancelPendingSessionLoss(): void {
-    if (this.pendingLossTimer === null) return;
-    window.clearTimeout(this.pendingLossTimer);
-    this.pendingLossTimer = null;
-  }
-
-  private hydrateRoadsIfNeeded(snapshot: SpacetimeGameSnapshot): void {
-    if (this.roadsHydrated || !snapshot.roads) return;
+  private syncRoads(snapshot: SpacetimeGameSnapshot): void {
+    if (!snapshot.roads) return;
+    const changed = !this.roadsHydrated;
     this.roadsHydrated = true;
-    this.callbacks.onRoadsHydrated(snapshot.roads);
+    if (changed) {
+      this.callbacks.onRoadsHydrated(snapshot.roads);
+    }
   }
 
   private async ensureWorldBootstrap(snapshot: SpacetimeGameSnapshot): Promise<void> {
@@ -143,6 +129,7 @@ export class GameRuntime {
     }
     await this.store.bootstrapWorld(this.registry, this.worldLayout);
     this.bootstrapComplete = true;
+    this.syncRoads(this.store.snapshot);
     this.tryEmitSessionReady();
   }
 
@@ -150,15 +137,14 @@ export class GameRuntime {
     if (this.sessionReadyEmitted || !this.bootstrapComplete || !this.roadsHydrated) {
       return;
     }
-    if (!this.store.isConnected) {
+    if (!this.store.isConnected || !this.store.snapshot.identityHex) {
       return;
     }
     this.sessionReadyEmitted = true;
-    this.awaitingSessionRecovery = false;
     this.callbacks.onSessionReady?.();
   }
 
-  private waitForWorldConfig(maxAttempts = 40): Promise<void> {
+  private waitForWorldConfig(maxAttempts = 80): Promise<void> {
     return new Promise((resolve, reject) => {
       let attempts = 0;
       const poll = (): void => {

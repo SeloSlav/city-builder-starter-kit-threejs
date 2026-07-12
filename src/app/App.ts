@@ -171,7 +171,6 @@ export class App {
           );
         },
         onSessionReady: () => this.sessionLifecycle?.onReady(),
-        onSessionLost: () => this.sessionLifecycle?.onLost(),
       },
     );
     this.sessionLifecycle = new SessionLifecycleController({
@@ -189,7 +188,9 @@ export class App {
 
     session.spacetimeStore.setConnectErrorListener((error) => {
       console.warn('SpacetimeDB connection error:', error);
-      clearAuthoritativeWorldGeneration();
+      if (!session.spacetimeStore.isConnected) {
+        clearAuthoritativeWorldGeneration();
+      }
       this.sessionLifecycle?.onBootConnectionFailure();
     });
 

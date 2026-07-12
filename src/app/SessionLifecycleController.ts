@@ -21,20 +21,19 @@ export type SessionLifecycleDeps = {
   recoverSession?: () => void;
 };
 
+const DISCONNECT_OVERLAY_DELAY_MS = 4_000;
+
 export class SessionLifecycleController {
   private reconnectTimer: number | null = null;
+  private disconnectOverlayTimer: number | null = null;
   private unsubscribeStore: (() => void) | null = null;
-  private transportLive = false;
+  private sawTransport = false;
   private readonly deps: SessionLifecycleDeps;
 
   constructor(deps: SessionLifecycleDeps) {
     this.deps = deps;
     this.unsubscribeStore = deps.spacetimeStore.subscribe((snapshot) => {
-      const live = snapshot.connected && snapshot.identityHex !== null;
-      if (live && !this.transportLive) {
-        this.onTransportConnected();
-      }
-      this.transportLive = live;
+      this.onStoreSnapshot(snapshot.connected && snapshot.identityHex !== null);
     });
   }
 
@@ -42,6 +41,7 @@ export class SessionLifecycleController {
     this.unsubscribeStore?.();
     this.unsubscribeStore = null;
     this.clearReconnectTimer();
+    this.clearDisconnectOverlayTimer();
   }
 
   onReady(): void {
@@ -50,44 +50,7 @@ export class SessionLifecycleController {
     this.deps.connectionOverlay.hide();
     this.deps.toolbar?.setGameplayEnabled(true);
     this.clearReconnectTimer();
-  }
-
-  onLost(): void {
-    this.deps.sessionGate.markDisconnected();
-    this.deactivateAllTools();
-    this.deps.toolbar?.setGameplayEnabled(false);
-    if (this.deps.spacetimeStore.isConnected) {
-      this.deps.connectionOverlay.show(
-        'Reconnecting…',
-        'Restoring SpacetimeDB session…',
-      );
-      this.deps.recoverSession?.();
-      return;
-    }
-    this.deps.connectionOverlay.show(
-      'Connection lost',
-      'Retrying SpacetimeDB connection…',
-    );
-    this.scheduleReconnect();
-  }
-
-  onBootConnectionFailure(): void {
-    if (this.deps.sessionGate.hasEverBeenReady()) {
-      if (this.deps.spacetimeStore.isConnected) {
-        this.deps.recoverSession?.();
-        return;
-      }
-      this.onLost();
-      return;
-    }
-    this.deps.loadingScreen?.setErrorState(
-      {
-        label: 'SpacetimeDB unavailable',
-        detail: 'Run `spacetime start` and `npm run deploy:local`, then retry.',
-      },
-      () => this.retryConnection(),
-    );
-    this.scheduleReconnect();
+    this.clearDisconnectOverlayTimer();
   }
 
   onBootstrapFailed(error: unknown, retry: () => void): void {
@@ -106,6 +69,26 @@ export class SessionLifecycleController {
     );
   }
 
+  onBootConnectionFailure(): void {
+    if (this.deps.spacetimeStore.isConnected) {
+      this.deps.recoverSession?.();
+      return;
+    }
+    if (this.deps.sessionGate.hasEverBeenReady()) {
+      this.scheduleDisconnectOverlay();
+      this.scheduleReconnect();
+      return;
+    }
+    this.deps.loadingScreen?.setErrorState(
+      {
+        label: 'SpacetimeDB unavailable',
+        detail: 'Run `spacetime start` and `npm run deploy:local`, then retry.',
+      },
+      () => this.retryConnection(),
+    );
+    this.scheduleReconnect();
+  }
+
   retryConnection(): void {
     this.deps.sessionGate.markConnecting();
     this.deps.loadingScreen?.setProgress({
@@ -120,17 +103,50 @@ export class SessionLifecycleController {
     this.scheduleReconnect();
   }
 
-  private onTransportConnected(): void {
-    if (!this.deps.sessionGate.hasEverBeenReady() || this.deps.sessionGate.isReady()) {
+  private onStoreSnapshot(transportLive: boolean): void {
+    if (transportLive) {
+      this.sawTransport = true;
+      this.clearDisconnectOverlayTimer();
+      this.deps.connectionOverlay.hide();
+      if (!this.deps.sessionGate.isReady()) {
+        this.deps.recoverSession?.();
+      }
       return;
     }
-    this.deps.recoverSession?.();
-    if (!this.deps.sessionGate.isReady()) {
-      this.deps.connectionOverlay.show(
-        'Reconnecting…',
-        'Restoring SpacetimeDB session…',
-      );
+
+    if (!this.sawTransport && !this.deps.sessionGate.hasEverBeenReady()) {
+      return;
     }
+
+    this.scheduleDisconnectOverlay();
+    if (this.deps.sessionGate.isReady()) {
+      this.deps.sessionGate.markDisconnected();
+      this.deactivateAllTools();
+      this.deps.toolbar?.setGameplayEnabled(false);
+    }
+    this.scheduleReconnect();
+  }
+
+  private scheduleDisconnectOverlay(): void {
+    if (this.disconnectOverlayTimer !== null) return;
+    this.disconnectOverlayTimer = window.setTimeout(() => {
+      this.disconnectOverlayTimer = null;
+      if (this.deps.spacetimeStore.isConnected) {
+        this.deps.recoverSession?.();
+        this.deps.connectionOverlay.hide();
+        return;
+      }
+      this.deps.connectionOverlay.show(
+        'Connection lost',
+        'Retrying SpacetimeDB connection…',
+      );
+    }, DISCONNECT_OVERLAY_DELAY_MS);
+  }
+
+  private clearDisconnectOverlayTimer(): void {
+    if (this.disconnectOverlayTimer === null) return;
+    window.clearTimeout(this.disconnectOverlayTimer);
+    this.disconnectOverlayTimer = null;
   }
 
   private scheduleReconnect(): void {
