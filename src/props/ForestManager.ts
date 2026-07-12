@@ -8,7 +8,7 @@ import type { RoadEdge } from '../roads/RoadEdge.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
 import { distancePointToPolylineXZ, type RockObstacle } from '../utils/pathGeometry.ts';
 import { distancePointToPolygon2 } from '../utils/polygonGeometry.ts';
-import type { UndergrowthInstances, UndergrowthPlacement } from './ForestUndergrowth.ts';
+import type { UndergrowthInstances, UndergrowthKind, UndergrowthPlacement } from './ForestUndergrowth.ts';
 import {
   computeRoadStumpPlacements,
   createRoadStumpMesh,
@@ -188,6 +188,7 @@ export class ForestManager {
     if (this.undergrowth) {
       this.undergrowth.bushShadowMesh.castShadow = enabled;
       this.undergrowth.fernShadowMesh.castShadow = enabled;
+      this.undergrowth.juniperShadowMesh.castShadow = enabled;
     }
     this.group.traverse((object) => {
       const mesh = object as THREE.Mesh;
@@ -223,14 +224,15 @@ export class ForestManager {
       }
     }
 
-    if (removedIndexSetsEqual(nextRemoved, this.removedTrees)) return;
+    const treesChanged = !removedIndexSetsEqual(nextRemoved, this.removedTrees);
+    if (treesChanged) {
+      this.removedTrees = nextRemoved;
 
-    this.removedTrees = nextRemoved;
-
-    for (let treeIndex = 0; treeIndex < this.placements.length; treeIndex++) {
-      const phase = this.treePhases.get(treeIndex) ?? 'mature';
-      const growthProgress = this.treeGrowthProgress.get(treeIndex) ?? 1;
-      this.applyTreePhase(treeIndex, phase, growthProgress);
+      for (let treeIndex = 0; treeIndex < this.placements.length; treeIndex++) {
+        const phase = this.treePhases.get(treeIndex) ?? 'mature';
+        const growthProgress = this.treeGrowthProgress.get(treeIndex) ?? 1;
+        this.applyTreePhase(treeIndex, phase, growthProgress);
+      }
     }
 
     this.syncUndergrowthClearance(edges, buildings, burgageParcelPolygons);
@@ -276,10 +278,9 @@ export class ForestManager {
       const shouldRemove = nextRemoved.has(index);
       if (shouldRemove === this.removedUndergrowth.has(index)) continue;
       const placement = this.undergrowthPlacements[index];
-      const mesh = placement.kind === 'bush' ? this.undergrowth.bushMesh : this.undergrowth.fernMesh;
-      const shadowMesh =
-        placement.kind === 'bush' ? this.undergrowth.bushShadowMesh : this.undergrowth.fernShadowMesh;
-      const matrices = placement.kind === 'bush' ? this.undergrowth.bushMatrices : this.undergrowth.fernMatrices;
+      const mesh = undergrowthMeshFor(this.undergrowth, placement.kind);
+      const shadowMesh = undergrowthShadowMeshFor(this.undergrowth, placement.kind);
+      const matrices = undergrowthMatricesFor(this.undergrowth, placement.kind);
       const matrix = shouldRemove ? this.hiddenMatrix : matrices[placement.meshIndex];
       mesh.setMatrixAt(placement.meshIndex, matrix);
       shadowMesh.setMatrixAt(placement.meshIndex, matrix);
@@ -288,8 +289,10 @@ export class ForestManager {
     this.removedUndergrowth = nextRemoved;
     this.undergrowth.bushMesh.instanceMatrix.needsUpdate = true;
     this.undergrowth.fernMesh.instanceMatrix.needsUpdate = true;
+    this.undergrowth.juniperMesh.instanceMatrix.needsUpdate = true;
     this.undergrowth.bushShadowMesh.instanceMatrix.needsUpdate = true;
     this.undergrowth.fernShadowMesh.instanceMatrix.needsUpdate = true;
+    this.undergrowth.juniperShadowMesh.instanceMatrix.needsUpdate = true;
   }
 
   private syncRoadStumps(network: RoadNetwork): void {
@@ -488,6 +491,51 @@ function pointWithinBuildingPad(
   const normDist = Math.hypot(localX / params.radiusX, localZ / params.radiusZ);
   const clearOuter = params.outerFade * 1.04 + canopyRadius / Math.min(params.radiusX, params.radiusZ);
   return normDist <= clearOuter;
+}
+
+function undergrowthMeshFor(instances: UndergrowthInstances, kind: UndergrowthKind): THREE.InstancedMesh {
+  switch (kind) {
+    case 'bush':
+      return instances.bushMesh;
+    case 'fern':
+      return instances.fernMesh;
+    case 'juniper':
+      return instances.juniperMesh;
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function undergrowthShadowMeshFor(instances: UndergrowthInstances, kind: UndergrowthKind): THREE.InstancedMesh {
+  switch (kind) {
+    case 'bush':
+      return instances.bushShadowMesh;
+    case 'fern':
+      return instances.fernShadowMesh;
+    case 'juniper':
+      return instances.juniperShadowMesh;
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function undergrowthMatricesFor(instances: UndergrowthInstances, kind: UndergrowthKind): THREE.Matrix4[] {
+  switch (kind) {
+    case 'bush':
+      return instances.bushMatrices;
+    case 'fern':
+      return instances.fernMatrices;
+    case 'juniper':
+      return instances.juniperMatrices;
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
 }
 
 function removedIndexSetsEqual(a: Set<number>, b: Set<number>): boolean {

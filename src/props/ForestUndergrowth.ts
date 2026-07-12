@@ -1,8 +1,26 @@
 import * as THREE from 'three';
+import { MeshSSSNodeMaterial } from 'three/webgpu';
+import {
+  attribute,
+  cameraViewMatrix,
+  float,
+  modelWorldMatrix,
+  normalMap,
+  normalView,
+  normalize,
+  positionLocal,
+  sin,
+  texture,
+  time,
+  uniform,
+  vec4,
+} from 'three/tsl';
+import { windSpeed, windStrength, WIND_DIR } from '@seedthree/core/wind.js';
 import type { Terrain } from '../terrain/Terrain.ts';
 import { applyFoliageDoubleSideNormals } from '../scene/foliageDoubleSideNormals.ts';
 import { TREE_SHADOW_CAST_LAYER } from '../scene/SceneLayers.ts';
 import type { RendererBackendKind } from '../scene/RendererBackend.ts';
+import { seedThreeLeafUrl } from '../vegetation/seedthree/seedThreeTextures.ts';
 import {
   CENTRAL_CLEARING_RADIUS,
   type ForestCore,
@@ -15,13 +33,42 @@ import {
   samplePointInPlayableExtent,
 } from './forestField.ts';
 
+type TslNode = {
+  mul: (value: unknown) => TslNode;
+  add: (value: unknown) => TslNode;
+  sub: (value: unknown) => TslNode;
+  div: (value: unknown) => TslNode;
+  x: TslNode;
+  y: TslNode;
+  z: TslNode;
+  r: TslNode;
+  xyz: TslNode;
+};
+
+const tsl = {
+  attribute: attribute as (name: string, type: string) => TslNode,
+  cameraViewMatrix: cameraViewMatrix as TslNode,
+  float: float as (value: number) => TslNode,
+  modelWorldMatrix: modelWorldMatrix as TslNode,
+  normalMap: normalMap as (sample: unknown) => TslNode,
+  normalView: normalView as TslNode,
+  normalize: normalize as (value: unknown) => TslNode,
+  positionLocal: positionLocal as TslNode,
+  sin: sin as (value: unknown) => TslNode,
+  texture: texture as (map: THREE.Texture) => TslNode,
+  time: time as TslNode,
+  uniform: uniform as <T>(value: T) => { value: T },
+  vec4: vec4 as (...values: unknown[]) => TslNode,
+  windSpeed: windSpeed as unknown as TslNode,
+  windStrength: windStrength as unknown as TslNode,
+};
+
 const TAU = Math.PI * 2;
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+const windQuat = new THREE.Quaternion();
+const windVecScratch = new THREE.Vector3();
 
-/** Canopy pines are ~15–22 m at scale 1, with veterans up to ~38 m in dense stands. */
-const BUSH_TARGET_WIDTH = 1.55;
-const BUSH_TARGET_HEIGHT = 0.95;
-
-export type UndergrowthKind = 'bush' | 'fern';
+export type UndergrowthKind = 'bush' | 'fern' | 'juniper';
 
 export type UndergrowthPlacement = {
   x: number;
@@ -32,64 +79,111 @@ export type UndergrowthPlacement = {
   meshIndex: number;
 };
 
+type UndergrowthTextureSet = {
+  albedo: THREE.Texture;
+  normal: THREE.Texture | null;
+  roughness: THREE.Texture | null;
+  translucency: THREE.Texture | null;
+};
+
+type UndergrowthTextureFiles = {
+  albedo: string;
+  normal: string;
+  roughness: string;
+  translucency: string;
+};
+
 export type UndergrowthMaterials = {
-  bush: THREE.MeshStandardMaterial;
-  fern: THREE.MeshStandardMaterial;
+  bush: THREE.Material;
+  fern: THREE.Material;
+  juniper: THREE.Material;
   shadowCast: THREE.MeshStandardMaterial;
   bushShadowDepth: THREE.MeshDepthMaterial;
   fernShadowDepth: THREE.MeshDepthMaterial;
+  juniperShadowDepth: THREE.MeshDepthMaterial;
+  textures: THREE.Texture[];
 };
 
 export type UndergrowthInstances = {
   group: THREE.Group;
   bushMesh: THREE.InstancedMesh;
   fernMesh: THREE.InstancedMesh;
+  juniperMesh: THREE.InstancedMesh;
   bushShadowMesh: THREE.InstancedMesh;
   fernShadowMesh: THREE.InstancedMesh;
+  juniperShadowMesh: THREE.InstancedMesh;
   placements: UndergrowthPlacement[];
   bushMatrices: THREE.Matrix4[];
   fernMatrices: THREE.Matrix4[];
+  juniperMatrices: THREE.Matrix4[];
 };
 
-export function createUndergrowthMaterials(
-  _maxAnisotropy: number,
-  _rendererBackend: RendererBackendKind | undefined,
+type UndergrowthBucket = {
+  placements: UndergrowthPlacement[];
+  mesh: THREE.InstancedMesh;
+  shadowMesh: THREE.InstancedMesh;
+  matrices: THREE.Matrix4[];
+  tintAttr: THREE.InstancedBufferAttribute;
+  anchorAttr: THREE.InstancedBufferAttribute;
+  windVecAttr: THREE.InstancedBufferAttribute;
+};
+
+const CARD_FILES: Record<UndergrowthKind, UndergrowthTextureFiles> = {
+  bush: {
+    albedo: 'bilberry_albedo.png',
+    normal: 'bilberry_normal.png',
+    roughness: 'bilberry_roughness.png',
+    translucency: 'bilberry_translucency.png',
+  },
+  fern: {
+    albedo: 'fern_albedo.png',
+    normal: 'fern_normal.png',
+    roughness: 'fern_roughness.png',
+    translucency: 'fern_translucency.png',
+  },
+  juniper: {
+    albedo: 'juniper_scrub_albedo.png',
+    normal: 'juniper_scrub_normal.png',
+    roughness: 'juniper_scrub_roughness.png',
+    translucency: 'juniper_scrub_translucency.png',
+  },
+};
+
+const CARD_GEOMETRY = {
+  bush: { quads: 7, width: 0.82, tiltMin: 0.14, tiltSpan: 0.42, heightMin: 0.7, heightSpan: 0.45, baseSpread: 0.12 },
+  fern: { quads: 8, width: 0.62, tiltMin: 0.38, tiltSpan: 0.42, heightMin: 0.82, heightSpan: 0.34, baseSpread: 0.08 },
+  juniper: { quads: 6, width: 0.88, tiltMin: 0.18, tiltSpan: 0.48, heightMin: 0.72, heightSpan: 0.42, baseSpread: 0.1 },
+} satisfies Record<UndergrowthKind, CardGeometrySpec>;
+
+const loader = new THREE.TextureLoader();
+
+export async function createUndergrowthMaterials(
+  maxAnisotropy: number,
+  rendererBackend: RendererBackendKind | undefined,
   _sharedTextures: THREE.Texture[],
-): UndergrowthMaterials {
-  const bush = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 0.9,
-    metalness: 0,
-    side: THREE.DoubleSide,
-    vertexColors: true,
-  });
-
-  const fern = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    roughness: 0.9,
-    metalness: 0,
-    side: THREE.DoubleSide,
-    vertexColors: true,
-  });
-
-  applyFoliageDoubleSideNormals(bush);
-  applyFoliageDoubleSideNormals(fern);
+): Promise<UndergrowthMaterials> {
+  const [bushTextures, fernTextures, juniperTextures] = await Promise.all([
+    loadUndergrowthTextures(CARD_FILES.bush, maxAnisotropy),
+    loadUndergrowthTextures(CARD_FILES.fern, maxAnisotropy),
+    loadUndergrowthTextures(CARD_FILES.juniper, maxAnisotropy),
+  ]);
+  const useNodeMaterials = rendererBackend === 'webgpu';
+  const textures = collectTextures(bushTextures, fernTextures, juniperTextures);
 
   return {
-    bush,
-    fern,
+    bush: createUndergrowthCardMaterial('SeedThree bilberry undergrowth', bushTextures, useNodeMaterials, [0.42, 0.6, 0.22]),
+    fern: createUndergrowthCardMaterial('SeedThree fern undergrowth', fernTextures, useNodeMaterials, [0.36, 0.68, 0.25]),
+    juniper: createUndergrowthCardMaterial('SeedThree juniper undergrowth', juniperTextures, useNodeMaterials, [0.3, 0.48, 0.2]),
     shadowCast: new THREE.MeshStandardMaterial({
       transparent: true,
       opacity: 0,
       colorWrite: false,
       depthWrite: false,
     }),
-    bushShadowDepth: new THREE.MeshDepthMaterial({
-      depthPacking: THREE.RGBADepthPacking,
-    }),
-    fernShadowDepth: new THREE.MeshDepthMaterial({
-      depthPacking: THREE.RGBADepthPacking,
-    }),
+    bushShadowDepth: new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }),
+    fernShadowDepth: new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }),
+    juniperShadowDepth: new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }),
+    textures,
   };
 }
 
@@ -116,17 +210,24 @@ export function createUndergrowthPlacements(
     const density = forestDensityAt(x, z, forestCores, spawnConfig.extent, spawnConfig.terrainExtent);
     if (density < 0.22 || rng() > density * 1.08) continue;
 
-    const kind: UndergrowthKind = rng() < 0.58 + density * 0.12 ? 'bush' : 'fern';
-    const minDistance = kind === 'bush' ? THREE.MathUtils.lerp(1.6, 1.0, density) : THREE.MathUtils.lerp(1.3, 0.8, density);
+    const kind = pickUndergrowthKind(rng, density);
+    const minDistance =
+      kind === 'fern'
+        ? THREE.MathUtils.lerp(1.3, 0.8, density)
+        : kind === 'juniper'
+          ? THREE.MathUtils.lerp(1.85, 1.25, density)
+          : THREE.MathUtils.lerp(1.6, 1.0, density);
     if (!hasMinimumDistance(placements, x, z, minDistance)) continue;
     if (isBlockedAt?.(x, z)) continue;
 
-    const scale =
-      kind === 'bush'
-        ? THREE.MathUtils.lerp(0.95, 1.65, Math.pow(rng(), 0.78)) * THREE.MathUtils.lerp(0.92, 1.1, density)
-        : THREE.MathUtils.lerp(1.05, 1.85, Math.pow(rng(), 0.72)) * THREE.MathUtils.lerp(0.9, 1.12, density);
-
-    placements.push({ x, z, kind, scale, yaw: rng() * TAU, meshIndex: -1 });
+    placements.push({
+      x,
+      z,
+      kind,
+      scale: sampleUndergrowthScale(kind, density, rng),
+      yaw: rng() * TAU,
+      meshIndex: -1,
+    });
   }
 
   return placements;
@@ -139,105 +240,132 @@ export function buildUndergrowthInstances(
   rng: () => number,
 ): UndergrowthInstances {
   const group = new THREE.Group();
-  group.name = 'Forest undergrowth';
+  group.name = 'SeedThree temperate undergrowth';
 
   const bushPlacements = placements.filter((p) => p.kind === 'bush');
   const fernPlacements = placements.filter((p) => p.kind === 'fern');
+  const juniperPlacements = placements.filter((p) => p.kind === 'juniper');
 
-  const bushGeometry = createBroadleafBushGeometry();
-  const fernGeometry = createFernClumpGeometry();
-  const bushShadowGeometry = createBushShadowGeometry();
-  const fernShadowGeometry = fernGeometry.clone();
+  const bush = createUndergrowthBucket('bush', bushPlacements, materials.bush, materials.shadowCast, materials.bushShadowDepth);
+  const fern = createUndergrowthBucket('fern', fernPlacements, materials.fern, materials.shadowCast, materials.fernShadowDepth);
+  const juniper = createUndergrowthBucket('juniper', juniperPlacements, materials.juniper, materials.shadowCast, materials.juniperShadowDepth);
 
-  const bushMesh = createFoliageInstancedMesh(bushGeometry, materials.bush, bushPlacements.length, 'Instanced bushes');
-  const fernMesh = createFoliageInstancedMesh(fernGeometry, materials.fern, fernPlacements.length, 'Instanced ferns');
-  const bushShadowMesh = createShadowInstancedMesh(
-    bushShadowGeometry,
-    materials.shadowCast,
-    materials.bushShadowDepth,
-    bushPlacements.length,
-    'Instanced bush shadows',
+  placeUndergrowthBucket(bush, terrain, rng);
+  placeUndergrowthBucket(fern, terrain, rng);
+  placeUndergrowthBucket(juniper, terrain, rng);
+
+  group.add(
+    bush.mesh,
+    fern.mesh,
+    juniper.mesh,
+    bush.shadowMesh,
+    fern.shadowMesh,
+    juniper.shadowMesh,
   );
-  const fernShadowMesh = createShadowInstancedMesh(
-    fernShadowGeometry,
-    materials.shadowCast,
-    materials.fernShadowDepth,
-    fernPlacements.length,
-    'Instanced fern shadows',
-  );
-
-  const matrix = new THREE.Matrix4();
-  const quaternion = new THREE.Quaternion();
-  const position = new THREE.Vector3();
-  const scaleVector = new THREE.Vector3();
-  const color = new THREE.Color();
-  const bushMatrices = bushPlacements.map(() => new THREE.Matrix4());
-  const fernMatrices = fernPlacements.map(() => new THREE.Matrix4());
-
-  bushPlacements.forEach((placement, index) => {
-    placement.meshIndex = index;
-    composeUndergrowthMatrix(placement, terrain, rng, matrix, quaternion, position, scaleVector);
-    bushMesh.setMatrixAt(index, matrix);
-    bushShadowMesh.setMatrixAt(index, matrix);
-    bushMatrices[index].copy(matrix);
-    color.setHSL(0.28 + (rng() - 0.5) * 0.03, 0.38 + rng() * 0.12, 0.3 + rng() * 0.08);
-    bushMesh.setColorAt(index, color);
-  });
-
-  fernPlacements.forEach((placement, index) => {
-    placement.meshIndex = index;
-    composeUndergrowthMatrix(placement, terrain, rng, matrix, quaternion, position, scaleVector);
-    fernMesh.setMatrixAt(index, matrix);
-    fernShadowMesh.setMatrixAt(index, matrix);
-    fernMatrices[index].copy(matrix);
-    color.setHSL(0.31 + (rng() - 0.5) * 0.04, 0.5 + rng() * 0.14, 0.34 + rng() * 0.1);
-    fernMesh.setColorAt(index, color);
-  });
-
-  bushMesh.instanceMatrix.needsUpdate = true;
-  fernMesh.instanceMatrix.needsUpdate = true;
-  bushShadowMesh.instanceMatrix.needsUpdate = true;
-  fernShadowMesh.instanceMatrix.needsUpdate = true;
-  if (bushMesh.instanceColor) bushMesh.instanceColor.needsUpdate = true;
-  if (fernMesh.instanceColor) fernMesh.instanceColor.needsUpdate = true;
-
-  group.add(bushMesh, fernMesh, bushShadowMesh, fernShadowMesh);
 
   return {
     group,
-    bushMesh,
-    fernMesh,
-    bushShadowMesh,
-    fernShadowMesh,
+    bushMesh: bush.mesh,
+    fernMesh: fern.mesh,
+    juniperMesh: juniper.mesh,
+    bushShadowMesh: bush.shadowMesh,
+    fernShadowMesh: fern.shadowMesh,
+    juniperShadowMesh: juniper.shadowMesh,
     placements,
-    bushMatrices,
-    fernMatrices,
+    bushMatrices: bush.matrices,
+    fernMatrices: fern.matrices,
+    juniperMatrices: juniper.matrices,
   };
 }
 
 export function disposeUndergrowthInstances(instances: UndergrowthInstances, materials: UndergrowthMaterials): void {
   instances.bushMesh.geometry.dispose();
   instances.fernMesh.geometry.dispose();
+  instances.juniperMesh.geometry.dispose();
   instances.bushShadowMesh.geometry.dispose();
   instances.fernShadowMesh.geometry.dispose();
+  instances.juniperShadowMesh.geometry.dispose();
   materials.bush.dispose();
   materials.fern.dispose();
+  materials.juniper.dispose();
   materials.shadowCast.dispose();
   materials.bushShadowDepth.dispose();
   materials.fernShadowDepth.dispose();
+  materials.juniperShadowDepth.dispose();
+  materials.textures.forEach((texture) => texture.dispose());
 }
 
-function createFoliageInstancedMesh(
-  geometry: THREE.BufferGeometry,
-  material: THREE.MeshStandardMaterial,
-  count: number,
-  name: string,
-): THREE.InstancedMesh {
-  const mesh = new THREE.InstancedMesh(geometry, material, count);
-  mesh.name = name;
+function createUndergrowthBucket(
+  kind: UndergrowthKind,
+  placements: UndergrowthPlacement[],
+  material: THREE.Material,
+  shadowCast: THREE.MeshStandardMaterial,
+  shadowDepth: THREE.MeshDepthMaterial,
+): UndergrowthBucket {
+  const capacity = Math.max(placements.length, 1);
+  const geometry = createCardClumpGeometry(CARD_GEOMETRY[kind]);
+  const tintAttr = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
+  const anchorAttr = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
+  const windVecAttr = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
+  geometry.setAttribute('aTint', tintAttr);
+  geometry.setAttribute('aAnchorPos', anchorAttr);
+  geometry.setAttribute('aWindVec', windVecAttr);
+
+  const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+  mesh.name = `SeedThree ${kind} undergrowth cards`;
+  mesh.count = placements.length;
   mesh.castShadow = false;
   mesh.receiveShadow = true;
-  return mesh;
+
+  const shadowMesh = createShadowInstancedMesh(
+    createUndergrowthShadowGeometry(kind),
+    shadowCast,
+    shadowDepth,
+    capacity,
+    `SeedThree ${kind} undergrowth shadows`,
+  );
+  shadowMesh.count = placements.length;
+
+  return {
+    placements,
+    mesh,
+    shadowMesh,
+    matrices: placements.map(() => new THREE.Matrix4()),
+    tintAttr,
+    anchorAttr,
+    windVecAttr,
+  };
+}
+
+function placeUndergrowthBucket(bucket: UndergrowthBucket, terrain: Terrain, rng: () => number): void {
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const position = new THREE.Vector3();
+  const scaleVector = new THREE.Vector3();
+  const color = new THREE.Color();
+
+  bucket.placements.forEach((placement, index) => {
+    placement.meshIndex = index;
+    const yaw = composeUndergrowthMatrix(placement, terrain, rng, matrix, quaternion, position, scaleVector);
+    bucket.mesh.setMatrixAt(index, matrix);
+    bucket.shadowMesh.setMatrixAt(index, matrix);
+    bucket.matrices[index].copy(matrix);
+
+    const tint = sampleUndergrowthTint(placement.kind, rng);
+    bucket.tintAttr.setXYZ(index, tint.x, tint.y, tint.z);
+    bucket.anchorAttr.setXYZ(index, position.x, position.y, position.z);
+    const windVec = undergrowthWindVecForYaw(yaw);
+    bucket.windVecAttr.setXYZ(index, windVec.x, windVec.y, windVec.z);
+    color.setRGB(tint.x, tint.y, tint.z);
+    bucket.mesh.setColorAt(index, color);
+  });
+
+  bucket.mesh.instanceMatrix.needsUpdate = true;
+  bucket.shadowMesh.instanceMatrix.needsUpdate = true;
+  bucket.tintAttr.needsUpdate = true;
+  bucket.anchorAttr.needsUpdate = true;
+  bucket.windVecAttr.needsUpdate = true;
+  if (bucket.mesh.instanceColor) bucket.mesh.instanceColor.needsUpdate = true;
 }
 
 function createShadowInstancedMesh(
@@ -264,398 +392,282 @@ function composeUndergrowthMatrix(
   quaternion: THREE.Quaternion,
   position: THREE.Vector3,
   scaleVector: THREE.Vector3,
-): void {
-  const y = terrain.getHeightAt(placement.x, placement.z);
+): number {
+  const y = terrain.getHeightAt(placement.x, placement.z) - 0.025;
+  const yaw = placement.yaw + (rng() - 0.5) * 0.24;
+  const leanDirection = rng() * TAU;
+  const lean = placement.kind === 'fern'
+    ? THREE.MathUtils.lerp(0.1, 0.28, rng())
+    : THREE.MathUtils.lerp(0.04, 0.16, rng());
   position.set(placement.x, y, placement.z);
   quaternion.setFromEuler(
     new THREE.Euler(
-      (rng() - 0.5) * 0.04,
-      placement.yaw,
-      (rng() - 0.5) * 0.04,
+      Math.cos(leanDirection) * lean,
+      yaw,
+      Math.sin(leanDirection) * lean * 0.7,
+      'YXZ',
     ),
   );
-  const heightScale = placement.kind === 'bush' ? 0.82 + rng() * 0.12 : 0.96 + rng() * 0.14;
-  scaleVector.set(placement.scale, placement.scale * heightScale, placement.scale);
+  const widthFactor = placement.kind === 'fern' ? 1.15 : placement.kind === 'juniper' ? 1.35 : 1.28;
+  const widthScale = placement.scale * widthFactor * THREE.MathUtils.lerp(0.9, 1.14, rng());
+  const heightScale = placement.scale * THREE.MathUtils.lerp(0.92, 1.14, rng());
+  scaleVector.set(widthScale, heightScale, widthScale);
   matrix.compose(position, quaternion, scaleVector);
+  return yaw;
 }
 
-/**
- * Broadleaf understory shrub — wide, low, matte green leaf masses with visible brown twigs.
- * No conifer needle texture; silhouette is horizontal not conical.
- */
-function createBroadleafBushGeometry(): THREE.BufferGeometry {
+function pickUndergrowthKind(rng: () => number, density: number): UndergrowthKind {
+  const juniperChance = THREE.MathUtils.lerp(0.18, 0.055, density);
+  const fernChance = THREE.MathUtils.lerp(0.26, 0.42, density);
+  const roll = rng();
+  if (roll < juniperChance) return 'juniper';
+  if (roll < juniperChance + fernChance) return 'fern';
+  return 'bush';
+}
+
+function sampleUndergrowthScale(kind: UndergrowthKind, density: number, rng: () => number): number {
+  const densityMul = THREE.MathUtils.lerp(0.92, 1.08, density);
+  switch (kind) {
+    case 'bush':
+      return THREE.MathUtils.lerp(0.52, 0.92, Math.pow(rng(), 0.78)) * densityMul;
+    case 'fern':
+      return THREE.MathUtils.lerp(0.68, 1.18, Math.pow(rng(), 0.7)) * THREE.MathUtils.lerp(0.9, 1.1, density);
+    case 'juniper':
+      return THREE.MathUtils.lerp(0.54, 1.04, Math.pow(rng(), 0.84)) * THREE.MathUtils.lerp(1.04, 0.9, density);
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function sampleUndergrowthTint(kind: UndergrowthKind, rng: () => number): THREE.Vector3 {
+  switch (kind) {
+    case 'bush':
+      return new THREE.Vector3(
+        rngRange(rng, 0.72, 0.94),
+        rngRange(rng, 0.82, 1.08),
+        rngRange(rng, 0.72, 0.96),
+      );
+    case 'fern':
+      return new THREE.Vector3(
+        rngRange(rng, 0.72, 0.92),
+        rngRange(rng, 0.92, 1.18),
+        rngRange(rng, 0.66, 0.9),
+      );
+    case 'juniper':
+      return new THREE.Vector3(
+        rngRange(rng, 0.68, 0.9),
+        rngRange(rng, 0.78, 1.0),
+        rngRange(rng, 0.78, 1.06),
+      );
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function createUndergrowthCardMaterial(
+  name: string,
+  textures: UndergrowthTextureSet,
+  useNodeMaterial: boolean,
+  transmitRGB: [number, number, number],
+): THREE.Material {
+  if (!useNodeMaterial) {
+    const material = new THREE.MeshStandardMaterial({
+      name,
+      map: textures.albedo,
+      normalMap: textures.normal,
+      roughnessMap: textures.roughness,
+      alphaTest: 0.42,
+      side: THREE.DoubleSide,
+      roughness: 0.96,
+      metalness: 0,
+      vertexColors: true,
+    });
+    material.forceSinglePass = true;
+    material.normalScale.set(0.45, 0.45);
+    applyFoliageDoubleSideNormals(material);
+    return material;
+  }
+
+  const material = new MeshSSSNodeMaterial({
+    map: textures.albedo,
+    alphaTest: 0.42,
+    side: THREE.DoubleSide,
+    roughness: 0.96,
+    metalness: 0,
+  });
+  material.name = name;
+  material.forceSinglePass = true;
+  material.roughnessMap = textures.roughness;
+  if (textures.roughness) material.roughness = 1.0;
+
+  const transmit = tsl.uniform(new THREE.Color().setRGB(...transmitRGB));
+  const edge = textures.translucency ? tsl.texture(textures.translucency).r : tsl.float(1);
+  material.thicknessColorNode = edge.mul(tsl.attribute('aTint', 'vec3').y).mul(transmit);
+  material.thicknessDistortionNode = tsl.uniform(0.35);
+  material.thicknessAmbientNode = tsl.uniform(0.05);
+  material.thicknessAttenuationNode = tsl.uniform(1.0);
+  material.thicknessPowerNode = tsl.uniform(5.0);
+  material.thicknessScaleNode = tsl.uniform(2.25);
+  material.colorNode = tsl.texture(textures.albedo).mul(tsl.vec4(tsl.attribute('aTint', 'vec3'), tsl.float(1)));
+  material.positionNode = createUndergrowthWindPosition(1);
+
+  const upView = tsl.cameraViewMatrix.mul(tsl.vec4(0, 1, 0, 0)).xyz;
+  const relief = textures.normal ? tsl.normalMap(tsl.texture(textures.normal)).sub(tsl.normalView) : null;
+  material.normalNode = relief ? tsl.normalize(upView.add(relief.mul(0.52))) : tsl.normalize(upView);
+  return material;
+}
+
+function createUndergrowthWindPosition(bladeHeight = 1): TslNode {
+  const heightNorm = tsl.positionLocal.y.div(tsl.float(bladeHeight));
+  const k = heightNorm.mul(heightNorm);
+  const amp = tsl.windStrength.mul(0.18);
+  const anchorWorld = tsl.modelWorldMatrix.mul(tsl.vec4(tsl.attribute('aAnchorPos', 'vec3'), tsl.float(1))).xyz;
+  const phase = anchorWorld.x.mul(0.35).add(anchorWorld.z.mul(0.27)).mul(2.0);
+  const gust = tsl.sin(tsl.time.mul(tsl.windSpeed).mul(1.15).add(phase)).mul(amp);
+  const jitter = tsl.sin(tsl.time.mul(tsl.windSpeed).mul(3.0).add(anchorWorld.x.mul(1.3)).add(anchorWorld.z.mul(1.7)))
+    .mul(amp)
+    .mul(0.2);
+  return tsl.positionLocal.add(tsl.attribute('aWindVec', 'vec3').mul(gust.add(jitter)).mul(k));
+}
+
+function undergrowthWindVecForYaw(yaw: number, out = windVecScratch): THREE.Vector3 {
+  windQuat.setFromAxisAngle(Y_AXIS, -yaw);
+  return out.copy(WIND_DIR).applyQuaternion(windQuat);
+}
+
+type CardGeometrySpec = {
+  quads: number;
+  width: number;
+  tiltMin: number;
+  tiltSpan: number;
+  heightMin: number;
+  heightSpan: number;
+  baseSpread: number;
+};
+
+function createCardClumpGeometry(spec: CardGeometrySpec): THREE.BufferGeometry {
   const positions: number[] = [];
   const normals: number[] = [];
-  const colors: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
+  let base = 0;
 
-  const leafGreen = new THREE.Color(0x4a6340);
-  const leafHighlight = new THREE.Color(0x5a7550);
-  const leafShadow = new THREE.Color(0x3a5032);
-  const twigBrown = new THREE.Color(0x5c4a38);
+  for (let quad = 0; quad < spec.quads; quad++) {
+    const azimuth = (quad / spec.quads) * TAU + (hash01(quad + 1.7) - 0.5) * 0.95;
+    const tilt = spec.tiltMin + hash01(quad + 7.1) * spec.tiltSpan;
+    const height = spec.heightMin + hash01(quad + 3.3) * spec.heightSpan;
+    const width = spec.width * (0.76 + hash01(quad + 11.4) * 0.52);
+    const offset = spec.baseSpread * hash01(quad + 5.2);
+    const ca = Math.cos(azimuth);
+    const sa = Math.sin(azimuth);
+    const cx = ca * offset;
+    const cz = sa * offset;
+    const upX = Math.sin(tilt) * ca;
+    const upY = Math.cos(tilt);
+    const upZ = Math.sin(tilt) * sa;
+    const rightX = -sa;
+    const rightZ = ca;
 
-  const moundBlobs = [
-    { x: 0, y: 0.32, z: 0, sx: 0.72, sy: 0.38, sz: 0.72 },
-    { x: 0.28, y: 0.24, z: 0.14, sx: 0.48, sy: 0.28, sz: 0.44 },
-    { x: -0.26, y: 0.26, z: -0.12, sx: 0.46, sy: 0.26, sz: 0.42 },
-    { x: 0.1, y: 0.38, z: -0.24, sx: 0.42, sy: 0.22, sz: 0.38 },
-    { x: -0.14, y: 0.34, z: 0.26, sx: 0.4, sy: 0.24, sz: 0.4 },
-    { x: 0.32, y: 0.18, z: -0.2, sx: 0.36, sy: 0.2, sz: 0.32 },
-    { x: -0.3, y: 0.2, z: 0.18, sx: 0.34, sy: 0.19, sz: 0.34 },
-  ];
+    for (const [localX, localY] of [
+      [-0.5 * width, 0],
+      [0.5 * width, 0],
+      [0.5 * width, 1],
+      [-0.5 * width, 1],
+    ] as const) {
+      positions.push(
+        cx + rightX * localX + upX * localY * height,
+        upY * localY * height,
+        cz + rightZ * localX + upZ * localY * height,
+      );
+      normals.push(0, 1, 0);
+      uvs.push(localX / width + 0.5, localY);
+    }
 
-  const blobTemplate = new THREE.IcosahedronGeometry(1, 2);
-  for (const blob of moundBlobs) {
-    appendScaledBlob(positions, normals, colors, indices, blobTemplate, blob, pickLeafColor(leafGreen, leafHighlight, leafShadow, blob.x + blob.z));
-  }
-  blobTemplate.dispose();
-
-  const padCount = 12;
-  for (let i = 0; i < padCount; i++) {
-    const angle = (i / padCount) * TAU;
-    const dist = 0.42 + (i % 3) * 0.1;
-    const padY = 0.38 + (i % 4) * 0.08;
-    appendLeafPad(
-      positions,
-      normals,
-      colors,
-      indices,
-      Math.cos(angle) * dist,
-      padY,
-      Math.sin(angle) * dist,
-      angle,
-      0.38 + (i % 2) * 0.08,
-      i % 3 === 0 ? leafHighlight : leafGreen,
-    );
+    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    base += 4;
   }
 
-  const twigCount = 7;
-  for (let i = 0; i < twigCount; i++) {
-    const angle = (i / twigCount) * TAU + 0.25;
-    const length = 0.48 + (i % 2) * 0.14;
-    appendTwig(
-      positions,
-      normals,
-      colors,
-      indices,
-      Math.cos(angle) * 0.08,
-      0.22 + (i % 3) * 0.06,
-      Math.sin(angle) * 0.08,
-      Math.cos(angle),
-      Math.sin(angle),
-      length,
-      twigBrown,
-    );
-  }
-
-  return finalizeColoredGeometry(positions, normals, colors, indices);
-}
-
-function createFernClumpGeometry(): THREE.BufferGeometry {
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
-  const frondGreen = new THREE.Color(0x567842);
-  const frondLight = new THREE.Color(0x6a8f52);
-  const stemBrown = new THREE.Color(0x4a5c36);
-
-  const frondCount = 9;
-  for (let i = 0; i < frondCount; i++) {
-    const angle = (i / frondCount) * TAU + (i % 2 === 0 ? 0.1 : -0.08);
-    const length = 0.88 + (i % 3) * 0.14;
-    const arch = 1.05 + (i % 4) * 0.12;
-    addPinnateFrond(
-      positions,
-      normals,
-      colors,
-      indices,
-      angle,
-      length,
-      arch,
-      i % 2 === 0 ? frondLight : frondGreen,
-      stemBrown,
-    );
-  }
-
-  return finalizeColoredGeometry(positions, normals, colors, indices);
-}
-
-function createBushShadowGeometry(): THREE.BufferGeometry {
-  const geometry = new THREE.SphereGeometry(1, 10, 8, 0, TAU, 0, Math.PI * 0.52);
-  geometry.scale(BUSH_TARGET_WIDTH * 0.42, BUSH_TARGET_HEIGHT * 0.38, BUSH_TARGET_WIDTH * 0.42);
-  geometry.translate(0, BUSH_TARGET_HEIGHT * 0.22, 0);
-  geometry.computeVertexNormals();
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeBoundingSphere();
   return geometry;
 }
 
-function pickLeafColor(base: THREE.Color, highlight: THREE.Color, shadow: THREE.Color, hash: number): THREE.Color {
-  const t = Math.abs(Math.sin(hash * 12.9898)) % 1;
-  if (t < 0.28) return shadow.clone();
-  if (t > 0.72) return highlight.clone();
-  return base.clone();
-}
-
-function appendScaledBlob(
-  positions: number[],
-  normals: number[],
-  colors: number[],
-  indices: number[],
-  template: THREE.BufferGeometry,
-  blob: { x: number; y: number; z: number; sx: number; sy: number; sz: number },
-  color: THREE.Color,
-): void {
-  const geometry = template.clone();
-  const position = geometry.getAttribute('position') as THREE.BufferAttribute;
-  const temp = new THREE.Vector3();
-  for (let i = 0; i < position.count; i++) {
-    temp.fromBufferAttribute(position, i);
-    temp.x = temp.x * blob.sx + blob.x;
-    temp.y = temp.y * blob.sy + blob.y;
-    temp.z = temp.z * blob.sz + blob.z;
-    position.setXYZ(i, temp.x, temp.y, temp.z);
-  }
-  geometry.computeVertexNormals();
-  appendColoredGeometry(positions, normals, colors, indices, geometry, color);
-  geometry.dispose();
-}
-
-function appendLeafPad(
-  positions: number[],
-  normals: number[],
-  colors: number[],
-  indices: number[],
-  x: number,
-  y: number,
-  z: number,
-  yaw: number,
-  padSize: number,
-  color: THREE.Color,
-): void {
-  const geometry = new THREE.IcosahedronGeometry(1, 1);
-  const position = geometry.getAttribute('position') as THREE.BufferAttribute;
-  const cos = Math.cos(yaw);
-  const sin = Math.sin(yaw);
-  const temp = new THREE.Vector3();
-  for (let i = 0; i < position.count; i++) {
-    temp.fromBufferAttribute(position, i);
-    const lx = temp.x * padSize * 1.15;
-    const ly = temp.y * padSize * 0.22;
-    const lz = temp.z * padSize * 1.15;
-    temp.set(lx * cos - lz * sin + x, ly + y, lx * sin + lz * cos + z);
-    position.setXYZ(i, temp.x, temp.y, temp.z);
-  }
-  geometry.computeVertexNormals();
-  appendColoredGeometry(positions, normals, colors, indices, geometry, color);
-  geometry.dispose();
-}
-
-function appendTwig(
-  positions: number[],
-  normals: number[],
-  colors: number[],
-  indices: number[],
-  startX: number,
-  startY: number,
-  startZ: number,
-  dirX: number,
-  dirZ: number,
-  length: number,
-  color: THREE.Color,
-): void {
-  const geometry = new THREE.CylinderGeometry(0.028, 0.038, length, 5, 1, false);
-  geometry.rotateX(Math.PI * 0.5);
-  geometry.rotateY(Math.atan2(dirX, dirZ));
-  geometry.translate(startX + dirX * length * 0.45, startY + 0.06, startZ + dirZ * length * 0.45);
-  appendColoredGeometry(positions, normals, colors, indices, geometry, color);
-  geometry.dispose();
-}
-
-function addPinnateFrond(
-  positions: number[],
-  normals: number[],
-  colors: number[],
-  indices: number[],
-  angle: number,
-  length: number,
-  archHeight: number,
-  leafColor: THREE.Color,
-  stemColor: THREE.Color,
-): void {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const lateral = new THREE.Vector3(-sin, 0, cos).normalize();
-  const forward = new THREE.Vector3(cos, 0.22, sin).normalize();
-  const leafletCount = 9;
-
-  for (let i = 0; i < leafletCount; i++) {
-    const t = (i + 1) / (leafletCount + 1);
-    const along = t * length;
-    const centerX = cos * along;
-    const centerZ = sin * along;
-    const centerY = Math.sin(t * Math.PI) * archHeight * 0.88 + 0.06;
-    const leafletLen = THREE.MathUtils.lerp(0.34, 0.16, t) * (0.92 + (i % 2) * 0.1);
-    const leafletWidth = leafletLen * 0.55;
-
-    addFernLeaflet(
-      positions,
-      normals,
-      colors,
-      indices,
-      centerX,
-      centerY,
-      centerZ,
-      lateral,
-      forward,
-      leafletLen,
-      leafletWidth,
-      1,
-      leafColor,
-    );
-    addFernLeaflet(
-      positions,
-      normals,
-      colors,
-      indices,
-      centerX,
-      centerY,
-      centerZ,
-      lateral,
-      forward,
-      leafletLen,
-      leafletWidth,
-      -1,
-      leafColor,
-    );
-  }
-
-  addFernStem(positions, normals, colors, indices, cos, sin, length, archHeight, stemColor);
-}
-
-function addFernLeaflet(
-  positions: number[],
-  normals: number[],
-  colors: number[],
-  indices: number[],
-  centerX: number,
-  centerY: number,
-  centerZ: number,
-  lateral: THREE.Vector3,
-  forward: THREE.Vector3,
-  length: number,
-  width: number,
-  side: number,
-  color: THREE.Color,
-): void {
-  const baseIndex = positions.length / 3;
-  const base = new THREE.Vector3(centerX, centerY, centerZ);
-  const tip = base
-    .clone()
-    .addScaledVector(lateral, side * length * 0.62)
-    .addScaledVector(forward, length * 0.42)
-    .add(new THREE.Vector3(0, length * 0.18, 0));
-  const mid = base.clone().addScaledVector(lateral, side * length * 0.32).add(new THREE.Vector3(0, length * 0.08, 0));
-  const sideOffset = lateral.clone().multiplyScalar(side * width * 0.5);
-
-  const verts = [
-    base.clone().sub(sideOffset),
-    mid.clone().add(sideOffset),
-    tip.clone(),
-    mid.clone().sub(sideOffset),
-  ];
-
-  for (const v of verts) {
-    positions.push(v.x, v.y, v.z);
-    normals.push(0, 0.85, 0);
-    colors.push(color.r, color.g, color.b);
-  }
-  indices.push(baseIndex, baseIndex + 1, baseIndex + 2, baseIndex, baseIndex + 2, baseIndex + 3);
-}
-
-function addFernStem(
-  positions: number[],
-  normals: number[],
-  colors: number[],
-  indices: number[],
-  cos: number,
-  sin: number,
-  length: number,
-  archHeight: number,
-  color: THREE.Color,
-): void {
-  const segments = 6;
-  let prevX = 0;
-  let prevY = 0.05;
-  let prevZ = 0;
-
-  for (let i = 1; i <= segments; i++) {
-    const t = i / segments;
-    const x = cos * length * t;
-    const z = sin * length * t;
-    const y = Math.sin(t * Math.PI) * archHeight * 0.72 + 0.05;
-    const baseIndex = positions.length / 3;
-    const stemHalf = 0.032 * (1 - t * 0.28);
-    const px = -sin * stemHalf;
-    const pz = cos * stemHalf;
-
-    const corners = [
-      [prevX - px, prevY, prevZ - pz],
-      [prevX + px, prevY, prevZ + pz],
-      [x + px, y, z + pz],
-      [x - px, y, z - pz],
-    ];
-    for (const [vx, vy, vz] of corners) {
-      positions.push(vx, vy, vz);
-      normals.push(0, 1, 0);
-      colors.push(color.r, color.g, color.b);
-    }
-    indices.push(baseIndex, baseIndex + 1, baseIndex + 2, baseIndex, baseIndex + 2, baseIndex + 3);
-    prevX = x;
-    prevY = y;
-    prevZ = z;
-  }
-}
-
-function appendColoredGeometry(
-  positions: number[],
-  normals: number[],
-  colors: number[],
-  indices: number[],
-  geometry: THREE.BufferGeometry,
-  color: THREE.Color,
-): number {
-  const vertexOffset = positions.length / 3;
-  const partPositions = geometry.getAttribute('position') as THREE.BufferAttribute;
-  const partNormals = geometry.getAttribute('normal') as THREE.BufferAttribute;
-
-  for (let i = 0; i < partPositions.count; i++) {
-    positions.push(partPositions.getX(i), partPositions.getY(i), partPositions.getZ(i));
-    normals.push(partNormals.getX(i), partNormals.getY(i), partNormals.getZ(i));
-    colors.push(color.r, color.g, color.b);
-  }
-
-  const partIndex = geometry.getIndex();
-  if (partIndex) {
-    for (let i = 0; i < partIndex.count; i++) {
-      indices.push(partIndex.getX(i) + vertexOffset);
+function createUndergrowthShadowGeometry(kind: UndergrowthKind): THREE.BufferGeometry {
+  const geometry = new THREE.SphereGeometry(1, 10, 6, 0, TAU, 0, Math.PI * 0.52);
+  switch (kind) {
+    case 'fern':
+      geometry.scale(0.82, 0.22, 0.82);
+      geometry.translate(0, 0.05, 0);
+      break;
+    case 'juniper':
+      geometry.scale(0.9, 0.36, 0.9);
+      geometry.translate(0, 0.12, 0);
+      break;
+    case 'bush':
+      geometry.scale(0.78, 0.3, 0.78);
+      geometry.translate(0, 0.1, 0);
+      break;
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
     }
   }
-
-  return vertexOffset + partPositions.count;
-}
-
-function finalizeColoredGeometry(
-  positions: number[],
-  normals: number[],
-  colors: number[],
-  indices: number[],
-): THREE.BufferGeometry {
-  const geometry = new THREE.BufferGeometry();
-  geometry.setIndex(indices);
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   return geometry;
+}
+
+async function loadUndergrowthTextures(files: UndergrowthTextureFiles, maxAnisotropy: number): Promise<UndergrowthTextureSet> {
+  const [albedo, normal, roughness, translucency] = await Promise.all([
+    loadRequiredLeafTexture(files.albedo, true, maxAnisotropy),
+    loadOptionalLeafTexture(files.normal, false, maxAnisotropy),
+    loadOptionalLeafTexture(files.roughness, false, maxAnisotropy),
+    loadOptionalLeafTexture(files.translucency, false, maxAnisotropy),
+  ]);
+  return { albedo, normal, roughness, translucency };
+}
+
+async function loadRequiredLeafTexture(name: string, srgb: boolean, maxAnisotropy: number): Promise<THREE.Texture> {
+  const texture = await loadOptionalLeafTexture(name, srgb, maxAnisotropy);
+  if (!texture) throw new Error(`SeedThree undergrowth texture missing (${name})`);
+  return texture;
+}
+
+async function loadOptionalLeafTexture(name: string, srgb: boolean, maxAnisotropy: number): Promise<THREE.Texture | null> {
+  const url = seedThreeLeafUrl(name);
+  if (!url) return null;
+  const texture = await loader.loadAsync(url);
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  texture.anisotropy = Math.max(1, Math.min(16, maxAnisotropy));
+  return texture;
+}
+
+function collectTextures(...sets: UndergrowthTextureSet[]): THREE.Texture[] {
+  const textures: THREE.Texture[] = [];
+  for (const set of sets) {
+    textures.push(set.albedo);
+    if (set.normal) textures.push(set.normal);
+    if (set.roughness) textures.push(set.roughness);
+    if (set.translucency) textures.push(set.translucency);
+  }
+  return textures;
+}
+
+function hash01(seed: number): number {
+  const value = Math.sin(seed * 12.9898) * 43758.5453;
+  return value - Math.floor(value);
+}
+
+function rngRange(rng: () => number, min: number, max: number): number {
+  return THREE.MathUtils.lerp(min, max, rng());
 }
