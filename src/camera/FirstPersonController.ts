@@ -419,7 +419,7 @@ export class FirstPersonController {
   };
 }
 
-/** Max terrain under the foot disk — keeps the body on slopes like Mammoth walk AABBs. */
+/** Max terrain under the foot disk — keeps the body grounded on slopes. */
 function sampleTerrainWalkTop(
   getHeightAt: (x: number, z: number) => number,
   x: number,

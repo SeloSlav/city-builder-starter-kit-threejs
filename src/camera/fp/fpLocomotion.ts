@@ -11,7 +11,7 @@ import {
   OUTDOOR_WALK_SPEED_MPS,
 } from './fpConstants.ts';
 
-/** Match The Mammoth `apps/server` pose clamp lower bound. */
+/** Outdoor walk pose clamp lower bound. */
 const FLOOR_Y = 0.35;
 export const FP_LOCOMOTION_FEET_SKIN_M = 0.034;
 const SKIN = FP_LOCOMOTION_FEET_SKIN_M;

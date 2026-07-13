@@ -19,7 +19,7 @@ const PREVIEW_HEIGHT: Record<BuildingKind, number> = {
   well: 2.4,
   hunters_hall: 4.8,
   foragers_shed: 3.8,
-  chapel: 5.4,
+  chapel: 8.6,
   marketplace: 3.2,
 };
 

@@ -1,4 +1,4 @@
-/** From The Mammoth `fpSessionConstants.ts` — look tuning. */
+/** First-person look tuning. */
 export const MOUSE_SENS = 0.0022;
 export const LOOK_INERTIA_COAST_GAIN = 0.11;
 export const LOOK_INERTIA_DAMP_PER_S = 18;

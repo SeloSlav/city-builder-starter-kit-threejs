@@ -1,162 +1,482 @@
 import * as THREE from 'three';
-import { addMesh } from '../buildingMaterials.ts';
-import { addTriangularGableWall } from '../meshPrimitives.ts';
 import {
+  addMesh,
+  metalMaterial,
   residenceFacadeMaterial,
-  residenceRoofMaterial,
   stoneMaterial,
+  tileMaterial,
   timberMaterial,
 } from '../buildingMaterials.ts';
+import { addTriangularGableWall } from '../meshPrimitives.ts';
 
-const FOLK_ART_RED = new THREE.MeshStandardMaterial({ color: 0xc04a3a, roughness: 0.88, metalness: 0 });
-const FOLK_ART_BLUE = new THREE.MeshStandardMaterial({ color: 0x3a6ea5, roughness: 0.88, metalness: 0 });
-const FOLK_ART_YELLOW = new THREE.MeshStandardMaterial({ color: 0xccb860, roughness: 0.88, metalness: 0 });
-const FOLK_ART_GREEN = new THREE.MeshStandardMaterial({ color: 0x4d6b3c, roughness: 0.88, metalness: 0 });
+type ChapelMaterials = {
+  limewash: THREE.MeshStandardMaterial;
+  limewashShade: THREE.MeshStandardMaterial;
+  glass: THREE.MeshStandardMaterial;
+  brass: THREE.MeshStandardMaterial;
+  redPaint: THREE.MeshStandardMaterial;
+  bluePaint: THREE.MeshStandardMaterial;
+  ochrePaint: THREE.MeshStandardMaterial;
+};
 
-/** Small village chapel — road-linked homes settle faster and resist abandonment longer. */
-export function createChapelMesh(): THREE.Group {
-  const group = new THREE.Group();
-  group.name = 'Chapel';
+function createChapelMaterials(): ChapelMaterials {
+  return {
+    limewash: residenceFacadeMaterial('white'),
+    limewashShade: new THREE.MeshStandardMaterial({ color: 0xd3c9b9, roughness: 0.94, metalness: 0 }),
+    glass: new THREE.MeshStandardMaterial({
+      color: 0x557481,
+      roughness: 0.34,
+      metalness: 0.08,
+      emissive: 0x172c33,
+      emissiveIntensity: 0.35,
+    }),
+    brass: new THREE.MeshStandardMaterial({ color: 0x9b7134, roughness: 0.48, metalness: 0.72 }),
+    redPaint: new THREE.MeshStandardMaterial({ color: 0xa84437, roughness: 0.88, metalness: 0 }),
+    bluePaint: new THREE.MeshStandardMaterial({ color: 0x466b78, roughness: 0.9, metalness: 0 }),
+    ochrePaint: new THREE.MeshStandardMaterial({ color: 0xc39a4a, roughness: 0.9, metalness: 0 }),
+  };
+}
 
-  const width = 5.2;
-  const depth = 6.8;
-  const stoneHeight = 0.55;
-  const wallHeight = 2.85;
+function createLancetGeometry(width: number, height: number, depth: number): THREE.ExtrudeGeometry {
+  const springY = height * 0.58;
+  const shape = new THREE.Shape();
+  shape.moveTo(-width * 0.5, 0);
+  shape.lineTo(width * 0.5, 0);
+  shape.lineTo(width * 0.5, springY);
+  shape.quadraticCurveTo(width * 0.45, height * 0.82, 0, height);
+  shape.quadraticCurveTo(-width * 0.45, height * 0.82, -width * 0.5, springY);
+  shape.closePath();
+  return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 4 });
+}
+
+function addLancetWindow(
+  group: THREE.Group,
+  materials: ChapelMaterials,
+  face: 'left' | 'right',
+  z: number,
+  sillY: number,
+  halfWidth: number,
+): void {
+  const outward = face === 'left' ? -1 : 1;
+  const window = new THREE.Group();
+  window.position.set(outward * (halfWidth - 0.035), sillY, z);
+  window.rotation.y = outward > 0 ? Math.PI * 0.5 : -Math.PI * 0.5;
+  group.add(window);
+
+  addMesh(
+    window,
+    createLancetGeometry(0.96, 1.9, 0.11),
+    stoneMaterial('light'),
+    new THREE.Vector3(0, 0, 0),
+  );
+  addMesh(
+    window,
+    createLancetGeometry(0.66, 1.55, 0.12),
+    materials.glass,
+    new THREE.Vector3(0, 0.12, 0.075),
+  );
+
+  addMesh(
+    window,
+    new THREE.BoxGeometry(0.045, 1.38, 0.055),
+    timberMaterial('dark'),
+    new THREE.Vector3(0, 0.78, 0.145),
+  );
+  addMesh(
+    window,
+    new THREE.BoxGeometry(0.56, 0.045, 0.055),
+    timberMaterial('dark'),
+    new THREE.Vector3(0, 0.72, 0.15),
+  );
+}
+
+function addSideButtress(
+  group: THREE.Group,
+  side: -1 | 1,
+  z: number,
+  wallTop: number,
+  halfWidth: number,
+): void {
+  const x = side * (halfWidth + 0.16);
+  addMesh(
+    group,
+    new THREE.BoxGeometry(0.72, 0.46, 0.92),
+    stoneMaterial('mid'),
+    new THREE.Vector3(x, 0.23, z),
+  );
+  addMesh(
+    group,
+    new THREE.BoxGeometry(0.56, wallTop * 0.68, 0.68),
+    stoneMaterial('light'),
+    new THREE.Vector3(x - side * 0.05, 0.46 + wallTop * 0.34, z),
+  );
+  addMesh(
+    group,
+    new THREE.BoxGeometry(0.63, 0.15, 0.75),
+    stoneMaterial('mortar'),
+    new THREE.Vector3(x - side * 0.05, 0.46 + wallTop * 0.68, z),
+  );
+}
+
+function addFoundationStones(group: THREE.Group, width: number, depth: number): void {
   const halfW = width * 0.5;
   const halfD = depth * 0.5;
-  const wallTop = stoneHeight + wallHeight;
-  const ridgeHeight = 2.45;
-  const roofPitch = Math.atan2(ridgeHeight, halfW);
-  const slopeLen = halfW / Math.cos(roofPitch) + 0.18;
-  const frontZ = halfD - 0.08;
-  const wallMaterial = residenceFacadeMaterial('white');
-  const roofMaterial = residenceRoofMaterial('red');
+  const blockHeight = 0.38;
+
+  for (let i = 0; i < 8; i++) {
+    const x = -halfW + 0.42 + i * ((width - 0.84) / 7);
+    const blockWidth = i % 3 === 0 ? 0.78 : 0.68;
+    for (const z of [-halfD - 0.09, halfD + 0.09]) {
+      addMesh(
+        group,
+        new THREE.BoxGeometry(blockWidth, blockHeight + (i % 2) * 0.05, 0.38),
+        stoneMaterial(i % 2 === 0 ? 'light' : 'mid'),
+        new THREE.Vector3(x, blockHeight * 0.5, z),
+        new THREE.Euler(0, (i % 2 === 0 ? 1 : -1) * 0.025, 0),
+      );
+    }
+  }
+
+  for (let i = 0; i < 9; i++) {
+    const z = -halfD + 0.4 + i * ((depth - 0.8) / 8);
+    for (const x of [-halfW - 0.09, halfW + 0.09]) {
+      addMesh(
+        group,
+        new THREE.BoxGeometry(0.38, blockHeight + ((i + 1) % 2) * 0.05, 0.65),
+        stoneMaterial(i % 2 === 0 ? 'mid' : 'light'),
+        new THREE.Vector3(x, blockHeight * 0.5, z),
+        new THREE.Euler(0, (i % 2 === 0 ? 1 : -1) * 0.035, 0),
+      );
+    }
+  }
+}
+
+function addPlankDoor(
+  group: THREE.Group,
+  materials: ChapelMaterials,
+  frontZ: number,
+  floorY: number,
+): void {
+  const doorWidth = 1.38;
+  const doorHeight = 2.22;
 
   addMesh(
     group,
-    new THREE.BoxGeometry(width + 0.42, stoneHeight, depth + 0.42),
+    createLancetGeometry(doorWidth + 0.48, doorHeight + 0.56, 0.16),
     stoneMaterial('light'),
-    new THREE.Vector3(0, stoneHeight * 0.5, 0),
+    new THREE.Vector3(0, floorY - 0.02, frontZ - 0.08),
   );
-
   addMesh(
     group,
-    new THREE.BoxGeometry(width - 0.24, wallHeight, depth - 0.24),
-    wallMaterial,
-    new THREE.Vector3(0, stoneHeight + wallHeight * 0.5, 0),
-  );
-
-  const doorWidth = 1.05;
-  const doorHeight = 2.05;
-  addMesh(
-    group,
-    new THREE.BoxGeometry(doorWidth, doorHeight, 0.12),
+    createLancetGeometry(doorWidth, doorHeight, 0.18),
     timberMaterial('dark'),
-    new THREE.Vector3(0, stoneHeight + doorHeight * 0.5, frontZ),
+    new THREE.Vector3(0, floorY, frontZ + 0.025),
   );
 
-  const trimY = stoneHeight + doorHeight * 0.5;
-  const trimZ = frontZ + 0.04;
-  for (const [x, material] of [
-    [-0.72, FOLK_ART_RED],
-    [-0.24, FOLK_ART_BLUE],
-    [0.24, FOLK_ART_YELLOW],
-    [0.72, FOLK_ART_GREEN],
-  ] as const) {
+  const plankWidth = doorWidth / 5;
+  for (let i = 0; i < 5; i++) {
     addMesh(
       group,
-      new THREE.BoxGeometry(0.34, 0.34, 0.06),
-      material,
-      new THREE.Vector3(x, trimY + 0.55, trimZ),
+      new THREE.BoxGeometry(plankWidth * 0.84, doorHeight * 0.68, 0.055),
+      i % 2 === 0 ? timberMaterial('mid') : timberMaterial('weathered'),
+      new THREE.Vector3(-doorWidth * 0.5 + plankWidth * (i + 0.5), floorY + doorHeight * 0.34, frontZ + 0.225),
     );
+  }
+
+  for (const y of [floorY + 0.48, floorY + 1.42]) {
     addMesh(
       group,
-      new THREE.BoxGeometry(0.28, 0.28, 0.06),
-      material,
-      new THREE.Vector3(x, trimY - 0.42, trimZ),
+      new THREE.BoxGeometry(doorWidth * 0.82, 0.09, 0.065),
+      metalMaterial('iron'),
+      new THREE.Vector3(0, y, frontZ + 0.27),
+    );
+  }
+  addMesh(
+    group,
+    new THREE.TorusGeometry(0.1, 0.025, 6, 12),
+    materials.brass,
+    new THREE.Vector3(0.38, floorY + 1.02, frontZ + 0.31),
+  );
+}
+
+function addFolkFrieze(
+  group: THREE.Group,
+  materials: ChapelMaterials,
+  frontZ: number,
+  y: number,
+): void {
+  const colors = [materials.redPaint, materials.bluePaint, materials.ochrePaint] as const;
+  for (let i = 0; i < 9; i++) {
+    const x = -1.84 + i * 0.46;
+    const diamond = addMesh(
+      group,
+      new THREE.BoxGeometry(0.25, 0.25, 0.055),
+      colors[i % colors.length],
+      new THREE.Vector3(x, y, frontZ + 0.075),
+      new THREE.Euler(0, 0, Math.PI * 0.25),
+    );
+    diamond.scale.set(1, 1, 1);
+  }
+}
+
+function addRoofTileBands(
+  group: THREE.Group,
+  halfWidth: number,
+  depth: number,
+  wallTop: number,
+  ridgeHeight: number,
+  roofPitch: number,
+): void {
+  for (const side of [-1, 1] as const) {
+    for (let row = 0; row < 6; row++) {
+      const t = (row + 0.25) / 6.5;
+      const x = side * halfWidth * (1 - t);
+      const y = wallTop + ridgeHeight * t;
+      addMesh(
+        group,
+        new THREE.BoxGeometry(0.075, 0.065, depth + 0.5),
+        tileMaterial((row % 2) as 0 | 1),
+        new THREE.Vector3(x, y + 0.025, 0),
+        new THREE.Euler(0, 0, side * -roofPitch),
+      );
+    }
+  }
+}
+
+function addBellTower(
+  group: THREE.Group,
+  materials: ChapelMaterials,
+  towerZ: number,
+  roofY: number,
+): void {
+  const baseSize = 1.62;
+  const belfryFloorY = roofY + 0.18;
+  const belfryHeight = 1.72;
+
+  addMesh(
+    group,
+    new THREE.BoxGeometry(baseSize + 0.16, 0.2, baseSize + 0.16),
+    stoneMaterial('light'),
+    new THREE.Vector3(0, belfryFloorY, towerZ),
+  );
+  for (const [sx, sz] of [[-1, -1], [-1, 1], [1, -1], [1, 1]] as const) {
+    addMesh(
+      group,
+      new THREE.BoxGeometry(0.2, belfryHeight, 0.2),
+      timberMaterial('dark'),
+      new THREE.Vector3(sx * 0.62, belfryFloorY + belfryHeight * 0.5, towerZ + sz * 0.62),
+    );
+  }
+  for (const zSign of [-1, 1] as const) {
+    addMesh(
+      group,
+      new THREE.BoxGeometry(baseSize, 0.18, 0.18),
+      timberMaterial('weathered'),
+      new THREE.Vector3(0, belfryFloorY + belfryHeight, towerZ + zSign * 0.62),
+    );
+  }
+  for (const xSign of [-1, 1] as const) {
+    addMesh(
+      group,
+      new THREE.BoxGeometry(0.18, 0.18, baseSize),
+      timberMaterial('weathered'),
+      new THREE.Vector3(xSign * 0.62, belfryFloorY + belfryHeight, towerZ),
     );
   }
 
   addMesh(
     group,
-    new THREE.BoxGeometry(doorWidth + 0.16, doorHeight + 0.1, 0.06),
-    timberMaterial('weathered'),
-    new THREE.Vector3(0, trimY + 0.02, frontZ - 0.03),
+    new THREE.CylinderGeometry(0.24, 0.43, 0.72, 12),
+    materials.brass,
+    new THREE.Vector3(0, belfryFloorY + 0.84, towerZ),
   );
+  addMesh(
+    group,
+    new THREE.TorusGeometry(0.4, 0.055, 7, 16),
+    materials.brass,
+    new THREE.Vector3(0, belfryFloorY + 0.48, towerZ),
+    new THREE.Euler(Math.PI * 0.5, 0, 0),
+  );
+  addMesh(
+    group,
+    new THREE.CylinderGeometry(0.055, 0.055, 1.34, 8),
+    timberMaterial('dark'),
+    new THREE.Vector3(0, belfryFloorY + 1.28, towerZ),
+    new THREE.Euler(0, 0, Math.PI * 0.5),
+  );
+  addMesh(
+    group,
+    new THREE.SphereGeometry(0.09, 8, 6),
+    materials.brass,
+    new THREE.Vector3(0, belfryFloorY + 0.38, towerZ),
+  );
+
+  const towerRoofY = belfryFloorY + belfryHeight + 0.63;
+  addMesh(
+    group,
+    new THREE.ConeGeometry(1.32, 1.25, 4),
+    tileMaterial(1),
+    new THREE.Vector3(0, towerRoofY, towerZ),
+    new THREE.Euler(0, Math.PI * 0.25, 0),
+  );
+  addMesh(
+    group,
+    new THREE.CylinderGeometry(0.055, 0.055, 0.78, 8),
+    metalMaterial('iron'),
+    new THREE.Vector3(0, towerRoofY + 0.98, towerZ),
+  );
+  addMesh(
+    group,
+    new THREE.BoxGeometry(0.48, 0.065, 0.065),
+    metalMaterial('iron'),
+    new THREE.Vector3(0, towerRoofY + 1.12, towerZ),
+  );
+}
+
+/**
+ * Gorski village chapel: compact limewashed nave, hand-laid limestone base,
+ * deep tile roof and an open oak belfry. This is the visual benchmark for the
+ * settlement's grounded, crafted architectural language.
+ */
+export function createChapelMesh(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'Chapel';
+  const materials = createChapelMaterials();
+
+  const width = 5.2;
+  const depth = 6.9;
+  const foundationHeight = 0.48;
+  const wallHeight = 3.15;
+  const halfW = width * 0.5;
+  const halfD = depth * 0.5;
+  const wallTop = foundationHeight + wallHeight;
+  const ridgeHeight = 2.55;
+  const roofPitch = Math.atan2(ridgeHeight, halfW);
+  const slopeLen = halfW / Math.cos(roofPitch) + 0.28;
+  const frontZ = halfD - 0.075;
+
+  addMesh(
+    group,
+    new THREE.BoxGeometry(width + 0.5, foundationHeight, depth + 0.5),
+    stoneMaterial('mid'),
+    new THREE.Vector3(0, foundationHeight * 0.5, 0),
+  );
+  addFoundationStones(group, width, depth);
+  addMesh(
+    group,
+    new THREE.BoxGeometry(width + 0.18, 0.14, depth + 0.18),
+    stoneMaterial('mortar'),
+    new THREE.Vector3(0, foundationHeight + 0.07, 0),
+  );
+
+  addMesh(
+    group,
+    new THREE.BoxGeometry(width - 0.18, wallHeight, depth - 0.18),
+    materials.limewash,
+    new THREE.Vector3(0, foundationHeight + wallHeight * 0.5, 0),
+  );
+  addMesh(
+    group,
+    new THREE.BoxGeometry(width + 0.08, 0.24, depth + 0.08),
+    materials.limewashShade,
+    new THREE.Vector3(0, wallTop - 0.12, 0),
+  );
+
+  for (const z of [-1.65, 1.15]) {
+    addLancetWindow(group, materials, 'left', z, 1.28, halfW);
+    addLancetWindow(group, materials, 'right', z, 1.28, halfW);
+    addSideButtress(group, -1, z - 0.72, wallTop, halfW);
+    addSideButtress(group, 1, z - 0.72, wallTop, halfW);
+  }
+
+  addPlankDoor(group, materials, frontZ, foundationHeight + 0.08);
+  addFolkFrieze(group, materials, frontZ, wallTop - 0.46);
+
+  for (let step = 0; step < 3; step++) {
+    addMesh(
+      group,
+      new THREE.BoxGeometry(2.45 - step * 0.32, 0.16, 0.62),
+      stoneMaterial(step === 1 ? 'mid' : 'light'),
+      new THREE.Vector3(0, 0.08 + step * 0.12, halfD + 0.52 - step * 0.18),
+    );
+  }
 
   for (const side of [-1, 1] as const) {
     addMesh(
       group,
-      new THREE.BoxGeometry(slopeLen, 0.12, depth + 0.28),
-      roofMaterial,
+      new THREE.BoxGeometry(slopeLen, 0.15, depth + 0.48),
+      tileMaterial(side > 0 ? 0 : 1),
       new THREE.Vector3(side * halfW * 0.46, wallTop + ridgeHeight * 0.48, 0),
       new THREE.Euler(0, 0, side * -roofPitch),
     );
   }
+  addRoofTileBands(group, halfW, depth, wallTop, ridgeHeight, roofPitch);
+  addMesh(
+    group,
+    new THREE.BoxGeometry(0.28, 0.2, depth + 0.66),
+    tileMaterial(2),
+    new THREE.Vector3(0, wallTop + ridgeHeight + 0.04, 0),
+  );
 
-  const gableThickness = 0.14;
   for (const zSign of [-1, 1] as const) {
     addTriangularGableWall(
       group,
       'z',
-      zSign * (halfD - 0.06),
+      zSign * (halfD - 0.065),
       halfW,
       wallTop,
       ridgeHeight,
-      gableThickness,
-      wallMaterial,
+      0.16,
+      materials.limewash,
+    );
+
+    for (const side of [-1, 1] as const) {
+      addMesh(
+        group,
+        new THREE.BoxGeometry(slopeLen, 0.15, 0.16),
+        timberMaterial('dark'),
+        new THREE.Vector3(side * halfW * 0.46, wallTop + ridgeHeight * 0.48, zSign * (halfD + 0.17)),
+        new THREE.Euler(0, 0, side * -roofPitch),
+      );
+    }
+  }
+
+  addBellTower(group, materials, 1.18, wallTop + ridgeHeight * 0.7);
+
+  const frontGableZ = halfD + 0.12;
+  addMesh(
+    group,
+    new THREE.CircleGeometry(0.48, 16),
+    materials.glass,
+    new THREE.Vector3(0, wallTop + 1.05, frontGableZ),
+  );
+  addMesh(
+    group,
+    new THREE.TorusGeometry(0.54, 0.1, 8, 18),
+    stoneMaterial('light'),
+    new THREE.Vector3(0, wallTop + 1.05, frontGableZ + 0.02),
+  );
+  for (let i = 0; i < 4; i++) {
+    addMesh(
+      group,
+      new THREE.BoxGeometry(0.055, 0.88, 0.045),
+      timberMaterial('dark'),
+      new THREE.Vector3(0, wallTop + 1.05, frontGableZ + 0.07),
+      new THREE.Euler(0, 0, i * Math.PI * 0.25),
     );
   }
 
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.14, 0.14, depth - 0.3),
-    timberMaterial('dark'),
-    new THREE.Vector3(0, wallTop + ridgeHeight, 0),
-  );
-
-  const towerSize = 0.95;
-  const towerBaseY = wallTop + ridgeHeight * 0.15;
-  const towerHeight = 1.75;
-  addMesh(
-    group,
-    new THREE.BoxGeometry(towerSize, towerHeight, towerSize),
-    wallMaterial,
-    new THREE.Vector3(0, towerBaseY + towerHeight * 0.5, -halfD + 1.35),
-  );
-  addMesh(
-    group,
-    new THREE.BoxGeometry(towerSize + 0.12, 0.12, towerSize + 0.12),
-    roofMaterial,
-    new THREE.Vector3(0, towerBaseY + towerHeight + 0.06, -halfD + 1.35),
-  );
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.08, 0.55, 0.08),
-    timberMaterial('dark'),
-    new THREE.Vector3(0, towerBaseY + towerHeight + 0.42, -halfD + 1.35),
-  );
-  addMesh(
-    group,
-    new THREE.BoxGeometry(0.34, 0.08, 0.08),
-    timberMaterial('dark'),
-    new THREE.Vector3(0, towerBaseY + towerHeight + 0.58, -halfD + 1.35),
-  );
-
-  const wallSegmentCount = 7;
-  const wallRadius = 4.1;
-  for (let i = 0; i < wallSegmentCount; i++) {
-    const t = (i / (wallSegmentCount - 1)) - 0.5;
-    const angle = t * 0.72;
-    const x = Math.sin(angle) * wallRadius;
-    const z = frontZ + 1.15 + Math.cos(angle) * 0.55;
-    addMesh(
-      group,
-      new THREE.BoxGeometry(0.72, 0.48, 0.42),
-      stoneMaterial(i % 2 === 0 ? 'mid' : 'light'),
-      new THREE.Vector3(x, stoneHeight * 0.24, z),
-      new THREE.Euler(0, -angle * 0.35, 0),
-    );
+  // A low parish wall frames the entrance without obscuring the facade.
+  for (const side of [-1, 1] as const) {
+    for (let i = 0; i < 3; i++) {
+      addMesh(
+        group,
+        new THREE.BoxGeometry(0.82, 0.44 + (i % 2) * 0.06, 0.46),
+        stoneMaterial(i % 2 === 0 ? 'light' : 'mid'),
+        new THREE.Vector3(side * (1.78 + i * 0.72), 0.22, halfD + 0.82 + i * 0.12),
+        new THREE.Euler(0, side * (0.08 + i * 0.035), 0),
+      );
+    }
   }
 
   return group;

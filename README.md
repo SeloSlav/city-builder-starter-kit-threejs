@@ -368,6 +368,21 @@ On the server, `server/src/reducers/simulation.rs` runs each 200 ms tick: lumber
 
 Texture assets are stored under `public/assets/textures`. The road surface uses a medieval dirt texture set with albedo, normal, roughness, ambient occlusion, height, rut mask, and edge mask maps. River bridge decks use a separate wood-log PBR set (procedurally generated via `scripts/generate_wood_logs_texture.py`). Terrain uses multiple manor grass PBR sets (meadow, dense, dry, blend) and prop textures for pine foliage and rocks. Build menu cards use illustrated PNG art under `public/assets/ui/build-menu/`. Building meshes use procedural geometry with timber, stone, and shingle materials. Everything is loaded locally at runtime — no external asset CDN required.
 
+## Third-Party Libraries
+
+Vegetation and sky rendering use vendored libraries (Git submodules under `vendor/`). Full license texts are kept alongside each package.
+
+| Library | Author / project | Used for | License |
+| --- | --- | --- | --- |
+| [SeedThree](https://github.com/SkyeShark/SeedThree) | [SkyeShark](https://github.com/SkyeShark) | Procedural forest trees, grass tufts (WebGPU), undergrowth cards, wind | [MIT](vendor/seedthree/LICENSE) |
+| [sky-cloud-3d](vendor/sky-cloud-3d/) | sky-cloud-3d | Volumetric sky and cloud dome (WebGL + WebGPU) | [Non-commercial](vendor/sky-cloud-3d/LICENSE) — see also [`public/assets/third-party/sky-cloud-3d-LICENSE.txt`](public/assets/third-party/sky-cloud-3d-LICENSE.txt) |
+
+After cloning, initialize submodules so `vendor/seedthree` is present:
+
+```bash
+git submodule update --init --recursive
+```
+
 ## Development Notes
 
 - Road editing works offline; buildings, residences, and economy require a running SpacetimeDB server (`spacetime start` + `npm run deploy:local`).

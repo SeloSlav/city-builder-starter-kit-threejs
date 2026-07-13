@@ -1,7 +1,6 @@
 sky-cloud-3d
 
-The sky shader in this prototype is adapted from the open-source sky-cloud-3d project
-used by The Mammoth.
+The sky shader in this project is adapted from the open-source sky-cloud-3d project.
 
 Copyright (c) 2025
 
