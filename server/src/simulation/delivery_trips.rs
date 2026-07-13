@@ -10,8 +10,8 @@ use crate::economy::{
     deposit_building_commodity, withdraw_building_commodity, CommodityKind,
 };
 use crate::simulation::delivery_cargo::{
-    building_delivery_stock, credit_undeposited_delivery_cargo, deposit_delivery_cargo,
-    pick_delivery_target, residence_delivery_room, withdraw_delivery_cargo, DeliveryCargoTotals,
+    building_delivery_stock, pick_delivery_target, residence_delivery_room, withdraw_delivery_cargo,
+    DeliveryCargoTotals,
 };
 use crate::roads::{RoadNetwork, RoadPathRoute};
 use crate::simulation::game_calendar::GameClock;
@@ -24,7 +24,6 @@ use crate::tables::{Building, DeliveryTrip, Residence};
 
 pub const DELIVERY_DESTINATION_RESIDENCE: u8 = 0;
 pub const DELIVERY_DESTINATION_BUILDING: u8 = 1;
-pub const CARGO_KIND_TIMBER: u8 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeliveryTripPhase {
@@ -500,23 +499,6 @@ fn return_trip_cargo_to_building(ctx: &ReducerContext, trip: &DeliveryTrip) {
         }
         None => {}
     }
-}
-
-fn return_need_cargo_to_building(
-    ctx: &ReducerContext,
-    building_id: u64,
-    need_kind: ResidenceNeedKind,
-    amount: f64,
-) {
-    let Some(mut building) = ctx.db.building().id().find(&building_id) else {
-        return;
-    };
-    let deposited = deposit_delivery_cargo(&mut building, need_kind, amount);
-    let remainder = (amount - deposited).max(0.0);
-    if remainder > 1e-6 {
-        credit_undeposited_delivery_cargo(ctx, building.owner, need_kind, remainder);
-    }
-    ctx.db.building().id().update(building);
 }
 
 fn return_commodity_to_building(

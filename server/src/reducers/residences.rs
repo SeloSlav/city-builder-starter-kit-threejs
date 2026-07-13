@@ -7,6 +7,7 @@ use crate::burgage::{
 use crate::db::*;
 use crate::economy::{
     credit_treasury_stone, credit_treasury_timber,
+    residence_population_for_parcel,
     residence_zone_cost,
     spend_aggregate_stone, spend_aggregate_timber, total_stone, total_timber,
     TIMBER_SALVAGE_FRACTION, STONE_SALVAGE_FRACTION, ResourceAmount,
@@ -23,7 +24,7 @@ use crate::simulation::{
 };
 use crate::tables::{BurgageZone, Residence};
 use crate::balance_generated::{
-    RESIDENCE_TIER1_CAPACITY, RESIDENCE_TIER2_CAPACITY, RESIDENCE_TIER2_GOLD_COST,
+    RESIDENCE_TIER2_CAPACITY, RESIDENCE_TIER2_GOLD_COST,
     RESIDENCE_TIER2_STONE_COST, RESIDENCE_TIER2_TIMBER_COST, RESIDENCE_TIER3_CAPACITY,
     RESIDENCE_TIER3_GOLD_COST, RESIDENCE_TIER3_STONE_COST, RESIDENCE_TIER3_TIMBER_COST,
 };
@@ -158,7 +159,7 @@ pub fn place_burgage_zone(
         .ok_or_else(|| "Failed to resolve residence zone id.".to_string())?;
 
     for residence in layout.residences {
-        let population_capacity = RESIDENCE_TIER1_CAPACITY;
+        let population_capacity = residence_population_for_parcel(residence.parcel_frontage);
         let inserted = ctx.db.residence().insert(Residence {
             id: 0,
             zone_id,

@@ -3,12 +3,8 @@
 use spacetimedb::ReducerContext;
 
 use crate::economy::{
-    building_food_storage_cap, building_storage_caps, building_water_storage_cap,
-    credit_treasury_firewood, credit_treasury_food, credit_treasury_water, deposit_building,
-    deposit_building_food, deposit_building_water, withdraw_building, withdraw_building_food,
-    withdraw_building_water,
-    credit_treasury_commodity, deposit_building_commodity, withdraw_building_commodity,
-    CommodityKind,
+    withdraw_building, withdraw_building_food, withdraw_building_water,
+    withdraw_building_commodity, CommodityKind,
 };
 use crate::simulation::residence_needs::{
     load_needs, need_stock, ResidenceNeedKind,
@@ -31,16 +27,6 @@ pub struct DeliveryCargoTotals {
 }
 
 impl DeliveryCargoTotals {
-    pub fn add(&mut self, kind: ResidenceNeedKind, amount: f64) {
-        match kind {
-            ResidenceNeedKind::Firewood => self.firewood += amount,
-            ResidenceNeedKind::Water => self.water += amount,
-            ResidenceNeedKind::Food => self.food += amount,
-            ResidenceNeedKind::Ale => self.ale += amount,
-            ResidenceNeedKind::PreservedFood => self.preserved_food += amount,
-        }
-    }
-
     pub fn add_commodity(&mut self, kind: CommodityKind, amount: f64) {
         match kind {
             CommodityKind::Timber => self.timber += amount,
@@ -91,63 +77,6 @@ pub fn withdraw_delivery_cargo(
         ResidenceNeedKind::Ale => withdraw_building_commodity(building, CommodityKind::Ale, amount),
         ResidenceNeedKind::PreservedFood => {
             withdraw_building_commodity(building, CommodityKind::PreservedFood, amount)
-        }
-    }
-}
-
-pub fn deposit_delivery_cargo(
-    building: &mut Building,
-    kind: ResidenceNeedKind,
-    amount: f64,
-) -> f64 {
-    if amount <= 1e-6 {
-        return 0.0;
-    }
-    match kind {
-        ResidenceNeedKind::Firewood => {
-            let caps = building_storage_caps(&building.kind);
-            let (_, firewood_added, _, updated) =
-                deposit_building(building, caps, 0.0, amount, 0.0);
-            *building = updated;
-            firewood_added
-        }
-        ResidenceNeedKind::Water => {
-            let cap = building
-                .water_capacity
-                .max(building_water_storage_cap(&building.kind));
-            let (deposited, updated) = deposit_building_water(building, cap, amount);
-            *building = updated;
-            deposited
-        }
-        ResidenceNeedKind::Food => {
-            let cap = building_food_storage_cap(&building.kind);
-            let (deposited, updated) = deposit_building_food(building, cap, amount);
-            *building = updated;
-            deposited
-        }
-        ResidenceNeedKind::Ale => deposit_building_commodity(building, CommodityKind::Ale, amount),
-        ResidenceNeedKind::PreservedFood => {
-            deposit_building_commodity(building, CommodityKind::PreservedFood, amount)
-        }
-    }
-}
-
-pub fn credit_undeposited_delivery_cargo(
-    ctx: &ReducerContext,
-    owner: spacetimedb::Identity,
-    kind: ResidenceNeedKind,
-    amount: f64,
-) {
-    if amount <= 1e-6 {
-        return;
-    }
-    match kind {
-        ResidenceNeedKind::Firewood => credit_treasury_firewood(ctx, owner, amount),
-        ResidenceNeedKind::Water => credit_treasury_water(ctx, owner, amount),
-        ResidenceNeedKind::Food => credit_treasury_food(ctx, owner, amount),
-        ResidenceNeedKind::Ale => credit_treasury_commodity(ctx, owner, CommodityKind::Ale, amount),
-        ResidenceNeedKind::PreservedFood => {
-            credit_treasury_commodity(ctx, owner, CommodityKind::PreservedFood, amount)
         }
     }
 }

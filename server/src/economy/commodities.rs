@@ -19,19 +19,6 @@ pub enum CommodityKind {
 }
 
 impl CommodityKind {
-    pub const ALL: [Self; 10] = [
-        Self::Firewood,
-        Self::Water,
-        Self::Food,
-        Self::Timber,
-        Self::Grain,
-        Self::Flour,
-        Self::Ale,
-        Self::PreservedFood,
-        Self::Honey,
-        Self::Wine,
-    ];
-
     pub fn as_u8(self) -> u8 {
         match self {
             Self::Firewood => 0,
