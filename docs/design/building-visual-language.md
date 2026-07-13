@@ -120,6 +120,8 @@ Residence variety must not be color-only.
 
 Narrow and wide parcels should affect the architecture, not merely stretch the same mesh.
 
+The current procedural residence family in `ResidenceMarkers.ts` and `residenceAppearance.ts` establishes three canonical archetypes: `stone_portal`, `timber_balcony`, and `working_lean_to`. Preserve this level of structural variation when extending the family. All three use an exposed-stone lower storey, a limewashed upper storey, steep weather roof, deterministic paint/roof/trim choices, and the state-driven firewood pile.
+
 ## Procedural modeling rules
 
 - Models remain native Three.js geometry unless an asset pipeline is explicitly approved.

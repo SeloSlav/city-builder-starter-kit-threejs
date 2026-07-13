@@ -13,6 +13,7 @@ const tests = [
   'test:marketplace-trade',
   'test:settlement-schedule',
   'test:world-config',
+  'test:chapel-bell-schedule',
 ] as const;
 
 let failed = 0;

@@ -225,8 +225,8 @@ function addStoneStoreyCourses(
   for (let course = 1; course <= 3; course++) {
     addMesh(
       group,
-      new THREE.BoxGeometry(width + 0.08, 0.045, depth + 0.08),
-      stoneMaterial(course % 2 === 0 ? 'light' : 'mortar'),
+      new THREE.BoxGeometry(width + 0.04, 0.035, depth + 0.04),
+      stoneMaterial('mortar'),
       new THREE.Vector3(0, foundationHeight + groundHeight * (course / 4), 0),
     );
   }

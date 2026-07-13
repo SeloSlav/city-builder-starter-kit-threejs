@@ -31,6 +31,7 @@ export class AmbientAudio {
   private readonly ambientTracks: Record<AmbientLayerId, AmbientTrackState> = {
     birds_wind_day: { audio: null, blobUrl: null, currentVolume: 0, targetVolume: 0, playPending: false, lastPlayAttemptAtMs: 0 },
     village_day: { audio: null, blobUrl: null, currentVolume: 0, targetVolume: 0, playPending: false, lastPlayAttemptAtMs: 0 },
+    night_insects: { audio: null, blobUrl: null, currentVolume: 0, targetVolume: 0, playPending: false, lastPlayAttemptAtMs: 0 },
     open_wind_overview: { audio: null, blobUrl: null, currentVolume: 0, targetVolume: 0, playPending: false, lastPlayAttemptAtMs: 0 },
   };
 

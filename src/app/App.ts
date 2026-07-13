@@ -307,6 +307,7 @@ export class App {
       settlementHud: this.toolbar?.settlementHud ?? null,
       sceneManager: this.sceneManager,
       residenceMarkers: this.residenceMarkers,
+      ambientAudio: this.ambientAudio,
     });
     this.worldMapUi?.minimap.tick({ keyHeld: this.input?.isDown('g') ?? false });
     if (firstPersonActive) {
@@ -479,6 +480,7 @@ export class App {
         settlementHud: this.toolbar?.settlementHud ?? null,
         sceneManager: this.sceneManager,
         residenceMarkers: this.residenceMarkers,
+        ambientAudio: this.ambientAudio,
       },
       snapshot,
       state,

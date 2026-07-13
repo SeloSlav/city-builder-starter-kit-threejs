@@ -1,6 +1,8 @@
 import type { BuildingState, BurgageZoneState } from '../resources/types.ts';
+import type { SettlementSchedule } from '../world/settlementSchedule.ts';
 import { AmbientAudio } from './AmbientAudio.ts';
 import { buildSettlementZones, evaluateAmbientRules, type AmbientRuleState } from './ambientRules.ts';
+import { ChapelBellPlayer } from './ChapelBellPlayer.ts';
 
 export type AmbientAudioControllerConfig = {
   getCameraTarget: () => { x: number; z: number };
@@ -12,11 +14,13 @@ export type AmbientAudioControllerConfig = {
 
 export class AmbientAudioController {
   private readonly audio = new AmbientAudio();
+  private readonly chapelBell = new ChapelBellPlayer();
   private readonly config: AmbientAudioControllerConfig;
   private readonly ambientRuleState: AmbientRuleState = { overviewActive: false, villageActive: false };
   private lastAmbientEvalAtMs = 0;
   private lastSettlementSignature = '';
   private settlementZones: ReturnType<typeof buildSettlementZones> = [];
+  private schedule: SettlementSchedule | null = null;
   private running = false;
   private unlocked = false;
   private readonly onUnlock = (): void => {
@@ -37,8 +41,22 @@ export class AmbientAudioController {
     this.lastAmbientEvalAtMs = 0;
   }
 
+  syncSettlementSchedule(schedule: SettlementSchedule | null): void {
+    this.schedule = schedule;
+  }
+
   tick(dtSeconds: number): void {
     if (!this.running || !this.audio.getEnabled()) return;
+
+    const schedule = this.schedule;
+    if (schedule) {
+      this.chapelBell.tick(
+        schedule.clock.hour,
+        hasPlacedChapel(this.config.getBuildings()),
+        true,
+      );
+    }
+
     const nowMs = performance.now();
     if (nowMs - this.lastAmbientEvalAtMs >= 100) {
       this.lastAmbientEvalAtMs = nowMs;
@@ -48,6 +66,7 @@ export class AmbientAudioController {
         cameraTarget: this.config.getCameraTarget(),
         orbitDistance: this.config.getOrbitDistance(),
         previous: this.ambientRuleState,
+        isNight: schedule?.dayNight.isNight ?? false,
       });
       this.ambientRuleState.overviewActive = ambient.state.overviewActive;
       this.ambientRuleState.villageActive = ambient.state.villageActive;
@@ -63,6 +82,7 @@ export class AmbientAudioController {
     this.audio.setEnabled(enabled);
     if (!enabled) {
       this.running = false;
+      this.chapelBell.stop();
     } else if (this.unlocked) {
       this.start();
     }
@@ -72,8 +92,10 @@ export class AmbientAudioController {
     this.config.unlockElement.removeEventListener('pointerdown', this.onUnlock, { capture: true });
     window.removeEventListener('keydown', this.onUnlock, { capture: true });
     this.audio.dispose();
+    this.chapelBell.dispose();
     this.running = false;
     this.unlocked = false;
+    this.schedule = null;
   }
 
   private refreshSettlementZones(): void {
@@ -84,6 +106,13 @@ export class AmbientAudioController {
     this.lastSettlementSignature = signature;
     this.settlementZones = buildSettlementZones(buildings, burgageZones);
   }
+}
+
+function hasPlacedChapel(buildings: Iterable<BuildingState>): boolean {
+  for (const building of buildings) {
+    if (building.kind === 'chapel') return true;
+  }
+  return false;
 }
 
 function settlementSignature(buildings: BuildingState[], burgageZones: BurgageZoneState[]): string {

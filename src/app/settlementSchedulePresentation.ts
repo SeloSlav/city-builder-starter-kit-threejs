@@ -1,5 +1,6 @@
 import type { SpacetimeGameSnapshot } from '../data/spacetimeGameStore.ts';
 import { simElapsedSeconds } from '../world/gameCalendar.ts';
+import type { AmbientAudioController } from '../audio/AmbientAudioController.ts';
 import type { ResidenceMarkers } from '../residences/ResidenceMarkers.ts';
 import type { GameState } from '../resources/types.ts';
 import type { SceneManager } from '../scene/SceneManager.ts';
@@ -15,6 +16,7 @@ export type SettlementPresentationTargets = {
   settlementHud: SettlementHud | null;
   sceneManager: SceneManager | null;
   residenceMarkers: ResidenceMarkers | null;
+  ambientAudio: AmbientAudioController | null;
 };
 
 type SnapshotAnchor = {
@@ -36,6 +38,7 @@ export class SettlementPresentationController {
   ): SettlementSchedule | null {
     if (!connected) {
       this.reset();
+      targets.ambientAudio?.syncSettlementSchedule(null);
       return null;
     }
 
@@ -80,5 +83,6 @@ export class SettlementPresentationController {
     targets.sceneManager?.applyDayNight(schedule.dayNight);
     targets.residenceMarkers?.setChimneySmokeAllowed(schedule.dayNight.smokeAllowed);
     targets.residenceMarkers?.setEveningWindowGlow(schedule.dayNight.eveningWindowGlow);
+    targets.ambientAudio?.syncSettlementSchedule(schedule);
   }
 }

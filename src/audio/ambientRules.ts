@@ -58,6 +58,7 @@ export function evaluateAmbientRules(params: {
   cameraTarget: CameraTarget;
   orbitDistance: number;
   previous: AmbientRuleState;
+  isNight: boolean;
 }): AmbientRuleResult {
   const overviewActive = params.previous.overviewActive
     ? params.orbitDistance >= OVERVIEW_EXIT_DISTANCE
@@ -74,10 +75,19 @@ export function evaluateAmbientRules(params: {
   const villageThreshold = nearestZone
     ? nearestZone.radius * (params.previous.villageActive ? VILLAGE_EXIT_RADIUS_MULTIPLIER : 1)
     : 0;
-  const villageActive = !overviewActive && !!nearestZone && nearestZone.distance <= villageThreshold;
+  const villageActive =
+    !params.isNight &&
+    !overviewActive &&
+    !!nearestZone &&
+    nearestZone.distance <= villageThreshold;
 
-  const baseLayer: AmbientLayerId = overviewActive ? 'open_wind_overview' : 'birds_wind_day';
-  const overlayLayer: AmbientLayerId | null = !overviewActive && villageActive ? 'village_day' : null;
+  const baseLayer: AmbientLayerId = overviewActive
+    ? 'open_wind_overview'
+    : params.isNight
+      ? 'night_insects'
+      : 'birds_wind_day';
+  const overlayLayer: AmbientLayerId | null =
+    !overviewActive && !params.isNight && villageActive ? 'village_day' : null;
 
   return {
     state: { overviewActive, villageActive },
