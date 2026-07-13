@@ -29,10 +29,14 @@ import { RESIDENCE_NEED_KINDS } from '../src/residences/residenceNeedState.ts';
 assert.equal(effectiveResidenceSettleTicks(false), RESIDENCE_SETTLE_TICKS);
 assert.equal(effectiveResidenceSettleTicks(true), expectedEffectiveSettleTicks(true));
 assert.equal(effectiveResidenceSettleTicks(true), 175);
+assert.equal(effectiveResidenceSettleTicks(true, false, true), expectedEffectiveSettleTicks(true, false, true));
+assert.equal(effectiveResidenceSettleTicks(true, false, true), 149);
 
 assert.equal(effectiveAbandonAfterDeficitTicks(false), ABANDON_AFTER_DEFICIT_TICKS);
 assert.equal(effectiveAbandonAfterDeficitTicks(true), expectedEffectiveAbandonAfterDeficitTicks(true));
 assert.equal(effectiveAbandonAfterDeficitTicks(true), 5143);
+assert.equal(effectiveAbandonAfterDeficitTicks(true, true), expectedEffectiveAbandonAfterDeficitTicks(true, true));
+assert.equal(effectiveAbandonAfterDeficitTicks(true, true), 6051);
 
 assert.equal(formatChapelSettlementBoostPercent(), '30%');
 assert.equal(formatChapelAbandonmentGracePercent(), '43%');

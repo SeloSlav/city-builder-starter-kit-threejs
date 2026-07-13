@@ -25,6 +25,8 @@ for (const kind of expanded) {
 assert.equal(BUILDING_DEFINITIONS.watermill.requiresWaterShore, true);
 assert.equal(BUILDING_DEFINITIONS.ferry_landing.requiresWaterShore, true);
 assert.equal(BUILDING_DEFINITIONS.monastery.acceptsLabor, false);
+assert.equal(BUILDING_DEFINITIONS.monastery.requiresHillside, true);
+assert.equal(BUILDING_DEFINITIONS.monastery.workRadius, 520);
 assert.ok(BUILDING_STORAGE_CAPS.granary.grain > BUILDING_STORAGE_CAPS.grain_field.grain);
 assert.deepEqual([RESIDENCE_TIER1_CAPACITY, RESIDENCE_TIER2_CAPACITY, RESIDENCE_TIER3_CAPACITY], [3, 6, 10]);
 

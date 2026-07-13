@@ -53,14 +53,17 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 - **Hunter's hall** — hunts game from procedural foraging nodes within 68 m, stores food, and delivers along roads; up to 3 laborers.
 - **Forager's shed** — gathers berries from forest-edge foraging nodes within 48 m, stores food, and delivers along roads; up to 2 laborers.
 - **Chapel** — parish hub on the road; assign a priest to collect tithes from road-linked household wealth into the **parish coffer** (collect into treasury when ready); boosts settlement, shortage resilience, and abandoned-home recovery. Optional Sunday sabbath observance (requires staffed chapel) pauses labor and logistics that day.
+- **Pauline monastery** — mid-game hillside landmark (requires staffed chapel and 12+ population); road-linked to the parish for full strength. Autonomous grain→food production, pilgrimage gold via marketplace, feast-day charity, ongoing food deliveries within a 520 m coverage radius, and wider faith bonuses for road-linked homes inside that radius. City administration sets tithe share (0–80%) and feast-day charity.
 - **Marketplace** — village trade hub on the road; buy and sell timber, stone, firewood, and food for gold, or barter goods. Backyard garden surplus and mayor tax both flow through marketplace-linked homes.
+- **Expanded agriculture & processing** — grain fields and threshing barns; river **watermill** (shore placement); **granary** bakes flour into food; **brewery** and **smokehouse** supply ale and preserved food for tier-2/3 homes; **apiary** and **vineyard** for honey/wine exports.
+- **Carpenter & wheelwright** — reduces timber placement cost when road-linked; **ferry landing** (shore placement) earns trade income when staffed and marketplace-connected.
 - **Road-based logistics** — Dijkstra road-path distance routes timber mill→lodge, firewood lodge→residence, water well→residence, and food supplier→residence; nearest supplier claims each home on its road branch.
 - **Delivery trips** — server-spawned road agents travel outbound, unload at the residence, and return; client renders wooden delivery carts along routes for firewood, water, and food hauls.
 - **Foraging nodes** — procedural game trails and berry patches bootstrapped at world start; depleted nodes respawn at new locations after cooldowns.
 - **Tree lifecycle** — server-driven `mature → stump → growing → mature` phases with client visual sync (instanced forest, animated saplings, stumps).
 - Server-authoritative simulation tick (200 ms) in the Rust module — buildings, trees, quarries, foraging, delivery trips, residence needs, backyard gardens, and settlement growth all run server-side. No pause or speed controls; players live through time at a fixed rate.
 - **In-game calendar** — one real second equals one sim second; a full day is 24 hours. Twelve 30-day months (no leap years), weekday names, and work hours 06:00–20:00. The settlement HUD shows date and time. Outside work hours, assigned labor pauses, residence needs do not deplete, chimneys go quiet, and the world shifts through dawn/day/dusk/night lighting. With a staffed chapel, the mayor can enable **Sunday sabbath** in City administration — labor, deliveries, need consumption, and tithes pause that day in exchange for higher chapel attendance and faster settlement.
-- Construction dock UI — `R` for roads, `B` for settlement essentials, `V` for industry and provisioning, `M` for the hydrology overlay. City administration lives in the main menu (gear icon or `Esc`).
+- Construction dock UI — `R` for roads, `B` for settlement essentials (residences, well, chapel, monastery, marketplace, ferry), `V` for industry and provisioning (grain chain, food processing, forestry, extraction, carpenter, apiary, vineyard), `M` for the hydrology overlay. **City administration** (main menu → gear) sets mayor tax, parish coffer policy, and Pauline monastery tithe share / feast-day charity.
 - Building placement tool with terrain-following preview, flattened terrain pads, work-radius rings, and validation (water, slope, overlap, road access, trees, quarry stone, foraging nodes).
 - Building and residence demolish actions from the inspector panel.
 - Click-to-inspect resource panel for quarries, foraging nodes, buildings, residences, backyards, and river access — yields, storage, labor controls, runway days, delivery status, and hydrology grades.
@@ -71,7 +74,7 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 - **Residence zone placement** — click two points along a road for the frontage edge, then a third point behind the road to set backyard depth; the plot subdivides into residence parcels.
 - **Residence layout HUD** — adjust plot count (+/−), rotate frontage edge (`F`), and see validity while placing.
 - **Road frontage requirement** — zones must sit within frontage distance of the road network; parcels face the selected frontage edge.
-- **Per-parcel costs** — each residence costs timber and stone on placement; narrow and wide parcels get 2 or 4 population capacity respectively (default 3).
+- **Per-parcel costs** — each residence costs timber and stone on placement; narrow and wide parcels get 2 or 4 population capacity respectively (default 3). Homes can upgrade to **tier 2** (preserved food) and **tier 3** (ale) when road-linked processing buildings are available.
 - **Gradual settlement** — empty homes fill one settler at a time after a settle timer; inspector shows pending settlers and ETA.
 - **Procedural residence meshes** — timber-and-stone houses with varied facade and roof colors per parcel; instanced fence posts and rails along zone boundaries.
 - **Residence needs** — residents consume firewood, water, and food per person per tick; homes track per-need stock and deficit timers server-side.
@@ -143,14 +146,17 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 | Select residence | Build menu (`B`) → **Residence** (`H`) |
 | Select well | Build menu (`B`) → **Well** (`E`) |
 | Select chapel | Build menu (`B`) → **Chapel** (`C`) |
-| Select lumber mill | Build menu (`B`) → **Lumber mill** (`L`) |
-| Select stonecutter's camp | Build menu (`B`) → **Stonecutter's camp** (`S`) |
+| Select Pauline monastery | Build menu (`B`) → **Pauline monastery** (`O`) |
+| Select grain field | Industry menu (`V`) → **Rye and oat field** (`G`) |
+| Select brewhouse | Industry menu (`V`) → **Brewhouse** (`B`) |
+| Select lumber mill | Industry menu (`V`) → **Lumber mill** (`L`) |
+| Select stonecutter's camp | Industry menu (`V`) → **Stonecutter's camp** (`S`) |
 | Select reforester | Industry menu (`V`) → **Reforester** (`F`) |
 | Select woodcutter's lodge | Industry menu (`V`) → **Woodcutter's lodge** (`W`) |
 | Select hunter's hall | Industry menu (`V`) → **Hunter's hall** (`K`) |
 | Select forager's shed | Industry menu (`V`) → **Forager's shed** (`Y`) |
-| Select marketplace | Industry menu (`V`) → **Marketplace** (`P`) |
-| Open city administration | Main menu (gear) → **City administration…** |
+| Select marketplace | Build menu (`B`) → **Marketplace** (`P`) |
+| Open city administration | Main menu (gear) → **City administration…** (tax, parish coffer, monastery policy) |
 | Place building | Left-click on terrain (building tool active) |
 | Undo last building placement | `Ctrl+Z` / `Cmd+Z` |
 | Redo last building placement | `Ctrl+Y` / `Cmd+Y` |
@@ -252,21 +258,21 @@ When real auth is added later, swap the token source in `src/network/identityPer
 
 | Data | Server table | Notes |
 | --- | --- | --- |
-| Timber / stone / firewood / water / food / gold | `player_resources` | Per anonymous identity (treasury) |
-| Lumber mill, reforester, lodge, quarry, well, hunter's hall, forager's shed, chapel, marketplace | `building` | Per-building storage, labor, cooldowns; server tick drives production |
+| Timber / stone / firewood / water / food / gold / grain / flour / ale / preserved food / honey / wine | `player_resources` | Per anonymous identity (treasury); parish and monastery policy fields on same row |
+| 20 building kinds (mills, lodges, quarry, well, food, chapel, monastery, marketplace, grain chain, processing, apiary, vineyard, carpenter, ferry) | `building` | Per-building storage, labor, cooldowns; server tick drives production |
 | Tree stump / growing / mature | `tree_entity` | Bootstrapped after forest load |
 | Quarry remaining yield | `quarry` | Global world sites (1 large + 2 small) |
 | Game trails / berry patches | `foraging_node` | Depletes on harvest; respawns after cooldown |
 | Roads + bridges | `road_network_state` | Full `RoadNetworkSnapshot` JSON per player |
 | Residence zone layout | zone records | Rectangular plot corners, frontage edge, plot count |
 | Residence parcels | `residence` | Population, capacity, settlement ticks, abandoned flag |
-| Residence need stocks | `residence_need` | Firewood, water, and food stock + deficit timers |
+| Residence need stocks | `residence_need` | Firewood, water, food, preserved food, ale — stock + deficit timers (tier-gated) |
 | Backyard gardens | `backyard_garden` | Orchard, vegetable, flower, or herb plot per residence |
 | Active delivery hauls | `delivery_trip` | Road agents carrying firewood, water, or food |
 | Sim tick counter | `world_config` | Monotonic server tick |
 | World generation | `world_config` | Authoritative seed, map size, topography, hydrology, forest density (`configure_world` on connect) |
 
-**Player reducers:** `place_building`, `demolish_building`, `assign_building_labor`, `collect_chapel_coffer`, `marketplace_trade`, `set_economic_activity_tax_rate`, `set_chapel_parish_policy`, `reset_world`, `configure_world`, `place_backyard_garden`, `demolish_backyard_garden`, `sync_road_network`, `remove_road_edge`, plus place/demolish residence zone. **Bootstrap reducers:** `bootstrap_quarries`, `bootstrap_trees`, `bootstrap_foraging`.
+**Player reducers:** `place_building`, `demolish_building`, `assign_building_labor`, `collect_chapel_coffer`, `marketplace_trade`, `set_economic_activity_tax_rate`, `set_chapel_parish_policy`, `set_monastery_policy`, `reset_world`, `configure_world`, `place_backyard_garden`, `demolish_backyard_garden`, `sync_road_network`, `remove_road_edge`, plus place/demolish/upgrade residence zone. **Bootstrap reducers:** `bootstrap_quarries`, `bootstrap_trees`, `bootstrap_foraging`.
 
 ### Server connection required
 
@@ -344,7 +350,7 @@ Road placement is handled by `src/roads/RoadTool.ts`. Pointer input is projected
 
 `src/props/ForestProps.ts`, `ForestUndergrowth.ts`, and `ForestManager.ts` scatter instanced conifer trees, bushes, ferns, and rocks across the playable area, skipping rivers and clearing trees near committed road edges. `RoadStumps.ts` places cut stumps along road shoulders after clearance. `RiverReeds.ts` adds instanced reed clusters along river banks. `ForestVisualSync.ts` mirrors server tree phases (`stump`, `growing`, `mature`) onto the instanced forest — growing trees swap to animated sapling meshes via `TreeSaplings.ts`.
 
-`src/buildings/BuildingTool.ts` handles placement of all nine production and trade buildings. `BuildingPlacementValidation.ts` rejects water, steep slopes, overlapping buildings, missing road access, missing quarry stone, mature trees, or foraging nodes as required per building type. `BuildingTerrainLayout.ts` flattens terrain pads under placed buildings. `BuildingMarkers.ts` renders placed buildings with work-radius rings. Placement calls the SpacetimeDB `place_building` reducer; the server tick then drives harvesting, regrowth, processing, and delivery dispatch.
+`src/buildings/BuildingTool.ts` handles placement of all twenty production, faith, and trade buildings. `BuildingPlacementValidation.ts` rejects water, steep slopes (and flat ground for hillside-only sites such as the monastery), overlapping buildings, missing road access, missing quarry stone, mature trees, or foraging nodes as required per building type. `BuildingTerrainLayout.ts` flattens terrain pads under placed buildings. `BuildingMarkers.ts` renders placed buildings with work-radius rings. Placement calls the SpacetimeDB `place_building` reducer; the server tick then drives harvesting, regrowth, processing, and delivery dispatch.
 
 `src/residences/` handles residence zone drawing — a frontage edge snapped to the road network plus a depth point defining the rectangular plot. Layout and placement validation subdivide the zone into residence parcels and enforce road frontage, depth limits, overlap checks, and resource costs. `ResidenceMarkers.ts` and parcel fencing render procedural houses along zone boundaries. Placement calls the residence-zone reducer; the server creates residence rows with population capacity scaled by parcel width. `residence_settlement.rs` gradually fills homes; `backyard_garden.rs` runs garden production and treasury tax.
 
@@ -356,7 +362,7 @@ Road placement is handled by `src/roads/RoadTool.ts`. Pointer input is projected
 
 `src/data/spacetimeGameStore.ts` subscribes to replicated tables and maps rows into client `GameState`. `GameRuntime.ts` connects on startup, publishes world-generation settings to `world_config` via `configure_world`, bootstraps quarries, trees, and foraging from the client layout, and hydrates the road network from the server snapshot. Module `init` still seeds deploy-time embedded JSON so a fresh publish has world entities before the first client connects; `bootstrap_*` reducers apply client-authored rows only and no longer fall back to that JSON when empty arrays are sent. `reset_world` clears settlement progress and global entities but does not re-seed deploy-time defaults — the next connect re-publishes settings and re-bootstraps from the authoritative layout.
 
-On the server, `server/src/reducers/simulation.rs` runs each 200 ms tick: lumber mills harvest mature trees (requiring road-connected well water), reforesters advance stump regrowth, stone quarries extract from quarry sites, woodcutter's lodges process timber into firewood and dispatch trips, wells refill and deliver water, hunter's halls and forager's sheds harvest and deliver food, `delivery_trips.rs` moves agents along road paths and unloads cargo at residences, residences consume firewood/water/food with abandonment and recovery (`residence_needs/`), backyard gardens produce food and gold, and settlement ticks fill homes over time. Economy constants come from `balance/gameBalance.json` via `balance_generated.rs`.
+On the server, `server/src/reducers/simulation.rs` runs each 200 ms tick: lumber mills, reforesters, quarries, lodges, wells, hunter's halls, forager's sheds, the grain→food processing chain (fields, barn, watermill, granary, brewery, smokehouse, apiary, vineyard), monastery charity and pilgrimages, carpenter/ferry bonuses, `delivery_trips.rs` road agents, residence needs with tier-gated ale and preserved food, backyard gardens, chapel tithes, and settlement growth. Economy constants come from `balance/gameBalance.json` via `balance_generated.rs`.
 
 `src/resources/ResourceInspector.ts` provides the settlement HUD and click-to-inspect panel for quarries, foraging nodes, buildings, residences, backyards, and river access — including labor assignment, demolish actions, hydrology grades, and delivery status. `WorldQueries.ts` resolves inspectable targets from terrain clicks. `src/map/` projects quarry, foraging, and backyard icons at zoomed-out camera levels.
 

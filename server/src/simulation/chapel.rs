@@ -5,7 +5,7 @@ use crate::economy::{credit_treasury_gold, debit_residence_wealth, deposit_chape
 use crate::simulation::chapel_community::{chapel_attendance_chance, chapel_tithe_gold_per_tick};
 use crate::simulation::game_calendar::GameClock;
 use crate::simulation::labor_schedule::is_chapel_tithe_paused;
-use crate::simulation::landmark_access::find_serving_chapel;
+use crate::simulation::landmark_access::{find_serving_chapel, residence_has_monastery_coverage};
 use crate::simulation::tick_context::SimTickContext;
 use crate::tables::Building;
 
@@ -15,6 +15,7 @@ pub fn step_chapels(
     sim_tick: u64,
     clock: &GameClock,
     chapels: &[Building],
+    monasteries: &[Building],
 ) {
     for residence in ctx.db.residence().iter() {
         if residence.abandoned || residence.population == 0 {
@@ -29,9 +30,19 @@ pub fn step_chapels(
             continue;
         };
 
+        let sabbath_observance =
+            crate::simulation::labor_schedule::owner_sabbath_observance_enabled(ctx, residence.owner);
+        let has_monastery_coverage = residence_has_monastery_coverage(
+            tick,
+            residence.owner,
+            &residence,
+            monasteries,
+            chapels,
+        );
         let attendance_chance = chapel_attendance_chance(
             chapel.assigned_labor,
-            crate::simulation::labor_schedule::owner_sabbath_observance_enabled(ctx, residence.owner),
+            sabbath_observance,
+            has_monastery_coverage,
         );
         if !roll_chapel_attendance(residence.id, sim_tick, attendance_chance) {
             continue;

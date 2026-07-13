@@ -25,11 +25,13 @@ export type ResidenceNeedSupplyContext = {
 
 export type ResidenceCommunityContext = {
   hasChapelAccess: boolean;
+  hasMonasteryCoverage: boolean;
   sabbathObservance: boolean;
 };
 
 export const DEFAULT_RESIDENCE_COMMUNITY_CONTEXT: ResidenceCommunityContext = {
   hasChapelAccess: false,
+  hasMonasteryCoverage: false,
   sabbathObservance: false,
 };
 

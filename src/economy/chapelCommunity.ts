@@ -5,6 +5,9 @@ import {
   CHAPEL_RECOVERY_STOCK_MULTIPLIER,
   CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS,
   CHAPEL_SETTLEMENT_TICKS_MULTIPLIER,
+  MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER,
+  MONASTERY_RECOVERY_STOCK_MULTIPLIER,
+  MONASTERY_SETTLEMENT_TICKS_MULTIPLIER,
   RESIDENCE_RECOVERY_FIREWOOD_MIN,
   RESIDENCE_RECOVERY_FOOD_MIN,
   RESIDENCE_RECOVERY_WATER_MIN,
@@ -21,10 +24,15 @@ import {
 export function effectiveResidenceSettleTicks(
   hasChapelAccess: boolean,
   sabbathObservance = false,
+  hasMonasteryCoverage = false,
 ): number {
   let ticks = hasChapelAccess
     ? Math.ceil(RESIDENCE_SETTLE_TICKS * CHAPEL_SETTLEMENT_TICKS_MULTIPLIER)
     : RESIDENCE_SETTLE_TICKS;
+
+  if (hasChapelAccess && hasMonasteryCoverage) {
+    ticks = Math.ceil(ticks * MONASTERY_SETTLEMENT_TICKS_MULTIPLIER);
+  }
 
   if (hasChapelAccess && sabbathObservance) {
     ticks = Math.ceil(ticks * (1 - CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS));
@@ -33,20 +41,35 @@ export function effectiveResidenceSettleTicks(
   return Math.max(1, ticks);
 }
 
-export function effectiveAbandonAfterDeficitTicks(hasChapelAccess: boolean): number {
+export function effectiveAbandonAfterDeficitTicks(
+  hasChapelAccess: boolean,
+  hasMonasteryCoverage = false,
+): number {
   if (!hasChapelAccess) {
     return ABANDON_AFTER_DEFICIT_TICKS;
   }
 
-  return Math.ceil(ABANDON_AFTER_DEFICIT_TICKS / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER);
+  let ticks = ABANDON_AFTER_DEFICIT_TICKS / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER;
+  if (hasMonasteryCoverage) {
+    ticks /= MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER;
+  }
+  return Math.ceil(ticks);
 }
 
-export function recoveryStockMin(kind: ResidenceNeedKind, hasChapelAccess: boolean): number {
+export function recoveryStockMin(
+  kind: ResidenceNeedKind,
+  hasChapelAccess: boolean,
+  hasMonasteryCoverage = false,
+): number {
   const base = recoveryStockBase(kind);
-  if (!hasChapelAccess) {
-    return base;
+  let threshold = base;
+  if (hasChapelAccess) {
+    threshold *= CHAPEL_RECOVERY_STOCK_MULTIPLIER;
   }
-  return base * CHAPEL_RECOVERY_STOCK_MULTIPLIER;
+  if (hasChapelAccess && hasMonasteryCoverage) {
+    threshold *= MONASTERY_RECOVERY_STOCK_MULTIPLIER;
+  }
+  return threshold;
 }
 
 export function recoveryNeedsRequired(hasChapelAccess: boolean): number {
@@ -65,8 +88,18 @@ export function formatChapelSettlementBoostPercent(): string {
   return `${percent}%`;
 }
 
+export function formatMonasterySettlementBoostPercent(): string {
+  const percent = Math.round((1 - MONASTERY_SETTLEMENT_TICKS_MULTIPLIER) * 100);
+  return `${percent}%`;
+}
+
 export function formatChapelAbandonmentGracePercent(): string {
   const percent = Math.round((1 / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER - 1) * 100);
+  return `${percent}%`;
+}
+
+export function formatMonasteryAbandonmentGracePercent(): string {
+  const percent = Math.round((1 / MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER - 1) * 100);
   return `${percent}%`;
 }
 

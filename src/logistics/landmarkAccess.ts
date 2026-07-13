@@ -1,4 +1,5 @@
 import type { BuildingKind, BuildingState, ResidenceState } from '../resources/types.ts';
+import { MONASTERY_COVERAGE_RADIUS } from '../generated/gameBalance.ts';
 
 export type RoadPathProbe = (ax: number, az: number, bx: number, bz: number) => number | null;
 
@@ -83,4 +84,59 @@ export function isResidenceConnectedToChapel(
   probe: RoadPathProbe,
 ): boolean {
   return findServingChapel(residence, buildings, probe) != null;
+}
+
+export function monasteryLinkedToChapel(
+  monastery: BuildingState,
+  chapels: Iterable<BuildingState>,
+  probe: RoadPathProbe,
+): boolean {
+  for (const chapel of chapels) {
+    if (!isChapelStaffed(chapel)) {
+      continue;
+    }
+    if (isRoadPathConnected(probe, monastery.x, monastery.z, chapel.x, chapel.z)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Mirrors `find_linked_monastery_in_coverage` in `server/src/simulation/landmark_access.rs`. */
+export function findLinkedMonasteryInCoverage(
+  residence: ResidenceState,
+  monasteries: Iterable<BuildingState>,
+  chapels: Iterable<BuildingState>,
+  probe: RoadPathProbe,
+): BuildingState | null {
+  if (!isResidenceConnectedToChapel(residence, chapels, probe)) {
+    return null;
+  }
+
+  let best: BuildingState | null = null;
+  for (const monastery of monasteries) {
+    if (monastery.kind !== 'monastery') {
+      continue;
+    }
+    if (!monasteryLinkedToChapel(monastery, chapels, probe)) {
+      continue;
+    }
+    const distance = probe(residence.x, residence.z, monastery.x, monastery.z);
+    if (distance == null || distance > MONASTERY_COVERAGE_RADIUS) {
+      continue;
+    }
+    if (!best || monastery.id < best.id) {
+      best = monastery;
+    }
+  }
+  return best;
+}
+
+export function isResidenceInMonasteryCoverage(
+  residence: ResidenceState,
+  monasteries: Iterable<BuildingState>,
+  chapels: Iterable<BuildingState>,
+  probe: RoadPathProbe,
+): boolean {
+  return findLinkedMonasteryInCoverage(residence, monasteries, chapels, probe) != null;
 }

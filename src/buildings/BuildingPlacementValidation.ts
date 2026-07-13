@@ -3,6 +3,7 @@ import type { ResourceTotals } from '../resources/resourceTotals.ts';
 import { canAffordBuilding } from '../resources/buildingEconomy.ts';
 import { buildingRequiresRoad } from '../resources/buildingPlacementPolicy.ts';
 import { getBuildingDefinition } from '../resources/buildings.ts';
+import { MONASTERY_MIN_FOOTPRINT_SLOPE } from '../generated/gameBalance.ts';
 import { sampleBuildingFootprintHeights } from './BuildingTerrainLayout.ts';
 import { sampleBuildingFootprintPoints } from './BuildingTerrainLayout.ts';
 import { buildingOverlapsResidenceZone } from '../placement/placementConflicts.ts';
@@ -12,6 +13,7 @@ import { hasRoadAccess, isOnRoadSurface } from '../roads/roadConnectivity.ts';
 export type BuildingPlacementFailureReason =
   | 'water'
   | 'requires_shore'
+  | 'requires_hillside'
   | 'too_steep'
   | 'too_close'
   | 'within_work_radius'
@@ -58,7 +60,15 @@ export function validateBuildingPlacement(
     return { ok: false, reason: 'requires_shore' };
   }
 
-  if (isFootprintTooUneven(kind, x, z, context.getNaturalHeightAt)) {
+  if (getBuildingDefinition(kind).requiresHillside) {
+    const slope = footprintHeightDelta(kind, x, z, context.getNaturalHeightAt);
+    if (slope < MONASTERY_MIN_FOOTPRINT_SLOPE) {
+      return { ok: false, reason: 'requires_hillside' };
+    }
+    if (slope > MAX_FOOTPRINT_HEIGHT_DELTA) {
+      return { ok: false, reason: 'too_steep' };
+    }
+  } else if (isFootprintTooUneven(kind, x, z, context.getNaturalHeightAt)) {
     return { ok: false, reason: 'too_steep' };
   }
 
@@ -149,6 +159,15 @@ function isFootprintTooUneven(
   z: number,
   getNaturalHeightAt: (x: number, z: number) => number,
 ): boolean {
+  return footprintHeightDelta(kind, x, z, getNaturalHeightAt) > MAX_FOOTPRINT_HEIGHT_DELTA;
+}
+
+function footprintHeightDelta(
+  kind: BuildingKind,
+  x: number,
+  z: number,
+  getNaturalHeightAt: (x: number, z: number) => number,
+): number {
   const heights = sampleBuildingFootprintHeights(kind, x, z, getNaturalHeightAt);
   let minHeight = Number.POSITIVE_INFINITY;
   let maxHeight = Number.NEGATIVE_INFINITY;
@@ -156,7 +175,7 @@ function isFootprintTooUneven(
     minHeight = Math.min(minHeight, height);
     maxHeight = Math.max(maxHeight, height);
   }
-  return maxHeight - minHeight > MAX_FOOTPRINT_HEIGHT_DELTA;
+  return maxHeight - minHeight;
 }
 
 function isWithinSameKindWorkRadius(

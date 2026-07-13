@@ -182,13 +182,19 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
         .iter()
         .filter(|building| building.kind == "chapel")
         .collect();
+    let monasteries: Vec<Building> = ctx
+        .db
+        .building()
+        .iter()
+        .filter(|building| building.kind == "monastery")
+        .collect();
 
-    step_chapels(ctx, &tick, sim_tick, &clock, &chapels);
+    step_chapels(ctx, &tick, sim_tick, &clock, &chapels, &monasteries);
 
     let residences: Vec<Residence> = ctx.db.residence().iter().collect();
     step_chapel_parish(ctx, &tick, sim_tick, &clock, &chapels, &residences);
 
     for residence in residences {
-        step_residence(ctx, &tick, &chapels, residence, &clock);
+        step_residence(ctx, &tick, &chapels, &monasteries, residence, &clock);
     }
 }

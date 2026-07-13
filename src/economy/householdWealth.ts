@@ -5,6 +5,7 @@ import {
   CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS,
   CHAPEL_TITHE_GOLD_PER_PERSON_PER_DAY,
   HOUSEHOLD_MAX_WEALTH,
+  MONASTERY_ATTENDANCE_BONUS,
   SIM_TICK_SECONDS,
 } from '../generated/gameBalance.ts';
 import { SECONDS_PER_DAY } from './gardenMarketActivity.ts';
@@ -12,7 +13,11 @@ import { taxedEconomicActivity } from './villageEconomy.ts';
 
 export { HOUSEHOLD_MAX_WEALTH };
 
-export function chapelAttendanceChance(assignedLabor: number, sabbathObservance = false): number {
+export function chapelAttendanceChance(
+  assignedLabor: number,
+  sabbathObservance = false,
+  hasMonasteryCoverage = false,
+): number {
   if (assignedLabor <= 0) {
     return 0;
   }
@@ -23,6 +28,10 @@ export function chapelAttendanceChance(assignedLabor: number, sabbathObservance 
 
   if (sabbathObservance) {
     chance += CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS;
+  }
+
+  if (hasMonasteryCoverage) {
+    chance += MONASTERY_ATTENDANCE_BONUS;
   }
 
   return Math.min(1, chance);

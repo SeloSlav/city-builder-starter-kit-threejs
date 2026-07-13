@@ -15,6 +15,7 @@ const tests = [
   'test:world-config',
   'test:chapel-bell-schedule',
   'test:expanded-settlement',
+  'test:monastery-polish',
   'test:backyard-gardens',
 ] as const;
 

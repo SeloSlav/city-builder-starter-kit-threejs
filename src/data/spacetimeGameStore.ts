@@ -21,6 +21,7 @@ import type { RoadNetworkSnapshot } from '../roads/RoadNetwork.ts';
 import type { BackyardGardenKind } from '../residences/backyardGarden.ts';
 import { ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT } from '../economy/villageEconomy.ts';
 import { DEFAULT_PARISH_POLICY, type ParishPolicyState } from '../economy/chapelParish.ts';
+import { DEFAULT_MONASTERY_POLICY, type MonasteryPolicyState } from '../economy/monasteryPolicy.ts';
 import {
   DEFAULT_REGIONAL_MARKET_STATE,
   type RegionalMarketState,
@@ -61,6 +62,7 @@ export type SpacetimeGameSnapshot = {
   stockpile: ResourceStockpile;
   economicActivityTaxRate: number;
   parishPolicy: ParishPolicyState;
+  monasteryPolicy: MonasteryPolicyState;
   marketState: RegionalMarketState;
   quarries: Map<string, ResourceNodeState>;
   foragingNodes: Map<string, ForagingNodeState>;
@@ -85,6 +87,7 @@ function createEmptyTableState(): GameTableSyncState {
     stockpile: createEmptyStockpile(),
     economicActivityTaxRate: ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT,
     parishPolicy: { ...DEFAULT_PARISH_POLICY },
+    monasteryPolicy: { ...DEFAULT_MONASTERY_POLICY },
     marketState: { ...DEFAULT_REGIONAL_MARKET_STATE },
     quarries: new Map(),
     foragingNodes: new Map(),
@@ -135,6 +138,7 @@ export class SpacetimeGameStore {
       stockpile: { ...state.stockpile },
       economicActivityTaxRate: state.economicActivityTaxRate,
       parishPolicy: { ...state.parishPolicy },
+      monasteryPolicy: { ...state.monasteryPolicy },
       marketState: { ...state.marketState },
       quarries: new Map(state.quarries),
       foragingNodes: new Map(state.foragingNodes),
@@ -261,6 +265,10 @@ export class SpacetimeGameStore {
       cofferReserveGold,
       sabbathObservanceEnabled,
     );
+  }
+
+  setMonasteryPolicy(titheShare: number, feastsEnabled: boolean): Promise<void> {
+    return spacetimeReducers.setMonasteryPolicy(titheShare, feastsEnabled);
   }
 
   async assignBuildingLabor(buildingId: string, labor: number): Promise<void> {

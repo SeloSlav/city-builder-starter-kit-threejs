@@ -119,6 +119,16 @@ export async function setChapelParishPolicy(
   });
 }
 
+export async function setMonasteryPolicy(
+  titheShare: number,
+  feastsEnabled: boolean,
+): Promise<void> {
+  await callReducer('setMonasteryPolicy', 'set_monastery_policy', {
+    titheShare,
+    feastsEnabled,
+  });
+}
+
 export async function assignBuildingLabor(buildingId: string, labor: number): Promise<void> {
   const serverId = parseBuildingServerId(buildingId);
   if (serverId === null) {

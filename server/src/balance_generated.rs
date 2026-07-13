@@ -82,6 +82,11 @@ pub const CHAPEL_COFFER_RESERVE_MIN: f64 = 20.0;
 pub const CHAPEL_COFFER_RESERVE_MAX: f64 = 200.0;
 pub const CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS: f64 = 0.12;
 pub const CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS: f64 = 0.08;
+pub const MONASTERY_SETTLEMENT_TICKS_MULTIPLIER: f64 = 0.85;
+pub const MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER: f64 = 0.85;
+pub const MONASTERY_RECOVERY_STOCK_MULTIPLIER: f64 = 0.92;
+pub const MONASTERY_ATTENDANCE_BONUS: f64 = 0.08;
+pub const MONASTERY_MIN_FOOTPRINT_SLOPE: f64 = 1.8;
 
 pub const BUILDING_ROAD_ACCESS_DISTANCE: f64 = 20.0;
 pub const BURGAGE_ROAD_FRONTAGE_DISTANCE: f64 = 16.0;
@@ -194,6 +199,7 @@ pub struct BuildingDef {
     pub requires_game: bool,
     pub requires_berries: bool,
     pub requires_water_shore: bool,
+    pub requires_hillside: bool,
     pub sim_kind: Option<BuildingSimKind>,
 }
 
@@ -223,6 +229,7 @@ const LUMBER_MILL: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::LumberMill),
 };
 
@@ -252,6 +259,7 @@ const REFORESTER: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::Reforester),
 };
 
@@ -281,6 +289,7 @@ const WOODCUTTERS_LODGE: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::WoodcuttersLodge),
 };
 
@@ -310,6 +319,7 @@ const STONE_QUARRY: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::StoneQuarry),
 };
 
@@ -339,6 +349,7 @@ const WELL: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::Well),
 };
 
@@ -368,6 +379,7 @@ const HUNTERS_HALL: BuildingDef = BuildingDef {
     requires_game: true,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::HuntersHall),
 };
 
@@ -397,6 +409,7 @@ const FORAGERS_SHED: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: true,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::ForagersShed),
 };
 
@@ -426,6 +439,7 @@ const CHAPEL: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: None,
 };
 
@@ -455,6 +469,7 @@ const MARKETPLACE: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: None,
 };
 
@@ -484,6 +499,7 @@ const GRAIN_FIELD: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::GrainField),
 };
 
@@ -513,6 +529,7 @@ const THRESHING_BARN: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::ThreshingBarn),
 };
 
@@ -542,6 +559,7 @@ const MONASTERY: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: true,
     sim_kind: Some(BuildingSimKind::Monastery),
 };
 
@@ -571,6 +589,7 @@ const BREWERY: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::Brewery),
 };
 
@@ -600,6 +619,7 @@ const SMOKEHOUSE: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::Smokehouse),
 };
 
@@ -629,6 +649,7 @@ const GRANARY: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::Granary),
 };
 
@@ -658,6 +679,7 @@ const APIARY: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::Apiary),
 };
 
@@ -687,6 +709,7 @@ const WATERMILL: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: true,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::Watermill),
 };
 
@@ -716,6 +739,7 @@ const CARPENTER: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::Carpenter),
 };
 
@@ -745,6 +769,7 @@ const FERRY_LANDING: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: true,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::FerryLanding),
 };
 
@@ -774,6 +799,7 @@ const VINEYARD: BuildingDef = BuildingDef {
     requires_game: false,
     requires_berries: false,
     requires_water_shore: false,
+    requires_hillside: false,
     sim_kind: Some(BuildingSimKind::Vineyard),
 };
 

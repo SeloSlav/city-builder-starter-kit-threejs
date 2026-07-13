@@ -59,11 +59,17 @@ export function renderResidenceInspector(
   const servingFoodSupplier = context.worldQueries.getServingFoodSupplierForResidence(residence);
   const servingChapel = context.worldQueries.getServingChapelForResidence(residence);
   const parishPolicy = context.getParishPolicy?.() ?? DEFAULT_PARISH_POLICY;
-  const community = buildResidenceCommunityContext(servingChapel, parishPolicy);
+  const hasMonasteryCoverage = context.worldQueries.isResidenceInMonasteryCoverage(residence);
+  const community = buildResidenceCommunityContext(
+    servingChapel,
+    parishPolicy,
+    hasMonasteryCoverage,
+  );
   const parishEconomy = buildResidenceParishEconomyView(
     residence,
     servingChapel,
     community.sabbathObservance,
+    community.hasMonasteryCoverage,
   );
   const needs = residenceNeedsStatus(residence, {
     servingLodgeId: servingLodge?.id ?? null,
@@ -96,6 +102,7 @@ export function renderResidenceInspector(
   const settleTicks = effectiveResidenceSettleTicks(
     community.hasChapelAccess,
     community.sabbathObservance,
+    community.hasMonasteryCoverage,
   );
   const settleEtaSeconds = settlersRemaining > 0
     ? Math.max(
@@ -140,6 +147,7 @@ export function renderResidenceInspector(
       <li><span>Serving well</span><span>${wellLabel}</span></li>
       <li><span>Serving food supplier</span><span>${foodSupplierLabel}</span></li>
       <li><span>Chapel link</span><span>${community.hasChapelAccess ? 'Staffed parish on the road' : 'None on branch'}</span></li>
+      <li><span>Monastery coverage</span><span>${community.hasMonasteryCoverage ? 'Linked Pauline house within parish radius' : 'None'}</span></li>
       <li><span>Road access</span><span>${roadAccess}</span></li>
       <li><span>Build cost</span><span>${formatBuildingCost(singleCost)}</span></li>
       <li><span>Nearest road</span><span>${nearestRoad == null ? 'None nearby' : `${nearestRoad.toFixed(1)} m`}</span></li>

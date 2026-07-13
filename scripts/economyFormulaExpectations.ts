@@ -19,6 +19,9 @@ import {
   CHAPEL_TITHE_GOLD_PER_PERSON_PER_DAY,
   CHAPEL_UNSTAFFED_UPKEEP_FRACTION,
   CHAPEL_UPKEEP_GOLD_PER_DAY,
+  MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER,
+  MONASTERY_ATTENDANCE_BONUS,
+  MONASTERY_SETTLEMENT_TICKS_MULTIPLIER,
   RESIDENCE_SETTLE_TICKS,
   SIM_TICK_SECONDS,
 } from '../src/generated/gameBalance.ts';
@@ -27,10 +30,15 @@ import { SECONDS_PER_DAY } from '../src/economy/gardenMarketActivity.ts';
 export function expectedEffectiveSettleTicks(
   hasChapelAccess: boolean,
   sabbathObservance = false,
+  hasMonasteryCoverage = false,
 ): number {
   let ticks = hasChapelAccess
     ? Math.ceil(RESIDENCE_SETTLE_TICKS * CHAPEL_SETTLEMENT_TICKS_MULTIPLIER)
     : RESIDENCE_SETTLE_TICKS;
+
+  if (hasChapelAccess && hasMonasteryCoverage) {
+    ticks = Math.ceil(ticks * MONASTERY_SETTLEMENT_TICKS_MULTIPLIER);
+  }
 
   if (hasChapelAccess && sabbathObservance) {
     ticks = Math.ceil(ticks * (1 - CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS));
@@ -39,16 +47,25 @@ export function expectedEffectiveSettleTicks(
   return Math.max(1, ticks);
 }
 
-export function expectedEffectiveAbandonAfterDeficitTicks(hasChapelAccess: boolean): number {
+export function expectedEffectiveAbandonAfterDeficitTicks(
+  hasChapelAccess: boolean,
+  hasMonasteryCoverage = false,
+): number {
   if (!hasChapelAccess) {
     return ABANDON_AFTER_DEFICIT_TICKS;
   }
-  return Math.ceil(ABANDON_AFTER_DEFICIT_TICKS / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER);
+
+  let ticks = ABANDON_AFTER_DEFICIT_TICKS / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER;
+  if (hasMonasteryCoverage) {
+    ticks /= MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER;
+  }
+  return Math.ceil(ticks);
 }
 
 export function expectedChapelAttendanceChance(
   assignedLabor: number,
   sabbathObservance = false,
+  hasMonasteryCoverage = false,
 ): number {
   if (assignedLabor <= 0) {
     return 0;
@@ -60,6 +77,10 @@ export function expectedChapelAttendanceChance(
 
   if (sabbathObservance) {
     chance += CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS;
+  }
+
+  if (hasMonasteryCoverage) {
+    chance += MONASTERY_ATTENDANCE_BONUS;
   }
 
   return Math.min(1, chance);

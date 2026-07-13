@@ -84,6 +84,11 @@ export const CHAPEL_COFFER_RESERVE_MIN = 20;
 export const CHAPEL_COFFER_RESERVE_MAX = 200;
 export const CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS = 0.12;
 export const CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS = 0.08;
+export const MONASTERY_SETTLEMENT_TICKS_MULTIPLIER = 0.85;
+export const MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER = 0.85;
+export const MONASTERY_RECOVERY_STOCK_MULTIPLIER = 0.92;
+export const MONASTERY_ATTENDANCE_BONUS = 0.08;
+export const MONASTERY_MIN_FOOTPRINT_SLOPE = 1.8;
 
 export const BUILDING_ROAD_ACCESS_DISTANCE = 20;
 export const BURGAGE_ROAD_FRONTAGE_DISTANCE = 16;
@@ -174,6 +179,7 @@ export type BuildingDefinition = {
   requiresRoad: boolean;
   facesRoad: boolean;
   requiresWaterShore: boolean;
+  requiresHillside: boolean;
 };
 
 export const BUILDING_DEFINITIONS = {
@@ -189,6 +195,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   reforester: {
     kind: 'reforester',
@@ -202,6 +209,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: false,
     facesRoad: false,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   woodcutters_lodge: {
     kind: 'woodcutters_lodge',
@@ -215,6 +223,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   stone_quarry: {
     kind: 'stone_quarry',
@@ -228,6 +237,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: false,
     facesRoad: false,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   well: {
     kind: 'well',
@@ -241,6 +251,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: false,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   hunters_hall: {
     kind: 'hunters_hall',
@@ -254,6 +265,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: false,
     facesRoad: false,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   foragers_shed: {
     kind: 'foragers_shed',
@@ -267,6 +279,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: false,
     facesRoad: false,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   chapel: {
     kind: 'chapel',
@@ -280,6 +293,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   marketplace: {
     kind: 'marketplace',
@@ -293,6 +307,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   grain_field: {
     kind: 'grain_field',
@@ -306,6 +321,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: false,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   threshing_barn: {
     kind: 'threshing_barn',
@@ -319,6 +335,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   monastery: {
     kind: 'monastery',
@@ -332,6 +349,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: true,
   },
   brewery: {
     kind: 'brewery',
@@ -345,6 +363,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   smokehouse: {
     kind: 'smokehouse',
@@ -358,6 +377,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   granary: {
     kind: 'granary',
@@ -371,6 +391,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   apiary: {
     kind: 'apiary',
@@ -384,6 +405,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: false,
     facesRoad: false,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   watermill: {
     kind: 'watermill',
@@ -397,6 +419,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: true,
+    requiresHillside: false,
   },
   carpenter: {
     kind: 'carpenter',
@@ -410,6 +433,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
   ferry_landing: {
     kind: 'ferry_landing',
@@ -423,6 +447,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: true,
     requiresWaterShore: true,
+    requiresHillside: false,
   },
   vineyard: {
     kind: 'vineyard',
@@ -436,6 +461,7 @@ export const BUILDING_DEFINITIONS = {
     requiresRoad: true,
     facesRoad: false,
     requiresWaterShore: false,
+    requiresHillside: false,
   },
 } as const satisfies Record<BuildingKind, BuildingDefinition>;
 

@@ -177,7 +177,12 @@
     "chapelCofferReserveMin": 20,
     "chapelCofferReserveMax": 200,
     "sabbathObservanceAttendanceBonus": 0.12,
-    "sabbathObservanceSettlementBonus": 0.08
+    "sabbathObservanceSettlementBonus": 0.08,
+    "monasterySettlementTicksMultiplier": 0.85,
+    "monasteryAbandonmentDeficitMultiplier": 0.85,
+    "monasteryRecoveryStockMultiplier": 0.92,
+    "monasteryAttendanceBonus": 0.08,
+    "monasteryMinFootprintSlope": 1.8
   },
   "roads": {
     "buildingRoadAccessDistance": 20,
@@ -431,7 +436,8 @@
       "requiresQuarryStone": false,
       "requiresGame": false,
       "requiresBerries": false,
-      "requiresWaterShore": false
+      "requiresWaterShore": false,
+      "requiresHillside": false
     },
     "monastery": {
       "label": "Pauline monastery",
@@ -449,7 +455,8 @@
       "requiresQuarryStone": false,
       "requiresGame": false,
       "requiresBerries": false,
-      "requiresWaterShore": false
+      "requiresWaterShore": false,
+      "requiresHillside": true
     },
     "brewery": {
       "label": "Brewhouse",

@@ -43,6 +43,7 @@ import type { BuildingKind } from '../generated/gameBalance.ts';
 import { CityAdministrationPanel } from '../ui/CityAdministrationPanel.ts';
 import { ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT } from '../economy/villageEconomy.ts';
 import { DEFAULT_PARISH_POLICY } from '../economy/chapelParish.ts';
+import { DEFAULT_MONASTERY_POLICY } from '../economy/monasteryPolicy.ts';
 import { beginNewWorld, resolveWorldGenerationSettings } from './worldBootstrapFlow.ts';
 import {
   syncBuildingTerrainLayout,
@@ -470,6 +471,7 @@ export async function bootstrapAppSession(
     getWorldQueries: () => worldQueries,
     getTaxRate: () => spacetimeStore.snapshot.economicActivityTaxRate ?? ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT,
     getParishPolicy: () => spacetimeStore.snapshot.parishPolicy ?? DEFAULT_PARISH_POLICY,
+    getMonasteryPolicy: () => spacetimeStore.snapshot.monasteryPolicy ?? DEFAULT_MONASTERY_POLICY,
     onTaxRateChange: async (taxRate) => {
       requireSessionReady();
       await spacetimeStore.setEconomicActivityTaxRate(taxRate);
@@ -488,6 +490,14 @@ export async function bootstrapAppSession(
     },
     onParishPolicyChangeFailed: (error) => {
       const message = error instanceof Error ? error.message : 'Could not update parish policy.';
+      toastManager?.show(message, { variant: 'error' });
+    },
+    onMonasteryPolicyChange: async (titheShare, feastsEnabled) => {
+      requireSessionReady();
+      await spacetimeStore.setMonasteryPolicy(titheShare, feastsEnabled);
+    },
+    onMonasteryPolicyChangeFailed: (error) => {
+      const message = error instanceof Error ? error.message : 'Could not update monastery policy.';
       toastManager?.show(message, { variant: 'error' });
     },
     onOpenChange: (open) => {

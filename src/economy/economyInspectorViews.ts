@@ -29,10 +29,12 @@ import {
 export function buildResidenceCommunityContext(
   servingChapel: BuildingState | null,
   parishPolicy: ParishPolicyState,
+  hasMonasteryCoverage = false,
 ): ResidenceCommunityContext {
   const sabbathObservance = servingChapel != null && parishPolicy.sabbathObservanceEnabled;
   return {
     hasChapelAccess: servingChapel != null,
+    hasMonasteryCoverage,
     sabbathObservance,
   };
 }
@@ -48,6 +50,7 @@ export function buildResidenceParishEconomyView(
   residence: ResidenceState,
   servingChapel: BuildingState | null,
   sabbathObservance = false,
+  hasMonasteryCoverage = false,
 ): ResidenceParishEconomyView {
   if (!servingChapel) {
     return {
@@ -58,7 +61,11 @@ export function buildResidenceParishEconomyView(
     };
   }
 
-  const attendance = chapelAttendanceChance(servingChapel.assignedLabor, sabbathObservance);
+  const attendance = chapelAttendanceChance(
+    servingChapel.assignedLabor,
+    sabbathObservance,
+    hasMonasteryCoverage,
+  );
   const uncapped = residence.population > 0
     ? payableChapelTithePerDay(
         residence.population,

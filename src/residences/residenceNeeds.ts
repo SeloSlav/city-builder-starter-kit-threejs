@@ -78,7 +78,7 @@ export function residenceNeedsStatus(
     return describeAwaitingSettlers(residence, community);
   }
 
-  const deficitWarning = describeDeficitWarning(residence, community.hasChapelAccess);
+  const deficitWarning = describeDeficitWarning(residence, community);
   if (deficitWarning) return deficitWarning;
 
   return describeActiveNeeds(residence);
@@ -91,7 +91,11 @@ function evaluateNeedRecovery(
   community: ResidenceCommunityContext,
 ): ResidenceNeedRecoveryStatus {
   const need = getNeed(residence.needs, kind);
-  const threshold = recoveryStockMin(kind, community.hasChapelAccess);
+  const threshold = recoveryStockMin(
+    kind,
+    community.hasChapelAccess,
+    community.hasMonasteryCoverage,
+  );
   switch (kind) {
     case 'firewood':
       return {
@@ -172,12 +176,17 @@ function describeAwaitingSettlers(
   const settleTicks = effectiveResidenceSettleTicks(
     community.hasChapelAccess,
     community.sabbathObservance,
+    community.hasMonasteryCoverage,
   );
   const settleSeconds = Math.max(
     1,
     Math.round((settleTicks - residence.settlementTicks) * SIM_TICK_SECONDS),
   );
-  const chapelNote = community.hasChapelAccess ? ' (staffed chapel)' : '';
+  const chapelNote = community.hasChapelAccess
+    ? community.hasMonasteryCoverage
+      ? ' (parish + monastery coverage)'
+      : ' (staffed chapel)'
+    : '';
   return {
     label: capacity > 0
       ? `Awaiting settlers — first arrival in ~${formatShortDuration(settleSeconds)}${chapelNote}`
@@ -188,7 +197,7 @@ function describeAwaitingSettlers(
 
 function describeDeficitWarning(
   residence: ResidenceState,
-  hasChapelAccess: boolean,
+  community: ResidenceCommunityContext,
 ): ResidenceNeedsStatus | null {
   const deficitTicks = maxNeedDeficitTicks(residence.needs);
   if (deficitTicks <= 0) return null;
@@ -197,7 +206,10 @@ function describeDeficitWarning(
     .filter((kind) => getNeed(residence.needs, kind).deficitTicks > 0)
     .map((kind) => needLabel(kind).toLowerCase());
 
-  const abandonThreshold = effectiveAbandonAfterDeficitTicks(hasChapelAccess);
+  const abandonThreshold = effectiveAbandonAfterDeficitTicks(
+    community.hasChapelAccess,
+    community.hasMonasteryCoverage,
+  );
   const remainingTicks = Math.max(0, abandonThreshold - deficitTicks);
   const remainingSeconds = remainingTicks * SIM_TICK_SECONDS;
   const needLabelText = unmetNeeds.length > 0 ? unmetNeeds.join(', ') : 'needs';

@@ -10,6 +10,7 @@ export const TOAST_MESSAGES = {
   'road.placement.too_short': 'Road segment is too short — add another point',
   'building.placement.water': 'Cannot build on water',
   'building.placement.requires_shore': 'This building must be placed beside open water',
+  'building.placement.requires_hillside': 'The Pauline monastery needs a hillside bench — find sloped ground above the valley floor',
   'building.placement.too_steep': 'The slope is too steep here',
   'building.placement.too_close': 'Too close to another building',
   'building.placement.within_work_radius': 'Another building of the same type already covers this area',
@@ -97,6 +98,8 @@ export function buildingPlacementReasonToToastId(reason: BuildingPlacementFailur
       return 'building.placement.water';
     case 'requires_shore':
       return 'building.placement.requires_shore';
+    case 'requires_hillside':
+      return 'building.placement.requires_hillside';
     case 'too_steep':
       return 'building.placement.too_steep';
     case 'too_close':

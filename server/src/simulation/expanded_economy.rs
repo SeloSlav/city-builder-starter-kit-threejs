@@ -4,7 +4,8 @@ use crate::balance_generated::{
     APIARY_FOOD_PER_CYCLE, APIARY_HONEY_PER_CYCLE, BREWERY_ALE_PER_CYCLE,
     BREWERY_GRAIN_PER_CYCLE, BREWERY_WATER_PER_CYCLE, FERRY_GOLD_PER_DAY,
     GRAIN_PER_FIELD_CYCLE, GRAIN_TRANSFER_PER_TRIP, GRANARY_FLOUR_PER_CYCLE,
-    GRANARY_FOOD_PER_CYCLE, MONASTERY_FOOD_PER_CYCLE, MONASTERY_GRAIN_PER_CYCLE,
+    GRANARY_FOOD_PER_CYCLE, MONASTERY_CHARITY_FOOD_PER_DELIVERY, MONASTERY_COVERAGE_RADIUS,
+    MONASTERY_FOOD_PER_CYCLE, MONASTERY_GRAIN_PER_CYCLE,
     MONASTERY_PILGRIMAGE_GOLD_PER_DAY, MONASTERY_UNLINKED_PRODUCTIVITY,
     SMOKEHOUSE_FIREWOOD_PER_CYCLE, SMOKEHOUSE_FOOD_PER_CYCLE, SMOKEHOUSE_PRESERVED_FOOD_PER_CYCLE,
     SPECIALTY_EXPORT_GOLD_PER_ALE, SPECIALTY_EXPORT_GOLD_PER_HONEY,
@@ -25,6 +26,7 @@ use crate::simulation::delivery_trips::{
     try_start_building_supply_trip, try_start_delivery_trip,
 };
 use crate::simulation::game_calendar::GameClock;
+use crate::simulation::landmark_access::monastery_linked_to_chapel;
 use crate::simulation::labor_and_logistics_paused;
 use crate::simulation::residence_needs::{apply_need_delivery, load_needs, need_stock, ResidenceNeedKind};
 use crate::simulation::tick_context::SimTickContext;
@@ -259,8 +261,24 @@ pub fn step_monastery(
             ctx.db.player_resources().owner().update(treasury);
         }
     }
-    dispatch_need(ctx, tick, clock, &mut monastery, ResidenceNeedKind::Food, 4.0);
-    dispatch_need(ctx, tick, clock, &mut monastery, ResidenceNeedKind::Ale, 3.0);
+    if linked {
+        dispatch_monastery_covered_need(
+            ctx,
+            tick,
+            clock,
+            &mut monastery,
+            ResidenceNeedKind::Food,
+            MONASTERY_CHARITY_FOOD_PER_DELIVERY,
+        );
+        dispatch_monastery_covered_need(
+            ctx,
+            tick,
+            clock,
+            &mut monastery,
+            ResidenceNeedKind::Ale,
+            3.0,
+        );
+    }
     run_monastery_feast(ctx, tick, clock, &mut monastery);
     ctx.db.building().id().update(monastery);
 }
@@ -452,6 +470,55 @@ fn dispatch_to_building(
     );
 }
 
+fn dispatch_monastery_covered_need(
+    ctx: &ReducerContext,
+    tick: &SimTickContext,
+    clock: &GameClock,
+    supplier: &mut Building,
+    need_kind: ResidenceNeedKind,
+    per_delivery: f64,
+) {
+    if building_has_active_trip(ctx, supplier.id)
+        || building_commodity_stock(supplier, need_to_commodity(need_kind)) <= 1e-6
+    {
+        return;
+    }
+    let Some(network) = tick.road_network(supplier.owner) else {
+        return;
+    };
+    let mut targets: Vec<Residence> = ctx
+        .db
+        .residence()
+        .owner()
+        .filter(&supplier.owner)
+        .filter(|residence| {
+            if residence.abandoned || !need_kind.is_active_for_tier(residence.tier) {
+                return false;
+            }
+            network
+                .road_path_distance(supplier.x, supplier.z, residence.x, residence.z)
+                .is_some_and(|distance| distance <= MONASTERY_COVERAGE_RADIUS)
+        })
+        .collect();
+    targets.sort_by(|a, b| {
+        let sa = need_stock(&load_needs(ctx, a.id), need_kind);
+        let sb = need_stock(&load_needs(ctx, b.id), need_kind);
+        sa.partial_cmp(&sb).unwrap_or(std::cmp::Ordering::Equal)
+    });
+    try_start_delivery_trip(
+        ctx,
+        clock,
+        network,
+        supplier,
+        1,
+        &targets,
+        need_kind,
+        FOOD_DELIVERY_SPEED_MPS,
+        FOOD_DELIVERY_UNLOAD_SEC,
+        per_delivery,
+    );
+}
+
 fn dispatch_need(
     ctx: &ReducerContext,
     tick: &SimTickContext,
@@ -618,14 +685,12 @@ fn monastery_has_parish_link(
     tick: &SimTickContext,
     monastery: &Building,
 ) -> bool {
-    let Some(network) = tick.road_network(monastery.owner) else {
-        return false;
-    };
-    ctx.db.building().owner().filter(&monastery.owner).any(|chapel| {
-        chapel.kind == "chapel"
-            && chapel.assigned_labor > 0
-            && network
-                .road_path_distance(monastery.x, monastery.z, chapel.x, chapel.z)
-                .is_some()
-    })
+    let chapels: Vec<Building> = ctx
+        .db
+        .building()
+        .owner()
+        .filter(&monastery.owner)
+        .filter(|building| building.kind == "chapel")
+        .collect();
+    monastery_linked_to_chapel(tick, monastery, &chapels)
 }

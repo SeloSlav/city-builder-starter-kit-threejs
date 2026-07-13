@@ -1,6 +1,7 @@
 import type { PlayerResources } from '../../generated/types.ts';
 import { ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT } from '../../economy/villageEconomy.ts';
 import { DEFAULT_PARISH_POLICY } from '../../economy/chapelParish.ts';
+import { DEFAULT_MONASTERY_POLICY } from '../../economy/monasteryPolicy.ts';
 import { createEmptyStockpile } from '../../resources/types.ts';
 import type { GameTableSyncState } from './gameTableSyncState.ts';
 
@@ -8,6 +9,7 @@ export function syncPlayerResources(rows: Iterable<PlayerResources>, state: Game
   state.stockpile = createEmptyStockpile();
   state.economicActivityTaxRate = ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT;
   state.parishPolicy = { ...DEFAULT_PARISH_POLICY };
+  state.monasteryPolicy = { ...DEFAULT_MONASTERY_POLICY };
   if (!state.identityHex) return;
 
   for (const row of rows) {
@@ -38,6 +40,13 @@ export function syncPlayerResources(rows: Iterable<PlayerResources>, state: Game
       salaryPaidTotal: row.parishSalaryPaidTotal ?? 0,
       upkeepPaidTotal: row.parishUpkeepPaidTotal ?? 0,
       charityPaidTotal: row.parishCharityPaidTotal ?? 0,
+    };
+    state.monasteryPolicy = {
+      titheShare: row.monasteryTitheShare ?? DEFAULT_MONASTERY_POLICY.titheShare,
+      feastsEnabled: row.monasteryFeastsEnabled ?? DEFAULT_MONASTERY_POLICY.feastsEnabled,
+      tithePaidTotal: row.monasteryTithePaidTotal ?? 0,
+      pilgrimageGoldTotal: row.monasteryPilgrimageGoldTotal ?? 0,
+      foodCharityTotal: row.monasteryFoodCharityTotal ?? 0,
     };
     break;
   }

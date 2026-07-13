@@ -27,6 +27,7 @@ pub fn step_residence_needs(
     ctx: &ReducerContext,
     residence: Residence,
     has_chapel_access: bool,
+    has_monastery_coverage: bool,
     clock: &GameClock,
 ) {
     if residence.abandoned || residence.population == 0 {
@@ -65,7 +66,8 @@ pub fn step_residence_needs(
         return;
     }
 
-    let abandon_threshold = effective_abandon_after_deficit_ticks(has_chapel_access);
+    let abandon_threshold =
+        effective_abandon_after_deficit_ticks(has_chapel_access, has_monastery_coverage);
     let abandoned = max_deficit_ticks(&needs) >= abandon_threshold;
     persist_needs(ctx, residence.id, &needs);
     ctx.db.residence().id().update(Residence {
@@ -80,6 +82,7 @@ pub fn step_residence_recovery(
     tick: &SimTickContext,
     residence: Residence,
     has_chapel_access: bool,
+    has_monastery_coverage: bool,
 ) {
     if !residence.abandoned {
         return;
@@ -87,7 +90,13 @@ pub fn step_residence_recovery(
 
     let needs = load_needs(ctx, residence.id);
     let supply = supply::build_supply_context(tick, ctx, &residence);
-    if !recovery_ready(&needs, &supply, residence.tier, has_chapel_access) {
+    if !recovery_ready(
+        &needs,
+        &supply,
+        residence.tier,
+        has_chapel_access,
+        has_monastery_coverage,
+    ) {
         return;
     }
 
@@ -131,6 +140,7 @@ fn recovery_ready(
     supply: &supply::ResidenceNeedSupplyContext,
     tier: u8,
     has_chapel_access: bool,
+    has_monastery_coverage: bool,
 ) -> bool {
     let ready_count = ResidenceNeedKind::ALL
         .into_iter()
@@ -139,7 +149,7 @@ fn recovery_ready(
             let Some(need) = state::find_need(needs, *kind) else {
                 return false;
             };
-            evaluate_recovery(*kind, need, supply, has_chapel_access)
+            evaluate_recovery(*kind, need, supply, has_chapel_access, has_monastery_coverage)
         })
         .count();
 
@@ -198,8 +208,9 @@ fn evaluate_recovery(
     need: &NeedState,
     supply: &supply::ResidenceNeedSupplyContext,
     has_chapel_access: bool,
+    has_monastery_coverage: bool,
 ) -> bool {
-    let stock_min = recovery_stock_min(kind, has_chapel_access);
+    let stock_min = recovery_stock_min(kind, has_chapel_access, has_monastery_coverage);
     match kind {
         ResidenceNeedKind::Firewood => firewood::evaluate_recovery(need, supply, stock_min),
         ResidenceNeedKind::Water => water::evaluate_recovery(need, supply, stock_min),

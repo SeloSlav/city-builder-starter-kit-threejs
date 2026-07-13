@@ -45,6 +45,7 @@ type BuildingBalance = {
   requiresGame: boolean;
   requiresBerries: boolean;
   requiresWaterShore?: boolean;
+  requiresHillside?: boolean;
 };
 
 type BackyardGardenBalance = {
@@ -164,6 +165,11 @@ export type GameBalance = {
     chapelCofferReserveMax: number;
     sabbathObservanceAttendanceBonus: number;
     sabbathObservanceSettlementBonus: number;
+    monasterySettlementTicksMultiplier: number;
+    monasteryAbandonmentDeficitMultiplier: number;
+    monasteryRecoveryStockMultiplier: number;
+    monasteryAttendanceBonus: number;
+    monasteryMinFootprintSlope: number;
   };
   roads: {
     buildingRoadAccessDistance: number;
@@ -358,6 +364,11 @@ function generateRust(): string {
     `pub const CHAPEL_COFFER_RESERVE_MAX: f64 = ${rustF64(b.population.chapelCofferReserveMax)};`,
     `pub const CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS: f64 = ${rustF64(b.population.sabbathObservanceAttendanceBonus)};`,
     `pub const CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS: f64 = ${rustF64(b.population.sabbathObservanceSettlementBonus)};`,
+    `pub const MONASTERY_SETTLEMENT_TICKS_MULTIPLIER: f64 = ${rustF64(b.population.monasterySettlementTicksMultiplier)};`,
+    `pub const MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER: f64 = ${rustF64(b.population.monasteryAbandonmentDeficitMultiplier)};`,
+    `pub const MONASTERY_RECOVERY_STOCK_MULTIPLIER: f64 = ${rustF64(b.population.monasteryRecoveryStockMultiplier)};`,
+    `pub const MONASTERY_ATTENDANCE_BONUS: f64 = ${rustF64(b.population.monasteryAttendanceBonus)};`,
+    `pub const MONASTERY_MIN_FOOTPRINT_SLOPE: f64 = ${rustF64(b.population.monasteryMinFootprintSlope)};`,
     '',
     `pub const BUILDING_ROAD_ACCESS_DISTANCE: f64 = ${rustF64(b.roads.buildingRoadAccessDistance)};`,
     `pub const BURGAGE_ROAD_FRONTAGE_DISTANCE: f64 = ${rustF64(b.roads.burgageRoadFrontageDistance)};`,
@@ -472,6 +483,7 @@ function generateRust(): string {
   lines.push('    pub requires_game: bool,');
   lines.push('    pub requires_berries: bool,');
   lines.push('    pub requires_water_shore: bool,');
+  lines.push('    pub requires_hillside: bool,');
   lines.push('    pub sim_kind: Option<BuildingSimKind>,');
   lines.push('}');
   lines.push('');
@@ -505,6 +517,7 @@ function generateRust(): string {
     lines.push(`    requires_game: ${def.requiresGame},`);
     lines.push(`    requires_berries: ${def.requiresBerries},`);
     lines.push(`    requires_water_shore: ${def.requiresWaterShore ?? false},`);
+    lines.push(`    requires_hillside: ${def.requiresHillside ?? false},`);
     lines.push(`    sim_kind: ${simKind ? `Some(BuildingSimKind::${simKind})` : 'None'},`);
     lines.push('};');
     lines.push('');
@@ -692,6 +705,11 @@ function generateTypeScript(): string {
     `export const CHAPEL_COFFER_RESERVE_MAX = ${b.population.chapelCofferReserveMax};`,
     `export const CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS = ${b.population.sabbathObservanceAttendanceBonus};`,
     `export const CHAPEL_SABBATH_OBSERVANCE_SETTLEMENT_BONUS = ${b.population.sabbathObservanceSettlementBonus};`,
+    `export const MONASTERY_SETTLEMENT_TICKS_MULTIPLIER = ${b.population.monasterySettlementTicksMultiplier};`,
+    `export const MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER = ${b.population.monasteryAbandonmentDeficitMultiplier};`,
+    `export const MONASTERY_RECOVERY_STOCK_MULTIPLIER = ${b.population.monasteryRecoveryStockMultiplier};`,
+    `export const MONASTERY_ATTENDANCE_BONUS = ${b.population.monasteryAttendanceBonus};`,
+    `export const MONASTERY_MIN_FOOTPRINT_SLOPE = ${b.population.monasteryMinFootprintSlope};`,
     '',
     `export const BUILDING_ROAD_ACCESS_DISTANCE = ${b.roads.buildingRoadAccessDistance};`,
     `export const BURGAGE_ROAD_FRONTAGE_DISTANCE = ${b.roads.burgageRoadFrontageDistance};`,
@@ -782,6 +800,7 @@ function generateTypeScript(): string {
     '  requiresRoad: boolean;',
     '  facesRoad: boolean;',
     '  requiresWaterShore: boolean;',
+    '  requiresHillside: boolean;',
     '};',
     '',
     `export const BUILDING_DEFINITIONS = {`,
@@ -800,6 +819,7 @@ function generateTypeScript(): string {
     lines.push(`    requiresRoad: ${def.requiresRoad},`);
     lines.push(`    facesRoad: ${def.facesRoad},`);
     lines.push(`    requiresWaterShore: ${def.requiresWaterShore ?? false},`);
+    lines.push(`    requiresHillside: ${def.requiresHillside ?? false},`);
     lines.push('  },');
   }
 

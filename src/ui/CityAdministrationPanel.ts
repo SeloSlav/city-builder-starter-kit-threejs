@@ -8,6 +8,14 @@ import {
 } from '../generated/gameBalance.ts';
 import { clampChapelCofferReserveGold, type ParishPolicyState } from '../economy/chapelParish.ts';
 import {
+  clampMonasteryTitheShare,
+  formatMonasteryFoodCharityTotal,
+  formatMonasteryPilgrimageTotal,
+  formatMonasteryTithePaidTotal,
+  formatMonasteryTitheSharePercent,
+  type MonasteryPolicyState,
+} from '../economy/monasteryPolicy.ts';
+import {
   clampEconomicActivityTaxRate,
   ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT,
 } from '../economy/villageEconomy.ts';
@@ -24,9 +32,12 @@ type CityAdministrationPanelOptions = {
     sabbathObservanceEnabled: boolean,
   ) => void | Promise<void>;
   onParishPolicyChangeFailed?: (error: unknown) => void;
+  onMonasteryPolicyChange: (titheShare: number, feastsEnabled: boolean) => void | Promise<void>;
+  onMonasteryPolicyChangeFailed?: (error: unknown) => void;
   getGameState: () => GameState | null;
   getTaxRate: () => number;
   getParishPolicy: () => ParishPolicyState;
+  getMonasteryPolicy: () => MonasteryPolicyState;
   getWorldQueries?: () => WorldQueries | null;
   onOpenChange?: (open: boolean) => void;
 };
@@ -39,8 +50,12 @@ export class CityAdministrationPanel {
   private readonly reserveSlider: HTMLInputElement;
   private readonly autoSweepToggle: HTMLInputElement;
   private readonly sabbathToggle: HTMLInputElement;
+  private readonly monasteryTitheSlider: HTMLInputElement;
+  private readonly monasteryFeastsToggle: HTMLInputElement;
   private readonly taxRateValue: HTMLElement;
   private readonly reserveValue: HTMLElement;
+  private readonly monasteryTitheValue: HTMLElement;
+  private readonly monasteryLedgerValue: HTMLElement;
   private readonly productivityValue: HTMLElement;
   private readonly gdpValue: HTMLElement;
   private readonly householdWealthValue: HTMLElement;
@@ -57,8 +72,11 @@ export class CityAdministrationPanel {
   private pendingReserve: number | null = null;
   private pendingAutoSweep: boolean | null = null;
   private pendingSabbath: boolean | null = null;
+  private pendingMonasteryTithe: number | null = null;
+  private pendingMonasteryFeasts: boolean | null = null;
   private debounceTimer: number | null = null;
   private parishDebounceTimer: number | null = null;
+  private monasteryDebounceTimer: number | null = null;
   private readonly options: CityAdministrationPanelOptions;
 
   constructor(parent: HTMLElement, options: CityAdministrationPanelOptions) {
@@ -126,6 +144,34 @@ export class CityAdministrationPanel {
           value="80"
         />
       </div>
+      <div class="city-admin-panel__section">
+        <h3 class="city-admin-panel__section-title">Pauline monastery policy</h3>
+        <label class="city-admin-panel__toggle">
+          <input type="checkbox" data-monastery-feasts-toggle />
+          <span>Hold feast-day charity (fixed calendar)</span>
+        </label>
+        <label class="city-admin-panel__slider-label" for="city-admin-monastery-tithe-slider">
+          <span>Parish tithe share to monastery</span>
+          <strong data-monastery-tithe-value>30%</strong>
+        </label>
+        <input
+          id="city-admin-monastery-tithe-slider"
+          class="city-admin-panel__slider"
+          type="range"
+          min="0"
+          max="80"
+          step="5"
+          value="30"
+        />
+        <div class="city-admin-panel__range-hints">
+          <span>0% — chapel keeps all tithe</span>
+          <span>80% — monastery-led parish</span>
+        </div>
+        <div class="city-admin-panel__stat city-admin-panel__stat--inline">
+          <span>Monastery ledger (lifetime)</span>
+          <strong data-monastery-ledger-value>0 gold tithe routed</strong>
+        </div>
+      </div>
       <dl class="city-admin-panel__stats">
         <div class="city-admin-panel__stat">
           <dt>Village activity (GDP)</dt>
@@ -176,8 +222,12 @@ export class CityAdministrationPanel {
     this.reserveSlider = this.root.querySelector<HTMLInputElement>('#city-admin-reserve-slider')!;
     this.autoSweepToggle = this.root.querySelector<HTMLInputElement>('[data-auto-sweep-toggle]')!;
     this.sabbathToggle = this.root.querySelector<HTMLInputElement>('[data-sabbath-toggle]')!;
+    this.monasteryTitheSlider = this.root.querySelector<HTMLInputElement>('#city-admin-monastery-tithe-slider')!;
+    this.monasteryFeastsToggle = this.root.querySelector<HTMLInputElement>('[data-monastery-feasts-toggle]')!;
     this.taxRateValue = this.root.querySelector<HTMLElement>('[data-tax-rate-value]')!;
     this.reserveValue = this.root.querySelector<HTMLElement>('[data-reserve-value]')!;
+    this.monasteryTitheValue = this.root.querySelector<HTMLElement>('[data-monastery-tithe-value]')!;
+    this.monasteryLedgerValue = this.root.querySelector<HTMLElement>('[data-monastery-ledger-value]')!;
     this.productivityValue = this.root.querySelector<HTMLElement>('[data-productivity-value]')!;
     this.gdpValue = this.root.querySelector<HTMLElement>('[data-gdp-value]')!;
     this.householdWealthValue = this.root.querySelector<HTMLElement>('[data-household-wealth-value]')!;
@@ -197,6 +247,8 @@ export class CityAdministrationPanel {
     this.reserveSlider.addEventListener('input', () => this.onReserveInput());
     this.autoSweepToggle.addEventListener('change', () => this.onAutoSweepToggle());
     this.sabbathToggle.addEventListener('change', () => this.onSabbathToggle());
+    this.monasteryTitheSlider.addEventListener('input', () => this.onMonasteryTitheInput());
+    this.monasteryFeastsToggle.addEventListener('change', () => this.onMonasteryFeastsToggle());
   }
 
   isOpen(): boolean {
@@ -238,12 +290,17 @@ export class CityAdministrationPanel {
       window.clearTimeout(this.parishDebounceTimer);
       this.parishDebounceTimer = null;
     }
+    if (this.monasteryDebounceTimer !== null) {
+      window.clearTimeout(this.monasteryDebounceTimer);
+      this.monasteryDebounceTimer = null;
+    }
     this.root.remove();
   }
 
   private syncPanel(): void {
     const taxRate = this.options.getTaxRate();
     const parishPolicy = this.options.getParishPolicy();
+    const monasteryPolicy = this.options.getMonasteryPolicy();
     if (this.pendingRate === null) {
       this.slider.value = String(Math.round(taxRate * 100));
     }
@@ -256,7 +313,17 @@ export class CityAdministrationPanel {
     if (this.pendingSabbath === null) {
       this.sabbathToggle.checked = parishPolicy.sabbathObservanceEnabled;
     }
-    this.updateReadout(this.pendingRate ?? taxRate, this.getEffectiveParishPolicy(parishPolicy));
+    if (this.pendingMonasteryTithe === null) {
+      this.monasteryTitheSlider.value = String(Math.round(monasteryPolicy.titheShare * 100));
+    }
+    if (this.pendingMonasteryFeasts === null) {
+      this.monasteryFeastsToggle.checked = monasteryPolicy.feastsEnabled;
+    }
+    this.updateReadout(
+      this.pendingRate ?? taxRate,
+      this.getEffectiveParishPolicy(parishPolicy),
+      this.getEffectiveMonasteryPolicy(monasteryPolicy),
+    );
   }
 
   private getEffectiveParishPolicy(base: ParishPolicyState): ParishPolicyState {
@@ -268,38 +335,60 @@ export class CityAdministrationPanel {
     };
   }
 
+  private getEffectiveMonasteryPolicy(base: MonasteryPolicyState): MonasteryPolicyState {
+    return {
+      ...base,
+      titheShare: this.pendingMonasteryTithe ?? base.titheShare,
+      feastsEnabled: this.pendingMonasteryFeasts ?? base.feastsEnabled,
+    };
+  }
+
+  private onMonasteryTitheInput(): void {
+    const titheShare = clampMonasteryTitheShare(Number(this.monasteryTitheSlider.value) / 100);
+    this.pendingMonasteryTithe = titheShare;
+    this.refreshReadout(this.pendingRate ?? this.options.getTaxRate());
+    this.scheduleMonasteryCommit();
+  }
+
+  private onMonasteryFeastsToggle(): void {
+    this.pendingMonasteryFeasts = this.monasteryFeastsToggle.checked;
+    this.refreshReadout(this.pendingRate ?? this.options.getTaxRate());
+    this.scheduleMonasteryCommit();
+  }
+
+  private scheduleMonasteryCommit(): void {
+    if (this.monasteryDebounceTimer !== null) {
+      window.clearTimeout(this.monasteryDebounceTimer);
+    }
+    this.monasteryDebounceTimer = window.setTimeout(() => {
+      this.monasteryDebounceTimer = null;
+      void this.commitMonasteryPolicy();
+    }, 280);
+  }
+
   private onSliderInput(): void {
     const rate = clampEconomicActivityTaxRate(Number(this.slider.value) / 100);
     this.pendingRate = rate;
-    this.updateReadout(rate, this.getEffectiveParishPolicy(this.options.getParishPolicy()));
+    this.refreshReadout(rate);
     this.scheduleRateCommit(rate);
   }
 
   private onReserveInput(): void {
     const reserve = clampChapelCofferReserveGold(Number(this.reserveSlider.value));
     this.pendingReserve = reserve;
-    this.updateReadout(
-      this.pendingRate ?? this.options.getTaxRate(),
-      this.getEffectiveParishPolicy(this.options.getParishPolicy()),
-    );
+    this.refreshReadout(this.pendingRate ?? this.options.getTaxRate());
     this.scheduleParishCommit();
   }
 
   private onAutoSweepToggle(): void {
     this.pendingAutoSweep = this.autoSweepToggle.checked;
-    this.updateReadout(
-      this.pendingRate ?? this.options.getTaxRate(),
-      this.getEffectiveParishPolicy(this.options.getParishPolicy()),
-    );
+    this.refreshReadout(this.pendingRate ?? this.options.getTaxRate());
     this.scheduleParishCommit();
   }
 
   private onSabbathToggle(): void {
     this.pendingSabbath = this.sabbathToggle.checked;
-    this.updateReadout(
-      this.pendingRate ?? this.options.getTaxRate(),
-      this.getEffectiveParishPolicy(this.options.getParishPolicy()),
-    );
+    this.refreshReadout(this.pendingRate ?? this.options.getTaxRate());
     this.scheduleParishCommit();
   }
 
@@ -332,11 +421,18 @@ export class CityAdministrationPanel {
       window.clearTimeout(this.parishDebounceTimer);
       this.parishDebounceTimer = null;
     }
+    if (this.monasteryDebounceTimer !== null) {
+      window.clearTimeout(this.monasteryDebounceTimer);
+      this.monasteryDebounceTimer = null;
+    }
     if (this.pendingRate !== null) {
       void this.commitRate(this.pendingRate);
     }
     if (this.pendingReserve !== null || this.pendingAutoSweep !== null || this.pendingSabbath !== null) {
       void this.commitParishPolicy();
+    }
+    if (this.pendingMonasteryTithe !== null || this.pendingMonasteryFeasts !== null) {
+      void this.commitMonasteryPolicy();
     }
   }
 
@@ -367,7 +463,31 @@ export class CityAdministrationPanel {
     }
   }
 
-  private updateReadout(taxRate: number, parishPolicy: ParishPolicyState): void {
+  private async commitMonasteryPolicy(): Promise<void> {
+    const policy = this.getEffectiveMonasteryPolicy(this.options.getMonasteryPolicy());
+    try {
+      await this.options.onMonasteryPolicyChange(policy.titheShare, policy.feastsEnabled);
+      this.pendingMonasteryTithe = null;
+      this.pendingMonasteryFeasts = null;
+    } catch (error) {
+      this.options.onMonasteryPolicyChangeFailed?.(error);
+      this.syncPanel();
+    }
+  }
+
+  private refreshReadout(taxRate: number): void {
+    this.updateReadout(
+      taxRate,
+      this.getEffectiveParishPolicy(this.options.getParishPolicy()),
+      this.getEffectiveMonasteryPolicy(this.options.getMonasteryPolicy()),
+    );
+  }
+
+  private updateReadout(
+    taxRate: number,
+    parishPolicy: ParishPolicyState,
+    monasteryPolicy: MonasteryPolicyState,
+  ): void {
     const readout = buildVillageAdminReadout({
       gameState: this.options.getGameState(),
       worldQueries: this.options.getWorldQueries?.() ?? null,
@@ -387,5 +507,11 @@ export class CityAdministrationPanel {
     this.autoSweepValue.textContent = readout.autoSweepLabel;
     this.cofferBalanceValue.textContent = readout.cofferBalanceLabel;
     this.parishLedgerValue.textContent = readout.parishLedgerLabel;
+    this.monasteryTitheValue.textContent = formatMonasteryTitheSharePercent(monasteryPolicy.titheShare);
+    this.monasteryLedgerValue.textContent = [
+      formatMonasteryTithePaidTotal(monasteryPolicy.tithePaidTotal),
+      formatMonasteryPilgrimageTotal(monasteryPolicy.pilgrimageGoldTotal),
+      formatMonasteryFoodCharityTotal(monasteryPolicy.foodCharityTotal),
+    ].join(' · ');
   }
 }

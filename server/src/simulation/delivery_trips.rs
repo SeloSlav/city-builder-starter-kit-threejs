@@ -472,6 +472,16 @@ fn unload_need_to_residence(
     if delivered > 1e-6 {
         apply_need_delivery(ctx, trip.residence_id, need_kind, delivered);
         trip.amount = (trip.amount - delivered).max(0.0);
+        if need_kind == ResidenceNeedKind::Food {
+            if let Some(origin) = ctx.db.building().id().find(&trip.building_id) {
+                if origin.kind == "monastery" {
+                    if let Some(mut resources) = ctx.db.player_resources().owner().find(&trip.owner) {
+                        resources.monastery_food_charity_total += delivered;
+                        ctx.db.player_resources().owner().update(resources);
+                    }
+                }
+            }
+        }
     }
 }
 

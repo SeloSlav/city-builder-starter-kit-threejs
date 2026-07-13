@@ -8,6 +8,7 @@ import {
 import {
   findServingChapel,
   hasRoadPathToBuildingKind as landmarkHasRoadPathToBuildingKind,
+  isResidenceInMonasteryCoverage,
 } from '../logistics/landmarkAccess.ts';
 import {
   FoodDeliveryClaimQueries,
@@ -374,6 +375,22 @@ export class WorldQueries {
 
   isResidenceConnectedToChapel(residence: ResidenceState): boolean {
     return this.getServingChapelForResidence(residence) != null;
+  }
+
+  isResidenceInMonasteryCoverage(residence: ResidenceState): boolean {
+    const state = this.getGameState();
+    const monasteries = [...state.buildings.values()].filter(
+      (building) => building.kind === 'monastery',
+    );
+    const chapels = [...state.buildings.values()].filter(
+      (building) => building.kind === 'chapel',
+    );
+    return isResidenceInMonasteryCoverage(
+      residence,
+      monasteries,
+      chapels,
+      (a, b, c, d) => this.getRoadPathDistance(a, b, c, d),
+    );
   }
 
   getRoadConnectedMills(lodge: BuildingState): BuildingState[] {
