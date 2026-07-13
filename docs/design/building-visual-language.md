@@ -122,6 +122,17 @@ Narrow and wide parcels should affect the architecture, not merely stretch the s
 
 The current procedural residence family in `ResidenceMarkers.ts` and `residenceAppearance.ts` establishes three canonical archetypes: `stone_portal`, `timber_balcony`, and `working_lean_to`. Preserve this level of structural variation when extending the family. All three use an exposed-stone lower storey, a limewashed upper storey, steep weather roof, deterministic paint/roof/trim choices, and the state-driven firewood pile.
 
+The current non-residential family is also canonical. Its dedicated meshes live in `src/buildings/meshes/`: `industryBuildingMeshes.ts`, `serviceBuildingMeshes.ts`, `stoneQuarryMesh.ts`, `marketplaceMesh.ts`, and `chapelMesh.ts`. Shared enclosed-building construction belongs in `buildingMeshKit.ts`; do not regress to one generic hut with scale and prop substitutions.
+
+## Resource-state props
+
+Visible stored goods must tell the truth about simulation state.
+
+- Residences show their firewood pile only when the household has firewood.
+- The lumber mill's `TimberStockpile` is hidden at zero timber and reveals its five `TimberStockSegment` groups progressively as storage fills.
+- Equipment that defines a trade (saw, chopping block, quarry derrick, drying rack) may remain visible when idle; stored output should not be faked.
+- New stock props should use named groups and be synchronized from building or household state rather than baked permanently into the base mesh.
+
 ## Procedural modeling rules
 
 - Models remain native Three.js geometry unless an asset pipeline is explicitly approved.
@@ -134,6 +145,7 @@ The current procedural residence family in `ResidenceMarkers.ts` and `residenceA
 - Prefer low-sided cylinders and faceted curves consistent with the game's stylization.
 - Avoid hidden interiors unless gameplay or a visible opening requires them.
 - Ensure preview materials and disposal still work after introducing groups or custom geometry.
+- Keep stored-resource props separate from permanent trade equipment so gameplay state can hide or scale them.
 
 ## Anti-drift rules
 

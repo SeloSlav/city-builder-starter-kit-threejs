@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BUILDING_STORAGE_CAPS } from '../generated/gameBalance.ts';
 import { disposeObject3D } from '../utils/dispose.ts';
 import type { BuildingKind, BuildingState } from '../resources/types.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
@@ -173,6 +174,7 @@ export class BuildingMarkers {
 
     const y = this.terrain.getHeightAt(building.x, building.z);
     marker.position.set(building.x, y, building.z);
+    syncBuildingVisualState(marker, building);
     if (!marker.getObjectByName('Building shadow proxy')) {
       const shadowProxy = createBuildingShadowProxy(building.kind);
       shadowProxy.castShadow = areBuildingShadowsEnabled();
@@ -187,6 +189,21 @@ export class BuildingMarkers {
       this.buildingMeshes.delete(id);
     }
   }
+}
+
+function syncBuildingVisualState(marker: THREE.Group, building: BuildingState): void {
+  if (building.kind !== 'lumber_mill') return;
+  const stockpile = marker.getObjectByName('TimberStockpile');
+  if (!(stockpile instanceof THREE.Group)) return;
+
+  const capacity = BUILDING_STORAGE_CAPS.lumber_mill.timber;
+  const fill = THREE.MathUtils.clamp(building.timber / capacity, 0, 1);
+  const segments = stockpile.children.filter((child) => child.name === 'TimberStockSegment');
+  const visibleCount = fill > 0 ? Math.max(1, Math.ceil(fill * segments.length)) : 0;
+  stockpile.visible = visibleCount > 0;
+  segments.forEach((segment, index) => {
+    segment.visible = index < visibleCount;
+  });
 }
 
 function workExtentColor(kind: BuildingKind): number {

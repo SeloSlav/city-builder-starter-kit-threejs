@@ -12,15 +12,15 @@ const PREVIEW_OPACITY = 0.48;
 const PREVIEW_RENDER_ORDER = 12;
 
 const PREVIEW_HEIGHT: Record<BuildingKind, number> = {
-  lumber_mill: 6.5,
-  reforester: 4.2,
-  woodcutters_lodge: 4.2,
-  stone_quarry: 5.8,
-  well: 2.4,
-  hunters_hall: 4.8,
-  foragers_shed: 3.8,
+  lumber_mill: 6.3,
+  reforester: 5.5,
+  woodcutters_lodge: 5.6,
+  stone_quarry: 6.4,
+  well: 4.7,
+  hunters_hall: 5.7,
+  foragers_shed: 4.9,
   chapel: 8.6,
-  marketplace: 3.2,
+  marketplace: 5.3,
 };
 
 export function createBuildingPreviewMesh(kind: BuildingKind): THREE.Group {
