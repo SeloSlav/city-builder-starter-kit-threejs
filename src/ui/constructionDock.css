@@ -20,11 +20,6 @@
 }
 
 .construction-dock {
-  position: absolute;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  z-index: 6;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -117,11 +112,6 @@
 }
 
 .construction-menu {
-  position: absolute;
-  left: 50%;
-  bottom: 86px;
-  transform: translateX(-50%);
-  z-index: 6;
   width: max-content;
   max-width: calc(100vw - 28px);
   padding: 0;
@@ -286,21 +276,21 @@
 }
 
 @media (max-width: 720px) {
-  .road-tools,
-  .construction-dock {
-    right: 10px;
+  .hud-bottom-center {
     left: 10px;
-    bottom: 10px;
+    right: 10px;
     transform: none;
-    justify-content: center;
+    max-width: none;
   }
 
+  .hud-bottom-messages,
   .construction-menu {
-    left: 50%;
-    right: auto;
-    bottom: 76px;
-    transform: translateX(-50%);
     max-width: calc(100vw - 20px);
+  }
+
+  .road-tools,
+  .construction-dock {
+    justify-content: center;
   }
 
   .construction-card__art {

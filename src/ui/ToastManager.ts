@@ -18,11 +18,16 @@ export class ToastManager {
   private dismissAnimationTimer = 0;
 
   constructor(root: HTMLElement) {
+    const messageStack = root.querySelector('[data-hud-bottom-messages]');
     this.container = document.createElement('div');
     this.container.className = 'toast-container';
     this.container.setAttribute('aria-live', 'polite');
     this.container.setAttribute('aria-atomic', 'true');
-    root.appendChild(this.container);
+    if (messageStack) {
+      messageStack.insertBefore(this.container, messageStack.firstChild);
+    } else {
+      root.appendChild(this.container);
+    }
   }
 
   show(message: string, options: ToastOptions = {}): void {

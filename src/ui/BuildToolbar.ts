@@ -221,27 +221,30 @@ export class BuildToolbar {
         </aside>
       </div>
 
-      <div class="builder-status-bar" data-builder-status hidden aria-live="polite"></div>
+      <div class="hud-bottom-center" data-hud-bottom-center>
+        <section class="construction-menu" data-build-menu="basic" hidden aria-label="Build menu">
+          <div class="construction-menu__cards">
+            ${renderBuildMenuCards(BASIC_BUILD_MENU_ENTRIES)}
+          </div>
+        </section>
 
-      <section class="construction-menu" data-build-menu="basic" hidden aria-label="Build menu">
-        <div class="construction-menu__cards">
-          ${renderBuildMenuCards(BASIC_BUILD_MENU_ENTRIES)}
+        <section class="construction-menu" data-build-menu="agriculture" hidden aria-label="Agriculture menu">
+          <div class="construction-menu__cards">
+            ${renderBuildMenuCards(AGRICULTURE_BUILD_MENU_ENTRIES)}
+          </div>
+        </section>
+
+        <section class="construction-menu" data-build-menu="industry" hidden aria-label="Industry menu">
+          <div class="construction-menu__cards">
+            ${renderBuildMenuCards(RURAL_INDUSTRY_BUILD_MENU_ENTRIES)}
+          </div>
+        </section>
+
+        <div class="hud-bottom-messages" data-hud-bottom-messages aria-live="polite">
+          <div class="builder-status-bar" data-builder-status hidden></div>
         </div>
-      </section>
 
-      <section class="construction-menu" data-build-menu="agriculture" hidden aria-label="Agriculture menu">
-        <div class="construction-menu__cards">
-          ${renderBuildMenuCards(AGRICULTURE_BUILD_MENU_ENTRIES)}
-        </div>
-      </section>
-
-      <section class="construction-menu" data-build-menu="industry" hidden aria-label="Industry menu">
-        <div class="construction-menu__cards">
-          ${renderBuildMenuCards(RURAL_INDUSTRY_BUILD_MENU_ENTRIES)}
-        </div>
-      </section>
-
-      <nav class="construction-dock" data-construction-dock aria-label="Construction tools">
+        <nav class="construction-dock" data-construction-dock aria-label="Construction tools">
         <button type="button" class="construction-dock-button construction-dock-button--hotkey" data-action="road" data-tooltip="Roads (R)" aria-label="Roads (R)" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M9 21c4.8-4.8 5.2-12.2 1-18" />
@@ -298,6 +301,7 @@ export class BuildToolbar {
           </svg>
         </button>
       </nav>
+      </div>
 
       <button type="button" class="road-tool-button icon-button floating-build-button" data-action="commit-build" title="Build road (Enter)" aria-label="Build road" disabled hidden>
         <svg viewBox="0 0 24 24" aria-hidden="true">
