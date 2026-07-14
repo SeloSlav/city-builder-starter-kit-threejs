@@ -51,6 +51,32 @@
         animation: app-loading-spin 900ms linear infinite;
       }
 
+      .app-loading-percent {
+        margin: 0;
+        color: #d7b463;
+        font-size: 22px;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+      }
+
+      .app-loading-progress {
+        width: 100%;
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(238, 232, 220, 0.12);
+        overflow: hidden;
+      }
+
+      .app-loading-progress__fill {
+        display: block;
+        width: var(--loading-progress, 0%);
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #b89245 0%, #e0c078 100%);
+        transition: width 180ms ease;
+      }
+
       .app-loading-label {
         margin: 0;
         font-size: 15px;
@@ -122,8 +148,20 @@
     <div id="app-loading" aria-live="polite" aria-busy="true">
       <div class="app-loading-card">
         <div class="app-loading-spinner" aria-hidden="true"></div>
+        <p class="app-loading-percent" data-loading-percent aria-hidden="true">0%</p>
         <p class="app-loading-label" data-loading-label>Starting world…</p>
         <p class="app-loading-detail" data-loading-detail>Preparing renderer</p>
+        <div
+          class="app-loading-progress"
+          role="progressbar"
+          aria-label="Overall loading progress"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+          data-loading-bar
+        >
+          <span class="app-loading-progress__fill" aria-hidden="true"></span>
+        </div>
         <button type="button" class="app-loading-retry" data-loading-retry hidden>Retry connection</button>
       </div>
     </div>

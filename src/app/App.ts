@@ -235,13 +235,29 @@ export class App {
     this.lastTime = performance.now();
     this.frameBudgetTime = this.lastTime;
     this.fpsSampleStart = this.lastTime;
-    session.loadingScreen?.setProgress({ label: 'Connecting…', detail: 'Syncing world with SpacetimeDB' });
+    session.loadingScreen?.setProgress({
+      label: 'Connecting…',
+      detail: 'Syncing world with SpacetimeDB',
+      phase: 'connecting',
+      fraction: 0.35,
+    });
     session.sceneManager.render(0, session.cameraController.getOrbitDistance());
     window.setTimeout(() => {
       void (async () => {
         try {
-          session.loadingScreen?.setProgress({ label: 'Growing forest…', detail: 'Building trees and ground cover' });
+          session.loadingScreen?.setProgress({
+            label: 'Growing forest…',
+            detail: 'Building trees and ground cover',
+            phase: 'vegetation',
+            fraction: 0,
+          });
           await session.sceneManager.finishVegetation();
+          session.loadingScreen?.setProgress({
+            label: 'Growing forest…',
+            detail: 'Building trees and ground cover',
+            phase: 'vegetation',
+            fraction: 1,
+          });
           if (this.roadNetwork) session.sceneManager.syncRoadNetwork(this.roadNetwork);
           this.onForestReady();
           // Prime a frame so WebGPU tree materials compile before the overlay clears.

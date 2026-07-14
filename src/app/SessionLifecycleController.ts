@@ -51,6 +51,8 @@ export class SessionLifecycleController {
     this.deps.loadingScreen?.setProgress({
       label: 'Growing forest…',
       detail: 'Building trees and ground cover',
+      phase: 'vegetation',
+      fraction: 0.15,
     });
     this.deps.connectionOverlay.hide();
     this.deps.toolbar?.setGameplayEnabled(true);
@@ -103,6 +105,8 @@ export class SessionLifecycleController {
     this.deps.loadingScreen?.setProgress({
       label: 'Connecting…',
       detail: 'Retrying SpacetimeDB connection',
+      phase: 'connecting',
+      fraction: 0,
     });
     try {
       this.deps.spacetimeStore.connect();

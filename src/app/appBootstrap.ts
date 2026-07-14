@@ -134,21 +134,38 @@ export async function bootstrapAppSession(
     loadingScreen?.setProgress({
       label: 'New settlement',
       detail: 'Choose map size, landscape, and seed',
+      phase: 'worldSetup',
+      fraction: 0,
     });
   }
   const worldSettings = await resolveWorldGenerationSettings(root, (progress) => {
-    loadingScreen?.setProgress(progress);
+    loadingScreen?.setProgress({
+      ...progress,
+      phase: 'worldSetup',
+      fraction: progress.label === 'Checking world…' ? 0.35 : 0.7,
+    });
   });
   setDraftWorldGeneration(worldSettings);
   saveWorldGenerationSettings(worldSettings);
 
-  loadingScreen?.setProgress({ label: 'Starting world…', detail: 'Setting up scene shell' });
+  loadingScreen?.setProgress({
+    label: 'Starting world…',
+    detail: 'Setting up scene shell',
+    phase: 'worldSetup',
+    fraction: 1,
+  });
+  loadingScreen?.setProgress({
+    label: 'Starting world…',
+    detail: 'Setting up scene shell',
+    phase: 'sceneShell',
+    fraction: 0,
+  });
 
   const sceneRoot = mustElement(root, '[data-scene-root]');
   const uiRoot = mustElement(root, '[data-ui-root]');
 
-  const sceneManager = await SceneManager.create(sceneRoot, worldSettings, (label, detail) => {
-    loadingScreen?.setProgress({ label, detail });
+  const sceneManager = await SceneManager.create(sceneRoot, worldSettings, (progress) => {
+    loadingScreen?.setProgress(progress);
   }, materialsPromise, startupTexturesPromise);
   const layoutRegistry = WorldLayoutRegistry.fromWorldLayout(sceneManager.worldLayout);
   const gameState = createInitialGameState(layoutRegistry, getDraftWorldGeneration().seed);
@@ -673,7 +690,12 @@ export async function bootstrapAppSession(
 
   toolbar.setWaterOverlayActive(isHydrologyOverlayEnabled());
   toolbar.setGameplayEnabled(false);
-  loadingScreen?.setProgress({ label: 'Connecting…', detail: 'Syncing with SpacetimeDB' });
+  loadingScreen?.setProgress({
+    label: 'Connecting…',
+    detail: 'Syncing with SpacetimeDB',
+    phase: 'connecting',
+    fraction: 0,
+  });
 
   return {
     loadingScreen,

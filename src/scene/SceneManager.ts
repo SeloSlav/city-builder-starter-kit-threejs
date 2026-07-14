@@ -41,6 +41,14 @@ import {
   isHydrologyOverlayEnabled,
   subscribeHydrologyOverlayPreference,
 } from './hydrologyOverlayPreference.ts';
+import type { LoadingPhase } from '../ui/loadingProgress.ts';
+
+export type SceneLoadProgress = {
+  label: string;
+  detail?: string;
+  phase: LoadingPhase;
+  fraction: number;
+};
 
 export class SceneManager {
   private readonly container: HTMLElement;
@@ -174,11 +182,16 @@ export class SceneManager {
   static async create(
     container: HTMLElement,
     settings: WorldGenerationSettings,
-    onProgress?: (label: string, detail?: string) => void,
+    onProgress?: (progress: SceneLoadProgress) => void,
     materialsPromise?: Promise<RoadMaterialFactory>,
     startupTexturesPromise?: Promise<SceneStartupTextures>,
   ): Promise<SceneManager> {
-    onProgress?.('Loading graphics', 'Renderer, roads, sky, and river textures');
+    onProgress?.({
+      label: 'Loading graphics',
+      detail: 'Renderer, roads, sky, and river textures',
+      phase: 'graphics',
+      fraction: 0,
+    });
     const [backend, materials, startupTextures] = await Promise.all([
       createPreferredRenderer(),
       materialsPromise ?? RoadMaterialFactory.create(8),
@@ -186,8 +199,19 @@ export class SceneManager {
     ]);
     applyMaxAnisotropy(startupTextures, backend.maxAnisotropy);
     container.appendChild(backend.renderer.domElement);
+    onProgress?.({
+      label: 'Loading graphics',
+      detail: 'Renderer, roads, sky, and river textures',
+      phase: 'graphics',
+      fraction: 1,
+    });
 
-    onProgress?.('Building world', 'River layout, quarries, and terrain');
+    onProgress?.({
+      label: 'Building world',
+      detail: 'River layout, quarries, and terrain',
+      phase: 'worldFeatures',
+      fraction: 0,
+    });
     const dimensions = resolveWorldDimensions(settings.mapSize);
     const worldLayout = createWorldLayout(settings);
     const { quarryLayout, riverLayout } = worldLayout;
@@ -202,13 +226,23 @@ export class SceneManager {
       riverField,
       quarryLayout,
       (completedRows, totalRows) => {
-        onProgress?.('Building world', `Shaping terrain (${completedRows}/${totalRows})`);
+        onProgress?.({
+          label: 'Building world',
+          detail: `Shaping terrain (${completedRows}/${totalRows})`,
+          phase: 'terrain',
+          fraction: completedRows / totalRows,
+        });
       },
       dimensions,
     );
     await yieldToMain();
 
-    onProgress?.('Building world', 'River water, banks, and quarries');
+    onProgress?.({
+      label: 'Building world',
+      detail: 'River water, banks, and quarries',
+      phase: 'worldFeatures',
+      fraction: 0.55,
+    });
     await yieldToMain();
     const riverSystem = createRiverSystem(
       terrain,
@@ -219,7 +253,12 @@ export class SceneManager {
     const quarrySystem = createQuarrySystem(terrain, quarryLayout, startupTextures.riverRock);
     await yieldToMain();
 
-    onProgress?.('Building world', 'Sky and scene lighting');
+    onProgress?.({
+      label: 'Building world',
+      detail: 'Sky and scene lighting',
+      phase: 'worldFeatures',
+      fraction: 1,
+    });
     const manager = new SceneManager(container, backend, materials, startupTextures, terrain, riverSystem, quarrySystem, worldLayout);
     void manager.sky.ready.catch((error) => {
       console.warn('Sky volumetric shader still compiling:', error);
