@@ -18,6 +18,7 @@ const tests = [
   'test:farming',
   'test:monastery-polish',
   'test:backyard-gardens',
+  'test:building-art',
 ] as const;
 
 let failed = 0;
