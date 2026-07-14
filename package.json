@@ -35,6 +35,7 @@
     "test:backyard-gardens": "npx tsx scripts/testBackyardGardenVisuals.mts",
     "test:building-art": "npx tsx scripts/testBuildingArtDirection.mts",
     "test:camera-controller": "npx tsx scripts/testCameraController.mts",
+    "test:deer-wildlife": "npx tsx scripts/testDeerWildlife.mts",
     "test": "npm run test:ci",
     "test:ci": "npx tsx scripts/run-all-tests.mts",
     "deploy:local": "powershell -ExecutionPolicy Bypass -File ./server/deploy-local.ps1",

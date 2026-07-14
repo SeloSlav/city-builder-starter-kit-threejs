@@ -43,6 +43,7 @@ import {
 } from './hydrologyOverlayPreference.ts';
 import type { LoadingPhase } from '../ui/loadingProgress.ts';
 import { createBerryPatchVisuals, type BerryPatchVisuals } from '../foraging/BerryPatchVisuals.ts';
+import { createDeerWildlifeVisuals, type DeerWildlifeVisuals } from '../foraging/DeerWildlifeVisuals.ts';
 
 export type SceneLoadProgress = {
   label: string;
@@ -76,6 +77,7 @@ export class SceneManager {
   private forestManager: ForestManager | null = null;
   private grassField: GrassBladeField | null = null;
   private berryPatchVisuals: BerryPatchVisuals | null = null;
+  private deerWildlifeVisuals: DeerWildlifeVisuals | null = null;
   private vegetationBuilt = false;
   private roadNetworkRef: RoadNetwork | null = null;
   private forestClearanceBuildings: BuildingTerrainSource[] = [];
@@ -283,15 +285,28 @@ export class SceneManager {
       densityScale: forestDensityScale(this.worldLayout.settings.forestDensity),
       forestCores: this.worldLayout.forestCores,
     });
+    const isForagingSiteBlocked = (x: number, z: number) =>
+      this.riverSystem.isBlockedAt(x, z) || this.quarrySystem.isBlockedAt(x, z);
+    const deerVisualsPromise = createDeerWildlifeVisuals(
+      this.terrain,
+      this.worldLayout.foragingLayout.sites,
+      this.worldLayout.foragingLayout.seed,
+      isForagingSiteBlocked,
+    ).catch((error: unknown) => {
+      console.warn('Animated deer model could not be loaded:', error);
+      return null;
+    });
     this.berryPatchVisuals = await createBerryPatchVisuals(
       this.terrain,
       this.worldLayout.foragingLayout.sites,
       this.maxAnisotropy,
       this.rendererBackend,
       this.worldLayout.foragingLayout.seed,
-      (x, z) => this.riverSystem.isBlockedAt(x, z) || this.quarrySystem.isBlockedAt(x, z),
+      isForagingSiteBlocked,
     );
     this.scene.add(this.berryPatchVisuals.group);
+    this.deerWildlifeVisuals = await deerVisualsPromise;
+    if (this.deerWildlifeVisuals) this.scene.add(this.deerWildlifeVisuals.group);
     if (GRASS_BLADES_ENABLED) {
       this.grassField = await createGrassBladeField(this.terrain, {
         isBlockedAt: (x, z) =>
@@ -400,6 +415,11 @@ export class SceneManager {
     this.sky.updateSun(this.sunDirection);
     this.sky.updateTime(this.skyAnimationTime);
     this.riverSystem.tick(dt, elapsed);
+    this.deerWildlifeVisuals?.update(
+      dt,
+      firstPersonActive ? this.camera.position : null,
+      cameraDistance,
+    );
     this.renderFrame++;
     if (this.shouldRefreshShadowMap(cameraDistance)) {
       const viewBounds = computeViewShadowBounds(this.camera, this.cameraTarget, cameraDistance);
@@ -600,6 +620,11 @@ export class SceneManager {
       this.berryPatchVisuals.dispose();
       disposeObject3D(this.berryPatchVisuals.group);
       this.berryPatchVisuals = null;
+    }
+    if (this.deerWildlifeVisuals) {
+      this.scene.remove(this.deerWildlifeVisuals.group);
+      this.deerWildlifeVisuals.dispose();
+      this.deerWildlifeVisuals = null;
     }
     this.riverSystem.dispose();
     disposeObject3D(this.riverSystem.group);

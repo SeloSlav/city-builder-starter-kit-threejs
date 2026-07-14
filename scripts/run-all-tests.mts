@@ -22,6 +22,7 @@ const tests = [
   'test:backyard-gardens',
   'test:building-art',
   'test:camera-controller',
+  'test:deer-wildlife',
 ] as const;
 
 let failed = 0;
