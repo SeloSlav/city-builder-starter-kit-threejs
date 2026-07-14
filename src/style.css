@@ -74,6 +74,8 @@ button {
 [data-ui-root] .settlement-hud,
 [data-ui-root] .resource-inspector-panel,
 [data-ui-root] .game-menu-backdrop,
+[data-ui-root] .game-controls-backdrop,
+[data-ui-root] .city-admin-backdrop,
 [data-ui-root] .quarry-map-icon,
 [data-ui-root] .foraging-map-icon,
 [data-ui-root] .toast--clickable,

@@ -1,5 +1,3 @@
-.fp-controls-panel,
-.rts-controls-panel,
 .road-controls-panel {
   width: 100%;
   display: grid;
@@ -12,8 +10,6 @@
   backdrop-filter: blur(14px);
 }
 
-.fp-controls-panel[hidden],
-.rts-controls-panel[hidden],
 .road-controls-panel[hidden] {
   display: none;
 }
@@ -186,8 +182,6 @@
     width: min(280px, calc(100vw - 20px));
   }
 
-  .fp-controls-panel,
-  .rts-controls-panel,
   .road-controls-panel {
     padding: 12px;
     gap: 12px;

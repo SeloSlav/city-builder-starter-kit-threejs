@@ -45,6 +45,7 @@ type CityAdministrationPanelOptions = {
 const DEFAULT_TAX_PERCENT = Math.round(ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT * 100);
 
 export class CityAdministrationPanel {
+  private readonly backdrop: HTMLElement;
   private readonly root: HTMLElement;
   private readonly slider: HTMLInputElement;
   private readonly reserveSlider: HTMLInputElement;
@@ -83,9 +84,14 @@ export class CityAdministrationPanel {
   constructor(parent: HTMLElement, options: CityAdministrationPanelOptions) {
     this.options = options;
 
+    this.backdrop = document.createElement('div');
+    this.backdrop.className = 'city-admin-backdrop';
+    this.backdrop.hidden = true;
+
     this.root = document.createElement('section');
     this.root.className = 'city-admin-panel';
-    this.root.hidden = true;
+    this.root.setAttribute('role', 'dialog');
+    this.root.setAttribute('aria-modal', 'true');
     this.root.setAttribute('aria-label', 'City administration');
     this.root.innerHTML = `
       <header class="city-admin-panel__header">
@@ -217,7 +223,8 @@ export class CityAdministrationPanel {
       </dl>
     `;
 
-    parent.appendChild(this.root);
+    this.backdrop.appendChild(this.root);
+    parent.appendChild(this.backdrop);
 
     this.slider = this.root.querySelector<HTMLInputElement>('#city-admin-tax-slider')!;
     this.reserveSlider = this.root.querySelector<HTMLInputElement>('#city-admin-reserve-slider')!;
@@ -242,8 +249,10 @@ export class CityAdministrationPanel {
     this.closeButton = this.root.querySelector<HTMLButtonElement>('[data-action="close"]')!;
 
     this.closeButton.addEventListener('click', () => this.close());
+    this.backdrop.addEventListener('click', () => this.close());
     this.root.addEventListener('mousedown', (event) => event.stopPropagation());
     this.root.addEventListener('click', (event) => event.stopPropagation());
+    this.backdrop.addEventListener('wheel', (event) => event.stopPropagation(), { capture: true });
     this.onKeyDown = (event: KeyboardEvent) => {
       if (!this.open || event.key !== 'Escape') return;
       if (isTypingTarget(event.target)) return;
@@ -267,7 +276,7 @@ export class CityAdministrationPanel {
   openPanel(): void {
     if (this.open) return;
     this.open = true;
-    this.root.hidden = false;
+    this.backdrop.hidden = false;
     this.syncPanel();
     this.options.onOpenChange?.(true);
   }
@@ -275,7 +284,7 @@ export class CityAdministrationPanel {
   close(): void {
     if (!this.open) return;
     this.open = false;
-    this.root.hidden = true;
+    this.backdrop.hidden = true;
     this.flushPendingChanges();
     this.options.onOpenChange?.(false);
   }
@@ -304,7 +313,7 @@ export class CityAdministrationPanel {
       window.clearTimeout(this.monasteryDebounceTimer);
       this.monasteryDebounceTimer = null;
     }
-    this.root.remove();
+    this.backdrop.remove();
   }
 
   private syncPanel(): void {

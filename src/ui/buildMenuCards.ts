@@ -63,14 +63,23 @@ export const BASIC_BUILD_MENU_ENTRIES: readonly BuildMenuEntry[] = [
   entry('residences'), entry('well'), entry('chapel'), entry('monastery'), entry('marketplace'), entry('ferry_landing'),
 ];
 
-/** Agriculture, food processing, forestry, extraction, and rural craft. */
-export const INDUSTRY_BUILD_MENU_ENTRIES: readonly BuildMenuEntry[] = [
+/** Farms, grain processing, and village food production. */
+export const AGRICULTURE_BUILD_MENU_ENTRIES: readonly BuildMenuEntry[] = [
   entry('farm_field'), entry('threshing_barn'), entry('watermill'), entry('granary'), entry('brewery'), entry('smokehouse'),
-  entry('apiary'), entry('vineyard'), entry('hunters_hall'), entry('foragers_shed'), entry('woodcutters_lodge'),
-  entry('lumber_mill'), entry('reforester'), entry('stone_quarry'), entry('carpenter'),
+  entry('apiary'), entry('vineyard'),
 ];
 
-export const BUILD_MENU_ENTRIES: readonly BuildMenuEntry[] = [...BASIC_BUILD_MENU_ENTRIES, ...INDUSTRY_BUILD_MENU_ENTRIES];
+/** Forestry, hunting, foraging, extraction, and rural craft. */
+export const RURAL_INDUSTRY_BUILD_MENU_ENTRIES: readonly BuildMenuEntry[] = [
+  entry('hunters_hall'), entry('foragers_shed'), entry('woodcutters_lodge'), entry('lumber_mill'), entry('reforester'),
+  entry('stone_quarry'), entry('carpenter'),
+];
+
+export const BUILD_MENU_ENTRIES: readonly BuildMenuEntry[] = [
+  ...BASIC_BUILD_MENU_ENTRIES,
+  ...AGRICULTURE_BUILD_MENU_ENTRIES,
+  ...RURAL_INDUSTRY_BUILD_MENU_ENTRIES,
+];
 
 export type BuildMenuHandlers = {
   onToggleBuilding: (kind: BuildingKind) => void;

@@ -14,6 +14,7 @@ export const GAME_CONTROL_SECTIONS: readonly GameControlSection[] = [
     entries: [
       { action: 'Road tool', keys: 'R' },
       { action: 'Build menu', keys: 'B' },
+      { action: 'Agriculture menu', keys: 'U' },
       { action: 'Industry menu', keys: 'V' },
       { action: 'Water map overlay', keys: 'M' },
       { action: 'City administration', keys: 'I' },
@@ -68,7 +69,7 @@ export const GAME_CONTROL_SECTIONS: readonly GameControlSection[] = [
     ],
   },
   {
-    title: 'Industry build menu',
+    title: 'Agriculture build menu',
     entries: [
       { action: 'Draw farm field', keys: 'G' },
       { action: 'Farmstead', keys: 'T' },
@@ -78,6 +79,11 @@ export const GAME_CONTROL_SECTIONS: readonly GameControlSection[] = [
       { action: 'Smokehouse', keys: 'Q' },
       { action: 'Forest apiary', keys: 'A' },
       { action: 'Vineyard terrace', keys: 'V' },
+    ],
+  },
+  {
+    title: 'Industry build menu',
+    entries: [
       { action: "Hunter's hall", keys: 'K' },
       { action: "Forager's shed", keys: 'Y' },
       { action: "Woodcutter's lodge", keys: 'W' },

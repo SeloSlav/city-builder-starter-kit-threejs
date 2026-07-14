@@ -4,7 +4,6 @@ import {
   setBuildingShadowsEnabled,
   setTreeShadowsEnabled,
 } from '../scene/shadowPreference.ts';
-import { areTipCardsDisabled, setTipCardsDisabled } from './tipCardsPreference.ts';
 import { GameControlsModal } from './GameControlsModal.ts';
 
 type GameMenuOptions = {
@@ -21,7 +20,6 @@ export class GameMenu {
   private readonly dialog: HTMLElement;
   private readonly treeShadowsCheckbox: HTMLInputElement;
   private readonly buildingShadowsCheckbox: HTMLInputElement;
-  private readonly tipCardsCheckbox: HTMLInputElement;
   private readonly menuButton: HTMLButtonElement;
   private readonly controlsModal: GameControlsModal;
   private open = false;
@@ -63,10 +61,6 @@ export class GameMenu {
           <input type="checkbox" data-building-shadows-checkbox />
           <span>Building shadows</span>
         </label>
-        <label class="game-menu-option">
-          <input type="checkbox" data-tip-cards-checkbox />
-          <span>Contextual control tips</span>
-        </label>
         <button type="button" class="game-menu-action" data-game-controls>Game controls…</button>
         <button type="button" class="game-menu-action" data-new-world>New world…</button>
         <button type="button" class="game-menu-return" data-return-button>Return to game</button>
@@ -76,23 +70,23 @@ export class GameMenu {
     this.dialog = this.backdrop.querySelector<HTMLElement>('.game-menu-dialog')!;
     this.treeShadowsCheckbox = this.backdrop.querySelector<HTMLInputElement>('[data-tree-shadows-checkbox]')!;
     this.buildingShadowsCheckbox = this.backdrop.querySelector<HTMLInputElement>('[data-building-shadows-checkbox]')!;
-    this.tipCardsCheckbox = this.backdrop.querySelector<HTMLInputElement>('[data-tip-cards-checkbox]')!;
     const returnButton = this.backdrop.querySelector<HTMLButtonElement>('[data-return-button]')!;
     const controlsButton = this.backdrop.querySelector<HTMLButtonElement>('[data-game-controls]')!;
     const newWorldButton = this.backdrop.querySelector<HTMLButtonElement>('[data-new-world]')!;
 
-    this.controlsModal = new GameControlsModal(parent);
+    this.controlsModal = new GameControlsModal(parent, {
+      onOpenChange: options.onOpenChange,
+    });
 
     if (options.showButton !== false) parent.appendChild(this.menuButton);
     parent.appendChild(this.backdrop);
 
     this.treeShadowsCheckbox.checked = areTreeShadowsEnabled();
     this.buildingShadowsCheckbox.checked = areBuildingShadowsEnabled();
-    this.tipCardsCheckbox.checked = !areTipCardsDisabled();
     this.menuButton.addEventListener('click', () => this.toggle());
     returnButton.addEventListener('click', () => this.close());
     controlsButton.addEventListener('click', () => {
-      this.close();
+      this.closeSettingsPanel();
       this.controlsModal.openModal();
     });
     newWorldButton.addEventListener('click', () => {
@@ -108,9 +102,6 @@ export class GameMenu {
     this.buildingShadowsCheckbox.addEventListener('change', () => {
       setBuildingShadowsEnabled(this.buildingShadowsCheckbox.checked);
       this.onShadowPreferenceChange();
-    });
-    this.tipCardsCheckbox.addEventListener('change', () => {
-      setTipCardsDisabled(!this.tipCardsCheckbox.checked);
     });
 
     this.onKeyDown = (event: KeyboardEvent) => {
@@ -165,7 +156,6 @@ export class GameMenu {
     this.open = true;
     this.treeShadowsCheckbox.checked = areTreeShadowsEnabled();
     this.buildingShadowsCheckbox.checked = areBuildingShadowsEnabled();
-    this.tipCardsCheckbox.checked = !areTipCardsDisabled();
     this.backdrop.hidden = false;
     this.menuButton.setAttribute('aria-expanded', 'true');
     this.onOpenChange?.(true);
@@ -174,10 +164,16 @@ export class GameMenu {
 
   private close(): void {
     if (!this.open) return;
+    this.closeSettingsPanel();
+    this.onOpenChange?.(false);
+  }
+
+  /** Hide settings without changing overlay-open state (e.g. when opening game controls). */
+  private closeSettingsPanel(): void {
+    if (!this.open) return;
     this.open = false;
     this.backdrop.hidden = true;
     this.menuButton.setAttribute('aria-expanded', 'false');
-    this.onOpenChange?.(false);
   }
 
   private isTextInputFocused(): boolean {

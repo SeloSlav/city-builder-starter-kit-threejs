@@ -1,9 +1,22 @@
-.city-admin-panel {
-  position: absolute;
-  left: 50%;
-  bottom: 86px;
-  transform: translateX(-50%);
+.city-admin-backdrop {
+  position: fixed;
+  inset: 0;
   z-index: 7;
+  display: grid;
+  place-items: end center;
+  padding: 0 14px 86px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+}
+
+.city-admin-backdrop[hidden] {
+  display: none;
+}
+
+.city-admin-panel {
+  position: relative;
+  z-index: 1;
   width: min(560px, calc(100vw - 28px));
   max-height: min(72vh, 720px);
   overflow: auto;
@@ -14,7 +27,6 @@
   background: rgba(23, 25, 21, 0.92);
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
   backdrop-filter: blur(14px);
-  pointer-events: auto;
 }
 
 .city-admin-panel[hidden] {

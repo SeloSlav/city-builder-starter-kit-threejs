@@ -1,12 +1,18 @@
 import { GAME_CONTROL_SECTIONS } from './gameControlsReference.ts';
 
+type GameControlsModalOptions = {
+  onOpenChange?: (open: boolean) => void;
+};
+
 export class GameControlsModal {
   private readonly backdrop: HTMLElement;
   private readonly dialog: HTMLElement;
+  private readonly onOpenChange?: (open: boolean) => void;
   private open = false;
   private readonly onKeyDown: (event: KeyboardEvent) => void;
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, options: GameControlsModalOptions = {}) {
+    this.onOpenChange = options.onOpenChange;
     this.backdrop = document.createElement('div');
     this.backdrop.className = 'game-controls-backdrop';
     this.backdrop.hidden = true;
@@ -44,6 +50,8 @@ export class GameControlsModal {
     closeButton.addEventListener('click', () => this.close());
     this.backdrop.addEventListener('click', () => this.close());
     this.dialog.addEventListener('click', (event) => event.stopPropagation());
+    this.backdrop.addEventListener('wheel', (event) => event.stopPropagation(), { capture: true });
+    this.dialog.addEventListener('wheel', (event) => event.stopPropagation(), { capture: true });
 
     this.onKeyDown = (event: KeyboardEvent) => {
       if (!this.open || event.key !== 'Escape') return;
@@ -63,6 +71,7 @@ export class GameControlsModal {
     if (this.open) return;
     this.open = true;
     this.backdrop.hidden = false;
+    this.onOpenChange?.(true);
     this.backdrop.querySelector<HTMLButtonElement>('[data-close]')?.focus({ preventScroll: true });
   }
 
@@ -70,6 +79,7 @@ export class GameControlsModal {
     if (!this.open) return;
     this.open = false;
     this.backdrop.hidden = true;
+    this.onOpenChange?.(false);
   }
 
   dispose(): void {
