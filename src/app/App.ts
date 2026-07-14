@@ -48,9 +48,6 @@ import { createSmokeTestHooks, installSmokeTestHooks } from '../e2e/smokeTestHoo
 import { sampleNaturalTerrainHeight } from '../terrain/TerrainHeight.ts';
 import { resolveWorldDimensions } from '../world/worldGenerationSettings.ts';
 
-const TARGET_MAX_FPS = 90;
-const TARGET_FRAME_MS = 1000 / TARGET_MAX_FPS;
-
 export class App {
   private readonly root: HTMLElement;
   private liveContext: SessionLiveContext | null = null;
@@ -90,7 +87,6 @@ export class App {
   private readonly spacetimeSnapshotApplier = new SpacetimeSnapshotApplier();
   private animationId = 0;
   private lastTime = 0;
-  private frameBudgetTime = 0;
   private fpsSampleStart = 0;
   private fpsFrameCount = 0;
   private fpsAccumulatedSeconds = 0;
@@ -233,7 +229,6 @@ export class App {
     session.cameraController.update(0);
     this.toolbar?.setZoomPercent(session.cameraController.getZoomPercent());
     this.lastTime = performance.now();
-    this.frameBudgetTime = this.lastTime;
     this.fpsSampleStart = this.lastTime;
     session.loadingScreen?.setProgress({
       label: 'Connecting…',
@@ -316,12 +311,6 @@ export class App {
 
   private readonly tick = (time: number): void => {
     if (this.disposed) return;
-    const budgetElapsed = time - this.frameBudgetTime;
-    if (budgetElapsed < TARGET_FRAME_MS) {
-      this.animationId = requestAnimationFrame(this.tick);
-      return;
-    }
-    this.frameBudgetTime = time - (budgetElapsed % TARGET_FRAME_MS);
     const rawDt = (time - this.lastTime) / 1000;
     if (rawDt > 0.25) this.resetFpsSample(time);
     const dt = Math.min(0.05, Math.max(0.001, rawDt));

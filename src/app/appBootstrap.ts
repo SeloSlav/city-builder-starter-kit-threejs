@@ -254,6 +254,10 @@ export async function bootstrapAppSession(
       || (buildingTool?.shouldBlockCameraInput(event) ?? false)
       || (burgageTool?.shouldBlockCameraInput(event) ?? false)
       || (farmFieldTool?.shouldBlockCameraInput(event) ?? false),
+    onViewChanged: () => {
+      if (firstPersonController?.isActive()) return;
+      sceneManager.render(0, cameraController.getOrbitDistance());
+    },
   });
 
   const roadSelection = new RoadSelection({

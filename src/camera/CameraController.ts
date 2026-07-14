@@ -23,9 +23,6 @@ const MAX_ZOOM_PERCENT = 1000;
 const MIN_ZOOM_PERCENT = 0;
 const MIN_DISTANCE = BASELINE_ORBIT_DISTANCE / (MAX_ZOOM_PERCENT / BASELINE_ZOOM_PERCENT);
 const ZOOM_MULTIPLIER = 1.18;
-const PAN_LERP_SPEED = 10;
-const ROTATE_LERP_SPEED = 12;
-const ZOOM_LERP_SPEED = 12;
 const ROTATE_SENSITIVITY = 0.005;
 const PITCH_SENSITIVITY = 0.004;
 const RMB_PAN_MULTIPLIER = 0.105;
@@ -40,18 +37,15 @@ export type CameraControllerConfig = {
   getHeightAt: (x: number, z: number) => number;
   getCursorOverride?: () => string | null;
   shouldIgnoreInput?: (event: MouseEvent | WheelEvent) => boolean;
+  onViewChanged?: () => void;
 };
 
 export class CameraController {
   private readonly config: CameraControllerConfig;
   private readonly maxDistance: number;
   private currentDistance = RTS_ORBIT_DISTANCE;
-  private targetDistance = RTS_ORBIT_DISTANCE;
   private currentYaw = -Math.PI / 2;
-  private targetYaw = -Math.PI / 2;
   private currentPitch = RTS_ORBIT_PITCH;
-  private targetPitch = RTS_ORBIT_PITCH;
-  private readonly desiredTarget = new THREE.Vector3();
   private readonly orbitPosition = new THREE.Vector3();
   private readonly orbitDirection = new THREE.Vector3();
   private readonly closePosition = new THREE.Vector3();
@@ -64,6 +58,7 @@ export class CameraController {
   private lastMouseX = 0;
   private lastMouseY = 0;
   private activeCursor = '';
+  private viewChangeFrame = 0;
 
   constructor(config: CameraControllerConfig) {
     this.config = config;
@@ -73,7 +68,6 @@ export class CameraController {
       RTS_ORBIT_PITCH,
     );
     this.config.target.set(0, config.getHeightAt(0, 0), 0);
-    this.desiredTarget.copy(this.config.target);
     this.applyRtsOrbitView();
     config.domElement.addEventListener('mousedown', this.onMouseDown, { capture: true });
     config.domElement.addEventListener('wheel', this.onWheel, { passive: false, capture: true });
@@ -111,18 +105,14 @@ export class CameraController {
 
   applyRtsOrbitView(): void {
     this.currentPitch = RTS_ORBIT_PITCH;
-    this.targetPitch = RTS_ORBIT_PITCH;
-    this.targetDistance = THREE.MathUtils.clamp(RTS_ORBIT_DISTANCE, this.getMinDistance(), this.maxDistance);
-    this.currentDistance = this.targetDistance;
+    this.currentDistance = THREE.MathUtils.clamp(RTS_ORBIT_DISTANCE, this.getMinDistance(), this.maxDistance);
     this.updateCamera();
   }
 
   syncFromFirstPerson(x: number, z: number, yaw: number): void {
     const terrainY = this.config.getHeightAt(x, z);
-    this.desiredTarget.set(x, terrainY, z);
-    this.config.target.copy(this.desiredTarget);
+    this.config.target.set(x, terrainY, z);
     this.currentYaw = this.normalizeAngle(yaw);
-    this.targetYaw = this.currentYaw;
     this.applyRtsOrbitView();
   }
 
@@ -130,37 +120,22 @@ export class CameraController {
     if (!this.inputEnabled) return;
     const scale = this.getPanScale();
     const panSpeed = KEY_PAN_SPEED * scale * dt;
-    const keyboardPan = this.isKeyboardPanActive();
     if (this.keys.has('w') || this.keys.has('arrowup')) this.pan(0, panSpeed);
     if (this.keys.has('s') || this.keys.has('arrowdown')) this.pan(0, -panSpeed);
     if (this.keys.has('a') || this.keys.has('arrowleft')) this.pan(panSpeed, 0);
     if (this.keys.has('d') || this.keys.has('arrowright')) this.pan(-panSpeed, 0);
-    if (this.keys.has('q')) this.targetYaw = this.normalizeAngle(this.targetYaw - KEY_ROTATE_SPEED * dt);
-    if (this.keys.has('e')) this.targetYaw = this.normalizeAngle(this.targetYaw + KEY_ROTATE_SPEED * dt);
+    if (this.keys.has('q')) this.currentYaw = this.normalizeAngle(this.currentYaw - KEY_ROTATE_SPEED * dt);
+    if (this.keys.has('e')) this.currentYaw = this.normalizeAngle(this.currentYaw + KEY_ROTATE_SPEED * dt);
 
-    if (this.isPanning || keyboardPan) {
-      this.syncPanTarget();
-    } else {
-      const panLerp = 1 - Math.exp(-PAN_LERP_SPEED * dt);
-      this.config.target.lerp(this.desiredTarget, panLerp);
-      this.config.target.y = this.config.getHeightAt(this.config.target.x, this.config.target.z);
-    }
-
-    if (this.isRotating) {
-      this.syncRotation();
-    } else {
-      const rotLerp = 1 - Math.exp(-ROTATE_LERP_SPEED * dt);
-      this.currentYaw = this.normalizeAngle(this.currentYaw + this.normalizeAngle(this.targetYaw - this.currentYaw) * rotLerp);
-      this.currentPitch += (this.targetPitch - this.currentPitch) * rotLerp;
-    }
-
-    const zoomLerp = 1 - Math.exp(-ZOOM_LERP_SPEED * dt);
-    this.currentDistance += (this.targetDistance - this.currentDistance) * zoomLerp;
     this.updateCamera();
     this.applyCursor();
   }
 
   dispose(): void {
+    if (this.viewChangeFrame !== 0) {
+      cancelAnimationFrame(this.viewChangeFrame);
+      this.viewChangeFrame = 0;
+    }
     const el = this.config.domElement;
     el.removeEventListener('mousedown', this.onMouseDown, true);
     el.removeEventListener('wheel', this.onWheel, true);
@@ -201,9 +176,7 @@ export class CameraController {
       this.lastMouseX = event.clientX;
       this.lastMouseY = event.clientY;
       this.pan(dx, dy);
-      this.syncPanTarget();
-      this.updateCamera();
-      this.applyCursor();
+      this.commitViewChange();
     } else if (this.isRotating) {
       if ((event.buttons & 4) === 0) {
         this.isRotating = false;
@@ -213,12 +186,10 @@ export class CameraController {
       const dy = event.clientY - this.lastMouseY;
       this.lastMouseX = event.clientX;
       this.lastMouseY = event.clientY;
-      this.targetYaw = this.normalizeAngle(this.targetYaw - dx * ROTATE_SENSITIVITY);
-      this.targetPitch = THREE.MathUtils.clamp(this.targetPitch + dy * PITCH_SENSITIVITY, MIN_PITCH, MAX_PITCH);
-      this.targetDistance = this.clampDistance(this.targetDistance);
-      this.syncRotation();
-      this.updateCamera();
-      this.applyCursor();
+      this.currentYaw = this.normalizeAngle(this.currentYaw - dx * ROTATE_SENSITIVITY);
+      this.currentPitch = THREE.MathUtils.clamp(this.currentPitch + dy * PITCH_SENSITIVITY, MIN_PITCH, MAX_PITCH);
+      this.currentDistance = this.clampDistance(this.currentDistance);
+      this.commitViewChange();
     }
   };
 
@@ -234,14 +205,14 @@ export class CameraController {
     if (event.deltaY !== 0) {
       const steps = Math.max(1, Math.floor(Math.abs(event.deltaY) / 80));
       const factor = event.deltaY > 0 ? ZOOM_MULTIPLIER : 1 / ZOOM_MULTIPLIER;
-      for (let i = 0; i < steps; i++) this.targetDistance = this.clampDistance(this.targetDistance * factor);
-      this.currentDistance = this.targetDistance;
+      for (let i = 0; i < steps; i++) {
+        this.currentDistance = this.clampDistance(this.currentDistance * factor);
+      }
     }
     if (event.deltaX !== 0) {
       this.pan(event.deltaX * 0.03, 0);
-      this.syncPanTarget();
     }
-    this.updateCamera();
+    this.commitViewChange();
   };
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
@@ -261,30 +232,29 @@ export class CameraController {
   private readonly onContextMenu = (event: Event): void => event.preventDefault();
 
   private pan(dx: number, dy: number): void {
+    const target = this.config.target;
     const rightX = -Math.sin(this.currentYaw);
     const rightZ = Math.cos(this.currentYaw);
     const forwardX = -Math.cos(this.currentYaw);
     const forwardZ = -Math.sin(this.currentYaw);
-    this.desiredTarget.x += rightX * dx + forwardX * dy;
-    this.desiredTarget.z += rightZ * dx + forwardZ * dy;
+    target.x += rightX * dx + forwardX * dy;
+    target.z += rightZ * dx + forwardZ * dy;
     this.clampTarget();
   }
 
-  private isKeyboardPanActive(): boolean {
-    return this.keys.has('w') || this.keys.has('arrowup')
-      || this.keys.has('s') || this.keys.has('arrowdown')
-      || this.keys.has('a') || this.keys.has('arrowleft')
-      || this.keys.has('d') || this.keys.has('arrowright');
+  private commitViewChange(): void {
+    this.updateCamera();
+    this.applyCursor();
+    this.notifyViewChanged();
   }
 
-  private syncPanTarget(): void {
-    this.config.target.copy(this.desiredTarget);
-    this.config.target.y = this.config.getHeightAt(this.config.target.x, this.config.target.z);
-  }
-
-  private syncRotation(): void {
-    this.currentYaw = this.targetYaw;
-    this.currentPitch = this.targetPitch;
+  private notifyViewChanged(): void {
+    if (!this.config.onViewChanged) return;
+    if (this.viewChangeFrame !== 0) return;
+    this.viewChangeFrame = requestAnimationFrame(() => {
+      this.viewChangeFrame = 0;
+      this.config.onViewChanged?.();
+    });
   }
 
   private getMinDistance(): number {
@@ -307,10 +277,10 @@ export class CameraController {
   }
 
   private clampTarget(): void {
-    const { bounds } = this.config;
-    this.desiredTarget.x = THREE.MathUtils.clamp(this.desiredTarget.x, bounds.minX, bounds.maxX);
-    this.desiredTarget.z = THREE.MathUtils.clamp(this.desiredTarget.z, bounds.minZ, bounds.maxZ);
-    this.desiredTarget.y = this.config.getHeightAt(this.desiredTarget.x, this.desiredTarget.z);
+    const { bounds, target } = this.config;
+    target.x = THREE.MathUtils.clamp(target.x, bounds.minX, bounds.maxX);
+    target.z = THREE.MathUtils.clamp(target.z, bounds.minZ, bounds.maxZ);
+    target.y = this.config.getHeightAt(target.x, target.z);
   }
 
   private getForwardXZ(): THREE.Vector3 {
