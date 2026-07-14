@@ -17,7 +17,7 @@ use crate::placement_validation::{
     building_overlaps_residence_zone, building_overlaps_road_surface, is_near_open_water,
     is_on_quarry_pit, is_open_water,
 };
-use crate::roads::{has_building_road_access, load_owner_road_network};
+use crate::roads::load_owner_road_network;
 use crate::simulation::drain_trips_for_building;
 use crate::tables::{farm_field, Building, WorldConfig};
 
@@ -200,10 +200,6 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
 
     if is_too_close_to_buildings(ctx, &kind, x, z) {
         return Err("Too close to another building.".to_string());
-    }
-
-    if def.requires_road && !has_building_road_access(ctx, owner, x, z) {
-        return Err("Building must be placed near a road.".to_string());
     }
 
     let cost = building_cost(&kind)?;

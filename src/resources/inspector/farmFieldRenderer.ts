@@ -1,4 +1,5 @@
-import { cropLabel, expectedFieldYield, fieldShapeEfficiency, moistureSuitability } from '../../farming/farmFieldMath.ts';
+import { FARM_OPTIMAL_FIELD_AREA } from '../../generated/gameBalance.ts';
+import { cropLabel, expectedFieldYield, fieldShapeEfficiency, fieldSizeEfficiency, moistureSuitability } from '../../farming/farmFieldMath.ts';
 import type { FarmCrop, InspectableTarget } from '../types.ts';
 import type { InspectorRenderContext, InspectorView } from './renderInspectableTarget.ts';
 import { hiddenLabor } from './renderInspectableTarget.ts';
@@ -24,6 +25,7 @@ export function renderFarmFieldInspector(
   const stageProgress = Math.max(0, Math.min(100, Math.round(field.stageProgress * 100)));
   const expectedYield = expectedFieldYield(field);
   const shape = Math.round(fieldShapeEfficiency(field.corners) * 100);
+  const sizeEfficiency = Math.round(fieldSizeEfficiency(field.area) * 100);
   const moistureFit = Math.round(moistureSuitability(field.crop, field.moisture) * 100);
   const active = Boolean(farmstead && farmstead.assignedLabor > 0 && field.priority > 0);
   const statusText = !farmstead
@@ -58,6 +60,7 @@ export function renderFarmFieldInspector(
       <li><span>Fertility</span><span>${Math.round(field.fertility * 100)}%</span></li>
       <li><span>Average slope</span><span>${field.averageSlopeDegrees.toFixed(1)}°</span></li>
       <li><span>Shape efficiency</span><span>${shape}%</span></li>
+      <li><span>Size efficiency</span><span>${sizeEfficiency}% · full through ${FARM_OPTIMAL_FIELD_AREA.toLocaleString()} m²</span></li>
       <li><span>Expected harvest</span><span>${field.crop === 'fallow' ? 'Restores fertility' : `${expectedYield.toFixed(1)} grain`}</span></li>
       <li><span>Last harvest</span><span>${field.harvestCount === 0 ? 'None yet' : `${field.lastYield.toFixed(1)} grain · ${field.harvestCount} total`}</span></li>
     `,

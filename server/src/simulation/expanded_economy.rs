@@ -164,9 +164,37 @@ fn step_farmstead_fields(ctx: &ReducerContext, farmstead: &mut Building) {
         let shape = shape_efficiency(&corners);
         let required = work_required(field.stage, field.area, shape).max(1e-6);
         let remaining = required * (1.0_f64 - field.stage_progress).max(0.0_f64);
-        let spent = work_budget.min(remaining);
+        let expected_harvest = if field.stage == STAGE_HARVESTING {
+            Some(expected_grain_yield(
+                field.area,
+                field.crop,
+                field.moisture,
+                field.fertility,
+                field.average_slope_degrees,
+                shape,
+            ))
+        } else {
+            None
+        };
+        let mut spent = work_budget.min(remaining);
+        if let Some(expected) = expected_harvest {
+            if expected > 1e-9 {
+                let storage_limited_work = required
+                    * building_commodity_room(farmstead, CommodityKind::Grain)
+                    / expected;
+                spent = spent.min(storage_limited_work);
+            }
+        }
+        if spent <= 1e-9 {
+            continue;
+        }
+        let previous_progress = field.stage_progress;
         field.stage_progress = (field.stage_progress + spent / required).min(1.0);
         work_budget -= spent;
+        if let Some(expected) = expected_harvest {
+            let harvested = expected * (field.stage_progress - previous_progress).max(0.0);
+            deposit_building_commodity(farmstead, CommodityKind::Grain, harvested);
+        }
         if field.stage_progress < 1.0 - 1e-9 {
             continue;
         }
@@ -180,20 +208,7 @@ fn step_farmstead_fields(ctx: &ReducerContext, farmstead: &mut Building) {
                 field.stage_progress = 0.0;
             }
             STAGE_HARVESTING => {
-                let expected = expected_grain_yield(
-                    field.area,
-                    field.crop,
-                    field.moisture,
-                    field.fertility,
-                    field.average_slope_degrees,
-                    shape,
-                );
-                if building_commodity_room(farmstead, CommodityKind::Grain) + 1e-6 < expected {
-                    field.stage_progress = 0.999;
-                    continue;
-                }
-                let deposited = deposit_building_commodity(farmstead, CommodityKind::Grain, expected);
-                finish_field_cycle(field, deposited);
+                finish_field_cycle(field, expected_harvest.unwrap_or_default());
             }
             _ => {}
         }

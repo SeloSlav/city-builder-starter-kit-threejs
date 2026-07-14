@@ -49,7 +49,7 @@ export class SpacetimeSnapshotApplier {
       this.previousTreeGrowth.set(treeId, entity.growthProgress);
     }
 
-    if (deps.forestVisualSync && state.trees.size > 0 && previousTreeCount === 0) {
+    if (deps.forestVisualSync && state.trees.size !== previousTreeCount) {
       deps.forestVisualSync.syncAll(state.trees);
     } else if (changedTreeIds.length > 0) {
       deps.forestVisualSync?.syncTrees(state.trees, changedTreeIds);
@@ -90,6 +90,7 @@ export class SpacetimeSnapshotApplier {
     deps.sceneManager.setForestClearanceSources(
       collectPlacedBuildingSources(gameState),
       collectOccupiedParcelPolygons(gameState.burgageZones.values(), gameState.residences.values()),
+      [...gameState.farmFields.values()].map((field) => field.corners),
     );
   }
 

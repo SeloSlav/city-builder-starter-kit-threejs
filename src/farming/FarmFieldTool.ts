@@ -1,22 +1,22 @@
 import * as THREE from 'three';
 import {
   FARM_MAX_ACCEPTED_SLOPE_DEGREES,
-  FARM_MAX_FIELD_AREA,
   FARM_MIN_FIELD_AREA,
   FARM_MIN_FIELD_EDGE,
+  FARM_OPTIMAL_FIELD_AREA,
 } from '../generated/gameBalance.ts';
 import { sampleAuthoritativeHydrologyScore } from '../hydrology/sampleAuthoritativeHydrology.ts';
 import { buildingFootprintPolygonFromState, burgageZonePolygon } from '../placement/placementConflicts.ts';
 import type { GameState, FarmCrop, BuildingState } from '../resources/types.ts';
-import type { TreeRegistry } from '../resources/TreeRegistry.ts';
 import type { TerrainProjector } from '../terrain/TerrainProjector.ts';
-import { convexPolygonsOverlap2, isPointInPolygon2, type Point2 } from '../utils/polygonGeometry.ts';
+import { convexPolygonsOverlap2, type Point2 } from '../utils/polygonGeometry.ts';
 import { FarmFieldPreview } from './FarmFieldMarkers.ts';
 import {
   cropLabel,
   fieldArea,
   fieldCentroid,
   fieldEdgeLengths,
+  fieldSizeEfficiency,
   moistureSuitability,
   rectangleFromBaseline,
   sampleAverageSlopeDegrees,
@@ -27,8 +27,8 @@ const MIN_CLICK_DISTANCE = 1.5;
 const CROPS: readonly FarmCrop[] = ['rye', 'oats', 'fallow'];
 
 export type FarmFieldPlacementFailureReason =
-  | 'too_small' | 'too_large' | 'edge_too_short' | 'too_steep' | 'no_farmstead'
-  | 'water' | 'quarry' | 'building' | 'residence' | 'field' | 'trees';
+  | 'too_small' | 'edge_too_short' | 'too_steep' | 'no_farmstead'
+  | 'water' | 'quarry' | 'building' | 'residence' | 'field';
 
 type Validation =
   | { ok: true; corners: FarmFieldCorners; farmstead: BuildingState; slope: number; moisture: number }
@@ -39,7 +39,6 @@ type FarmFieldToolOptions = {
   camera: THREE.Camera;
   terrainProjector: TerrainProjector;
   getState: () => GameState;
-  getTreeRegistry: () => TreeRegistry | null;
   getHeightAt: (x: number, z: number) => number;
   isWaterAt: (x: number, z: number) => boolean;
   isQuarryPitAt: (x: number, z: number) => boolean;
@@ -133,14 +132,15 @@ export class FarmFieldTool {
   }
 
   getStatusDetail(): string {
-    if (this.points.length === 0 && !this.fixedCorners) return `Click to start the field baseline · crop: ${cropLabel(this.crop)} (C to change)`;
+    if (this.points.length === 0 && !this.fixedCorners) return `Click to start the field baseline · crop: ${cropLabel(this.crop)} (C to change) · full yield through ${FARM_OPTIMAL_FIELD_AREA.toLocaleString()} m²`;
     if (this.points.length === 1) return 'Click to set the other end of the field baseline';
     if (!this.fixedCorners) return 'Click to set field depth';
     if (!this.validation.ok) return this.failureDetail(this.validation.reason);
     const area = Math.round(fieldArea(this.validation.corners));
+    const sizeEfficiency = Math.round(fieldSizeEfficiency(area) * 100);
     const slope = this.validation.slope.toFixed(1);
     const moisture = Math.round(this.validation.moisture * 100);
-    return `${cropLabel(this.crop)} · ${area} m² · ${slope}° slope · ${moisture}% moisture · hammer or Enter to place`;
+    return `${cropLabel(this.crop)} · ${area} m² · ${sizeEfficiency}% size efficiency · ${slope}° slope · ${moisture}% moisture · hammer or Enter to place`;
   }
 
   getBuildButtonPosition(): { clientX: number; clientY: number } | null {
@@ -296,7 +296,6 @@ export class FarmFieldTool {
     if (!corners) return { ok: false, reason: 'too_small', corners: null };
     const area = fieldArea(corners);
     if (area < FARM_MIN_FIELD_AREA) return { ok: false, reason: 'too_small', corners };
-    if (area > FARM_MAX_FIELD_AREA) return { ok: false, reason: 'too_large', corners };
     if (fieldEdgeLengths(corners).some((edge) => edge < FARM_MIN_FIELD_EDGE)) return { ok: false, reason: 'edge_too_short', corners };
     const slope = sampleAverageSlopeDegrees(corners, this.options.getHeightAt);
     const center = fieldCentroid(corners);
@@ -326,21 +325,12 @@ export class FarmFieldTool {
     for (const field of state.farmFields.values()) {
       if (convexPolygonsOverlap2(corners, field.corners)) return { ok: false, reason: 'field', corners, slope, moisture };
     }
-    const registry = this.options.getTreeRegistry();
-    if (registry) {
-      const radius = Math.max(...fieldEdgeLengths(corners));
-      for (const tree of registry.treesInRadius(center.x, center.z, radius)) {
-        if (!isPointInPolygon2(tree, corners)) continue;
-        if (state.trees.get(tree.id)?.phase !== 'stump') return { ok: false, reason: 'trees', corners, slope, moisture };
-      }
-    }
     return { ok: true, corners, farmstead, slope, moisture };
   }
 
   private failureDetail(reason: FarmFieldPlacementFailureReason): string {
     switch (reason) {
       case 'too_small': return `Field too small · at least ${FARM_MIN_FIELD_AREA} m²`;
-      case 'too_large': return `Field too large · maximum ${FARM_MAX_FIELD_AREA} m²`;
       case 'edge_too_short': return `Each edge must be at least ${FARM_MIN_FIELD_EDGE} m`;
       case 'too_steep': return `Ground too steep · maximum ${FARM_MAX_ACCEPTED_SLOPE_DEGREES}° average`;
       case 'no_farmstead': return "Field center must lie within a farmstead's work extent";
@@ -349,7 +339,6 @@ export class FarmFieldTool {
       case 'building': return 'Field overlaps a building';
       case 'residence': return 'Field overlaps a residence plot';
       case 'field': return 'Field overlaps existing farmland';
-      case 'trees': return 'Clear standing trees before cultivating this field';
     }
   }
 }

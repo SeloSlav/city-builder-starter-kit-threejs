@@ -29,6 +29,20 @@ export type ForestPlacementClearance = {
   roadNetwork?: RoadNetwork | null;
   buildings?: Iterable<BuildingTerrainSource>;
   burgageParcelPolygons?: Iterable<Point2[]>;
+  farmFieldPolygons?: Iterable<Point2[]>;
+};
+
+export type ForestRockInstance = {
+  placement: RockObstacle;
+  mesh: THREE.InstancedMesh;
+  shadowMesh: THREE.InstancedMesh;
+  instanceIndex: number;
+  matrix: THREE.Matrix4;
+};
+
+export type ForestRockInstances = {
+  group: THREE.Group;
+  instances: ForestRockInstance[];
 };
 
 type TreePlacement = {
@@ -62,7 +76,6 @@ export type MixedForestInstances = {
 
 export class ForestManager {
   readonly group: THREE.Group;
-  readonly rockPlacements: ReadonlyArray<RockObstacle>;
   private readonly disposeResources: () => void;
   private readonly placements: TreePlacement[];
   private readonly trunkMesh: THREE.InstancedMesh;
@@ -79,6 +92,9 @@ export class ForestManager {
   private readonly broadleafFoliageMatrices: THREE.Matrix4[];
   private readonly undergrowth: UndergrowthInstances | null;
   private readonly undergrowthPlacements: UndergrowthPlacement[];
+  private readonly rockInstances: ForestRockInstance[];
+  private readonly allRockPlacements: RockObstacle[];
+  private activeRockPlacements: RockObstacle[];
   private readonly stumpMesh: THREE.InstancedMesh;
   private readonly harvestStumpMesh: THREE.InstancedMesh;
   private readonly saplingMesh: THREE.InstancedMesh;
@@ -86,14 +102,16 @@ export class ForestManager {
   private readonly seedThreeForest: SeedThreeForestController | null;
   private readonly hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
   private removedTrees = new Set<number>();
+  private missingTreeEntities = new Set<number>();
   private removedUndergrowth = new Set<number>();
+  private removedRocks = new Set<number>();
   private treePhases = new Map<number, TreePhase>();
   private treeGrowthProgress = new Map<number, number>();
 
   constructor(
     root: THREE.Group,
     forestInstances: MixedForestInstances,
-    rockPlacements: ReadonlyArray<RockObstacle>,
+    rockField: ForestRockInstances,
     undergrowth: UndergrowthInstances | null,
     undergrowthPlacements: UndergrowthPlacement[],
     terrain: Terrain,
@@ -102,7 +120,9 @@ export class ForestManager {
   ) {
     this.seedThreeForest = seedThreeForest;
     this.group = root;
-    this.rockPlacements = rockPlacements;
+    this.rockInstances = rockField.instances;
+    this.allRockPlacements = rockField.instances.map((instance) => instance.placement);
+    this.activeRockPlacements = [...this.allRockPlacements];
     this.disposeResources = disposeResources;
     this.placements = forestInstances.placements;
     this.trunkMesh = forestInstances.trunkMesh;
@@ -139,8 +159,13 @@ export class ForestManager {
     }));
   }
 
+  get rockPlacements(): ReadonlyArray<RockObstacle> {
+    return this.activeRockPlacements;
+  }
+
   applyTreePhase(layoutIndex: number, phase: TreePhase, growthProgress: number): void {
     if (layoutIndex < 0 || layoutIndex >= this.placements.length) return;
+    this.missingTreeEntities.delete(layoutIndex);
     this.treePhases.set(layoutIndex, phase);
     this.treeGrowthProgress.set(layoutIndex, growthProgress);
 
@@ -153,6 +178,31 @@ export class ForestManager {
     }
 
     this.restoreTreePhaseVisual(layoutIndex, phase, growthProgress);
+    this.commitTreeInstanceUpdates();
+  }
+
+  syncAuthoritativeTreeLayouts(activeLayoutIndices: Iterable<number>): void {
+    const active = new Set(activeLayoutIndices);
+    const nextMissing = new Set<number>();
+    for (let layoutIndex = 0; layoutIndex < this.placements.length; layoutIndex++) {
+      if (!active.has(layoutIndex)) nextMissing.add(layoutIndex);
+    }
+    if (removedIndexSetsEqual(nextMissing, this.missingTreeEntities)) return;
+
+    const previousMissing = this.missingTreeEntities;
+    this.missingTreeEntities = nextMissing;
+    for (let layoutIndex = 0; layoutIndex < this.placements.length; layoutIndex++) {
+      const wasMissing = previousMissing.has(layoutIndex);
+      const isMissing = nextMissing.has(layoutIndex);
+      if (wasMissing === isMissing) continue;
+      if (isMissing || this.removedTrees.has(layoutIndex)) {
+        this.hideTree(layoutIndex);
+        this.hideHarvestStump(layoutIndex);
+        this.hideSapling(layoutIndex);
+      } else {
+        this.restoreTreePhaseVisual(layoutIndex);
+      }
+    }
     this.commitTreeInstanceUpdates();
   }
 
@@ -214,6 +264,7 @@ export class ForestManager {
     const edges = clearance.roadNetwork ? [...clearance.roadNetwork.edges.values()] : [];
     const buildings = clearance.buildings ? [...clearance.buildings] : [];
     const burgageParcelPolygons = clearance.burgageParcelPolygons ? [...clearance.burgageParcelPolygons] : [];
+    const farmFieldPolygons = clearance.farmFieldPolygons ? [...clearance.farmFieldPolygons] : [];
     const nextRemoved = new Set<number>();
 
     for (let treeIndex = 0; treeIndex < this.placements.length; treeIndex++) {
@@ -228,6 +279,10 @@ export class ForestManager {
       }
       if (this.isTreeNearAnyBurgageParcel(placement, burgageParcelPolygons)) {
         nextRemoved.add(treeIndex);
+        continue;
+      }
+      if (this.isTreeInsideAnyFarmField(placement, farmFieldPolygons)) {
+        nextRemoved.add(treeIndex);
       }
     }
 
@@ -241,7 +296,7 @@ export class ForestManager {
         const isRemoved = nextRemoved.has(treeIndex);
         if (wasRemoved === isRemoved) continue;
 
-        if (isRemoved) {
+        if (isRemoved || this.missingTreeEntities.has(treeIndex)) {
           this.hideTree(treeIndex);
           this.hideHarvestStump(treeIndex);
           this.hideSapling(treeIndex);
@@ -253,7 +308,8 @@ export class ForestManager {
       this.commitTreeInstanceUpdates();
     }
 
-    this.syncUndergrowthClearance(edges, buildings, burgageParcelPolygons);
+    this.syncUndergrowthClearance(edges, buildings, burgageParcelPolygons, farmFieldPolygons);
+    this.syncRockClearance(farmFieldPolygons);
     if (clearance.roadNetwork) {
       this.syncRoadStumps(clearance.roadNetwork);
     }
@@ -273,6 +329,7 @@ export class ForestManager {
     edges: RoadEdge[],
     buildings: BuildingTerrainSource[],
     burgageParcelPolygons: Point2[][],
+    farmFieldPolygons: Point2[][],
   ): void {
     if (!this.undergrowth) return;
 
@@ -288,6 +345,10 @@ export class ForestManager {
         continue;
       }
       if (this.isUndergrowthNearAnyBurgageParcel(placement.x, placement.z, burgageParcelPolygons)) {
+        nextRemoved.add(index);
+        continue;
+      }
+      if (this.isUndergrowthNearAnyFarmField(placement.x, placement.z, farmFieldPolygons)) {
         nextRemoved.add(index);
       }
     }
@@ -311,6 +372,30 @@ export class ForestManager {
     this.undergrowth.bushShadowMesh.instanceMatrix.needsUpdate = true;
     this.undergrowth.fernShadowMesh.instanceMatrix.needsUpdate = true;
     this.undergrowth.juniperShadowMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  private syncRockClearance(farmFieldPolygons: Point2[][]): void {
+    const nextRemoved = new Set<number>();
+    for (let index = 0; index < this.rockInstances.length; index++) {
+      const placement = this.rockInstances[index].placement;
+      if (this.isRockNearAnyFarmField(placement, farmFieldPolygons)) {
+        nextRemoved.add(index);
+      }
+    }
+    if (removedIndexSetsEqual(nextRemoved, this.removedRocks)) return;
+
+    for (let index = 0; index < this.rockInstances.length; index++) {
+      if (nextRemoved.has(index) === this.removedRocks.has(index)) continue;
+      const instance = this.rockInstances[index];
+      const matrix = nextRemoved.has(index) ? this.hiddenMatrix : instance.matrix;
+      instance.mesh.setMatrixAt(instance.instanceIndex, matrix);
+      instance.shadowMesh.setMatrixAt(instance.instanceIndex, matrix);
+      instance.mesh.instanceMatrix.needsUpdate = true;
+      instance.shadowMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    this.removedRocks = nextRemoved;
+    this.activeRockPlacements = this.allRockPlacements.filter((_, index) => !nextRemoved.has(index));
   }
 
   private syncRoadStumps(network: RoadNetwork): void {
@@ -342,6 +427,13 @@ export class ForestManager {
     return false;
   }
 
+  private isTreeInsideAnyFarmField(placement: TreePlacement, fieldPolygons: Point2[][]): boolean {
+    for (const polygon of fieldPolygons) {
+      if (distancePointToPolygon2({ x: placement.x, z: placement.z }, polygon) <= 1e-6) return true;
+    }
+    return false;
+  }
+
   private isUndergrowthNearAnyBuilding(x: number, z: number, buildings: BuildingTerrainSource[]): boolean {
     for (const building of buildings) {
       if (pointWithinBuildingPad(x, z, building, 0)) return true;
@@ -352,6 +444,21 @@ export class ForestManager {
   private isUndergrowthNearAnyBurgageParcel(x: number, z: number, parcelPolygons: Point2[][]): boolean {
     for (const polygon of parcelPolygons) {
       if (distancePointToPolygon2({ x, z }, polygon) <= UNDERGROWTH_CLEAR_MARGIN) return true;
+    }
+    return false;
+  }
+
+  private isUndergrowthNearAnyFarmField(x: number, z: number, fieldPolygons: Point2[][]): boolean {
+    for (const polygon of fieldPolygons) {
+      if (distancePointToPolygon2({ x, z }, polygon) <= UNDERGROWTH_CLEAR_MARGIN) return true;
+    }
+    return false;
+  }
+
+  private isRockNearAnyFarmField(placement: RockObstacle, fieldPolygons: Point2[][]): boolean {
+    const clearRadius = placement.scale * 1.35 + 0.35;
+    for (const polygon of fieldPolygons) {
+      if (distancePointToPolygon2(placement, polygon) <= clearRadius) return true;
     }
     return false;
   }

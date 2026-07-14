@@ -1,8 +1,7 @@
 use spacetimedb::{reducer, ReducerContext};
 
 use crate::balance_generated::{
-    FARM_MAX_ACCEPTED_SLOPE_DEGREES, FARM_MAX_FIELD_AREA, FARM_MIN_FIELD_AREA,
-    FARM_MIN_FIELD_EDGE,
+    FARM_MAX_ACCEPTED_SLOPE_DEGREES, FARM_MIN_FIELD_AREA, FARM_MIN_FIELD_EDGE,
 };
 use crate::burgage::{convex_zones_overlap, zone_corners_polygon, zone_overlaps_footprint, Point2};
 use crate::db::*;
@@ -51,9 +50,6 @@ pub fn place_farm_field(
     let area = polygon_area(&corners);
     if area < FARM_MIN_FIELD_AREA - 1e-6 {
         return Err(format!("Field is too small; draw at least {} m².", FARM_MIN_FIELD_AREA.round()));
-    }
-    if area > FARM_MAX_FIELD_AREA + 1e-6 {
-        return Err(format!("Field is too large; keep it below {} m².", FARM_MAX_FIELD_AREA.round()));
     }
     if edge_lengths(&corners).iter().any(|length| *length < FARM_MIN_FIELD_EDGE) {
         return Err(format!("Every field edge must be at least {} m.", FARM_MIN_FIELD_EDGE.round()));
@@ -108,10 +104,15 @@ pub fn place_farm_field(
             return Err("Field overlaps existing farmland.".to_string());
         }
     }
-    if ctx.db.tree_entity().iter().any(|tree| {
-        tree.phase != "stump" && point_in_field(Point2 { x: tree.x, z: tree.z }, &corners)
-    }) {
-        return Err("Clear standing trees before cultivating this field.".to_string());
+    let cleared_tree_ids = ctx
+        .db
+        .tree_entity()
+        .iter()
+        .filter(|tree| point_in_field(Point2 { x: tree.x, z: tree.z }, &corners))
+        .map(|tree| tree.tree_id)
+        .collect::<Vec<_>>();
+    for tree_id in cleared_tree_ids {
+        ctx.db.tree_entity().tree_id().delete(&tree_id);
     }
 
     let moisture = sample_hydrology_score(center.x, center.z).clamp(0.0, 1.0);

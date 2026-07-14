@@ -13,8 +13,10 @@ import { evaluateResidenceNeedRecovery } from '../src/residences/residenceNeeds.
 import type { ResidenceState } from '../src/resources/types.ts';
 import * as THREE from 'three';
 import { createBuildingMesh } from '../src/buildings/BuildingMeshes.ts';
+import { validateBuildingPlacement } from '../src/buildings/BuildingPlacementValidation.ts';
 import { getBuildingExtent } from '../src/buildings/buildingExtents.ts';
 import { createResidenceMesh } from '../src/residences/ResidenceMarkers.ts';
+import { RoadNetwork } from '../src/roads/RoadNetwork.ts';
 
 const expanded = [
   'threshing_barn', 'monastery', 'brewery', 'smokehouse', 'granary',
@@ -44,6 +46,37 @@ for (const kind of ['brewery', 'smokehouse', 'granary', 'apiary', 'watermill', '
 }
 assert.ok(BUILDING_STORAGE_CAPS.granary.grain > BUILDING_STORAGE_CAPS.threshing_barn.grain);
 assert.deepEqual([RESIDENCE_TIER1_CAPACITY, RESIDENCE_TIER2_CAPACITY, RESIDENCE_TIER3_CAPACITY], [3, 6, 10]);
+
+const roadlessPlacementContext = {
+  buildings: [],
+  residences: [],
+  burgageZones: [],
+  farmFields: [],
+  quarries: [],
+  foragingNodes: [],
+  stockpile: { timber: 999, stone: 999 },
+  isWaterAt: () => false,
+  getNaturalHeightAt: () => 0,
+  roadNetwork: new RoadNetwork(),
+};
+assert.equal(
+  validateBuildingPlacement('carpenter', 0, 0, roadlessPlacementContext).ok,
+  true,
+  'roads must be connected after construction, not required for placement',
+);
+
+const closeShorePlacement = validateBuildingPlacement('watermill', 0, 0, {
+  ...roadlessPlacementContext,
+  isWaterAt: (x: number, z: number) => Math.hypot(x - 4, z) <= 0.75,
+});
+assert.equal(closeShorePlacement.ok, true, 'watermill placement must detect water within the close-bank sampling gap');
+
+const distantShorePlacement = validateBuildingPlacement('watermill', 0, 0, {
+  ...roadlessPlacementContext,
+  isWaterAt: (x: number, z: number) => Math.hypot(x - 30, z) <= 0.75,
+});
+assert.equal(distantShorePlacement.ok, false);
+if (!distantShorePlacement.ok) assert.equal(distantShorePlacement.reason, 'requires_shore');
 
 const residence = (tier: 1 | 2 | 3): ResidenceState => ({
   id: `tier-${tier}`, zoneId: 'zone', parcelIndex: 0, x: 0, z: 0, yaw: 0,

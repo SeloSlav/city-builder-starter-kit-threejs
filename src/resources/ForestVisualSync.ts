@@ -9,6 +9,9 @@ export class ForestVisualSync {
   }
 
   syncAll(trees: Map<string, TreeEntityState>): void {
+    this.forestManager.syncAuthoritativeTreeLayouts(
+      [...trees.values()].map((entity) => entity.layoutIndex),
+    );
     for (const entity of trees.values()) {
       this.syncTree(entity);
     }

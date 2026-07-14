@@ -1,7 +1,10 @@
 import {
   FARM_BASE_GRAIN_PER_SQUARE_METER,
+  FARM_LARGE_FIELD_EFFICIENCY_EXPONENT,
+  FARM_LARGE_FIELD_EFFICIENCY_FLOOR,
   FARM_OATS_MOISTURE_IDEAL,
   FARM_OATS_MOISTURE_TOLERANCE,
+  FARM_OPTIMAL_FIELD_AREA,
   FARM_RYE_MOISTURE_IDEAL,
   FARM_RYE_MOISTURE_TOLERANCE,
   FARM_SLOPE_PENALTY_PER_DEGREE,
@@ -52,6 +55,12 @@ export function fieldShapeEfficiency(corners: FarmFieldCorners): number {
   return Math.max(0.72, Math.min(1, 1 - Math.max(0, aspect - 1) * 0.035));
 }
 
+export function fieldSizeEfficiency(area: number): number {
+  if (area <= FARM_OPTIMAL_FIELD_AREA) return 1;
+  const efficiency = (FARM_OPTIMAL_FIELD_AREA / Math.max(area, 1)) ** FARM_LARGE_FIELD_EFFICIENCY_EXPONENT;
+  return Math.max(FARM_LARGE_FIELD_EFFICIENCY_FLOOR, Math.min(1, efficiency));
+}
+
 export function moistureSuitability(crop: FarmCrop, moisture: number): number {
   if (crop === 'fallow') return 1;
   const ideal = crop === 'oats' ? FARM_OATS_MOISTURE_IDEAL : FARM_RYE_MOISTURE_IDEAL;
@@ -68,7 +77,8 @@ export function expectedFieldYield(field: Pick<FarmFieldState, 'area' | 'crop' |
     * moistureSuitability(field.crop, field.moisture)
     * Math.max(0.2, Math.min(1, field.fertility))
     * slope
-    * fieldShapeEfficiency(field.corners);
+    * fieldShapeEfficiency(field.corners)
+    * fieldSizeEfficiency(field.area);
 }
 
 export function sampleAverageSlopeDegrees(

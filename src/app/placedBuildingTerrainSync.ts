@@ -31,7 +31,11 @@ export function getForestClearanceSignature(state: GameState): string {
     .map((residence) => `${residence.id}:${residence.zoneId}:${residence.parcelIndex}`)
     .sort()
     .join('|');
-  return `${buildings}§${residences}`;
+  const farmFields = [...state.farmFields.values()]
+    .map((field) => `${field.id}:${field.corners.map((corner) => `${corner.x.toFixed(2)},${corner.z.toFixed(2)}`).join('-')}`)
+    .sort()
+    .join('|');
+  return `${buildings}§${residences}§${farmFields}`;
 }
 
 export function syncBuildingTerrainLayout(

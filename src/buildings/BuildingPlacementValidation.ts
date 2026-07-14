@@ -1,7 +1,6 @@
 import type { BuildingKind, BuildingState, BurgageZoneState, FarmFieldState, ForagingNodeState, ResidenceState, ResourceNodeState } from '../resources/types.ts';
 import type { ResourceTotals } from '../resources/resourceTotals.ts';
 import { canAffordBuilding } from '../resources/buildingEconomy.ts';
-import { buildingRequiresRoad } from '../resources/buildingPlacementPolicy.ts';
 import { getBuildingDefinition } from '../resources/buildings.ts';
 import { MONASTERY_MIN_FOOTPRINT_SLOPE } from '../generated/gameBalance.ts';
 import { hasStaffedChapel, MONASTERY_MIN_PARISH_POPULATION, parishPopulation } from '../logistics/specialtyLogistics.ts';
@@ -10,7 +9,7 @@ import { sampleBuildingFootprintPoints } from './BuildingTerrainLayout.ts';
 import { buildingFootprintPolygon, buildingOverlapsResidenceZone } from '../placement/placementConflicts.ts';
 import { convexPolygonsOverlap2 } from '../utils/polygonGeometry.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
-import { hasRoadAccess, isOnRoadSurface } from '../roads/roadConnectivity.ts';
+import { isOnRoadSurface } from '../roads/roadConnectivity.ts';
 import { getBuildingExtent } from './buildingExtents.ts';
 
 export type BuildingPlacementFailureReason =
@@ -27,7 +26,6 @@ export type BuildingPlacementFailureReason =
   | 'no_game_in_range'
   | 'no_berries_in_range'
   | 'no_trees_in_range'
-  | 'no_road_access'
   | 'on_road'
   | 'insufficient_resources'
   | 'requires_staffed_chapel'
@@ -132,14 +130,6 @@ export function validateBuildingPlacement(
     }
   }
 
-  if (
-    buildingRequiresRoad(kind)
-    && context.roadNetwork
-    && !hasRoadAccess(x, z, context.roadNetwork)
-  ) {
-    return { ok: false, reason: 'no_road_access' };
-  }
-
   if (!canAffordBuilding(context.stockpile, kind)) {
     return { ok: false, reason: 'insufficient_resources' };
   }
@@ -158,10 +148,21 @@ export function validateBuildingPlacement(
   return { ok: true };
 }
 
-function isNearOpenWater(x: number, z: number, isWaterAt: (x: number, z: number) => boolean): boolean {
-  for (const radius of [10, 17, 24]) {
-    for (let i = 0; i < 16; i++) {
-      const angle = i * Math.PI * 2 / 16;
+const SHORE_RADIAL_SAMPLE_STEP = 2;
+const SHORE_ARC_SAMPLE_SPACING = 4;
+
+function isNearOpenWater(
+  x: number,
+  z: number,
+  isWaterAt: (x: number, z: number) => boolean,
+  maxDistance = 24,
+): boolean {
+  const ringCount = Math.ceil(maxDistance / SHORE_RADIAL_SAMPLE_STEP);
+  for (let ring = 1; ring <= ringCount; ring++) {
+    const radius = Math.min(maxDistance, ring * SHORE_RADIAL_SAMPLE_STEP);
+    const sampleCount = Math.max(12, Math.ceil(Math.PI * 2 * radius / SHORE_ARC_SAMPLE_SPACING));
+    for (let i = 0; i < sampleCount; i++) {
+      const angle = i * Math.PI * 2 / sampleCount;
       if (isWaterAt(x + Math.cos(angle) * radius, z + Math.sin(angle) * radius)) return true;
     }
   }

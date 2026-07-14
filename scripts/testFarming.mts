@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import {
-  FARM_MAX_FIELD_AREA,
+  FARM_LARGE_FIELD_EFFICIENCY_FLOOR,
   FARM_MIN_FIELD_AREA,
   FARM_MIN_FIELD_EDGE,
+  FARM_OPTIMAL_FIELD_AREA,
   GRANARY_FIREWOOD_PER_CYCLE,
   GRANARY_WATER_PER_CYCLE,
   MILL_WATER_PER_HARVEST,
@@ -13,6 +14,7 @@ import {
   fieldArea,
   fieldEdgeLengths,
   fieldShapeEfficiency,
+  fieldSizeEfficiency,
   moistureSuitability,
   rectangleFromBaseline,
   sampleAverageSlopeDegrees,
@@ -58,7 +60,43 @@ assert.ok(goodYield > poorYield * 3, 'hydrology, fertility, and slope should mat
 assert.equal(expectedFieldYield({ area: 400, crop: 'fallow', moisture: 0.5, fertility: 0.5, averageSlopeDegrees: 0, corners: rectangle }), 0);
 
 assert.ok(FARM_MIN_FIELD_AREA >= FARM_MIN_FIELD_EDGE ** 2);
-assert.ok(FARM_MAX_FIELD_AREA >= 20 * FARM_MIN_FIELD_AREA);
+assert.ok(FARM_OPTIMAL_FIELD_AREA >= 20 * FARM_MIN_FIELD_AREA);
+assert.equal(fieldSizeEfficiency(FARM_OPTIMAL_FIELD_AREA), 1);
+assert.ok(fieldSizeEfficiency(FARM_OPTIMAL_FIELD_AREA * 2) < 1);
+assert.ok(fieldSizeEfficiency(FARM_OPTIMAL_FIELD_AREA * 2) > FARM_LARGE_FIELD_EFFICIENCY_FLOOR);
+assert.equal(fieldSizeEfficiency(FARM_OPTIMAL_FIELD_AREA * 1e12), FARM_LARGE_FIELD_EFFICIENCY_FLOOR);
+
+const optimalSide = Math.sqrt(FARM_OPTIMAL_FIELD_AREA);
+const optimalRectangle = rectangleFromBaseline(
+  { x: 0, z: 0 },
+  { x: optimalSide, z: 0 },
+  { x: 0, z: optimalSide },
+);
+const largeSide = Math.sqrt(FARM_OPTIMAL_FIELD_AREA * 2);
+const largeRectangle = rectangleFromBaseline(
+  { x: 0, z: 0 },
+  { x: largeSide, z: 0 },
+  { x: 0, z: largeSide },
+);
+assert.ok(optimalRectangle && largeRectangle);
+const optimalYield = expectedFieldYield({
+  area: FARM_OPTIMAL_FIELD_AREA,
+  crop: 'rye',
+  moisture: 0.38,
+  fertility: 1,
+  averageSlopeDegrees: 0,
+  corners: optimalRectangle,
+});
+const largeYield = expectedFieldYield({
+  area: FARM_OPTIMAL_FIELD_AREA * 2,
+  crop: 'rye',
+  moisture: 0.38,
+  fertility: 1,
+  averageSlopeDegrees: 0,
+  corners: largeRectangle,
+});
+assert.ok(largeYield > optimalYield, 'oversized fields should remain useful and produce more total grain');
+assert.ok(largeYield / (FARM_OPTIMAL_FIELD_AREA * 2) < optimalYield / FARM_OPTIMAL_FIELD_AREA, 'oversized fields should yield less grain per square metre');
 assert.equal(MILL_WATER_PER_HARVEST, 0, 'lumber should not consume well water');
 assert.equal(WATERMILL_WATER_PER_CYCLE, 0, 'a river-powered mill should not consume well water');
 assert.ok(GRANARY_WATER_PER_CYCLE > 0, 'bakery production should consume well water');

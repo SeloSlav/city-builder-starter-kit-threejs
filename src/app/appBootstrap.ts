@@ -419,7 +419,6 @@ export async function bootstrapAppSession(
   const fieldFailureMessage = (reason: FarmFieldPlacementFailureReason): string => {
     switch (reason) {
       case 'too_small': return 'Draw a larger field.';
-      case 'too_large': return 'Draw a smaller field.';
       case 'edge_too_short': return 'Each field edge must be at least 6 metres.';
       case 'too_steep': return 'This ground is too steep to cultivate.';
       case 'no_farmstead': return "Place a farmstead first, then draw inside its work extent.";
@@ -428,7 +427,6 @@ export async function bootstrapAppSession(
       case 'building': return 'Field overlaps a building.';
       case 'residence': return 'Field overlaps a residence plot.';
       case 'field': return 'Field overlaps existing farmland.';
-      case 'trees': return 'Clear standing trees before cultivating this field.';
     }
   };
 
@@ -437,7 +435,6 @@ export async function bootstrapAppSession(
     camera: sceneManager.camera,
     terrainProjector: sceneManager.terrainProjector,
     getState: () => liveContext.gameState,
-    getTreeRegistry: () => liveContext.treeRegistry,
     getHeightAt: (x, z) => sceneManager.terrain.getHeightAt(x, z),
     isWaterAt: (x, z) => sceneManager.riverField.isRenderedWetAt(x, z),
     isQuarryPitAt: (x, z) => sceneManager.worldLayout.quarryLayout.isBlockedForProps(x, z),

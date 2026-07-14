@@ -99,10 +99,6 @@ impl RoadNetwork {
         best
     }
 
-    pub fn has_road_access(&self, x: f64, z: f64) -> bool {
-        self.nearest_distance(x, z) <= BUILDING_ROAD_ACCESS_DISTANCE
-    }
-
     pub fn is_on_road_surface(&self, x: f64, z: f64) -> bool {
         const ROAD_SURFACE_MARGIN: f64 = 0.15;
 
@@ -430,12 +426,6 @@ fn cost_to_key(cost: f64) -> u64 {
 pub fn load_owner_road_network(ctx: &ReducerContext, owner: Identity) -> Option<RoadNetwork> {
     let state = ctx.db.road_network_state().owner().find(&owner)?;
     RoadNetwork::from_snapshot_json(&state.snapshot_json)
-}
-
-pub fn has_building_road_access(ctx: &ReducerContext, owner: Identity, x: f64, z: f64) -> bool {
-    load_owner_road_network(ctx, owner)
-        .map(|network| network.has_road_access(x, z))
-        .unwrap_or(false)
 }
 
 fn distance(ax: f64, az: f64, bx: f64, bz: f64) -> f64 {

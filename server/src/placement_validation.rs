@@ -11,7 +11,10 @@ const LARGE_QUARRY_PIT_RADIUS: f64 = 58.0;
 const SMALL_QUARRY_PIT_RADIUS: f64 = 30.0;
 const FOOTPRINT_SAMPLE_FRACTIONS: [f64; 3] = [0.0, 0.55, 0.82];
 const OPEN_WATER_THRESHOLD: f64 = 0.999;
+const SHORE_WATER_THRESHOLD: f64 = 0.95;
 const MAX_ROAD_FRONTAGE_DISTANCE: f64 = 16.0;
+const SHORE_RADIAL_SAMPLE_STEP: f64 = 2.0;
+const SHORE_ARC_SAMPLE_SPACING: f64 = 4.0;
 
 struct BuildingPadParams {
     radius_x: f64,
@@ -28,11 +31,26 @@ pub fn is_open_water(x: f64, z: f64) -> bool {
 }
 
 pub fn is_near_open_water(x: f64, z: f64, max_distance: f64) -> bool {
-    for ring in [0.45, 0.72, 1.0] {
-        let radius = max_distance * ring;
-        for index in 0..16 {
-            let angle = index as f64 / 16.0 * std::f64::consts::TAU;
-            if is_open_water(x + angle.cos() * radius, z + angle.sin() * radius) {
+    any_open_water_near(x, z, max_distance, |sample_x, sample_z| {
+        sample_hydrology_score(sample_x, sample_z) >= SHORE_WATER_THRESHOLD
+    })
+}
+
+fn any_open_water_near(
+    x: f64,
+    z: f64,
+    max_distance: f64,
+    mut is_water_at: impl FnMut(f64, f64) -> bool,
+) -> bool {
+    let ring_count = (max_distance / SHORE_RADIAL_SAMPLE_STEP).ceil() as usize;
+    for ring in 1..=ring_count {
+        let radius = (ring as f64 * SHORE_RADIAL_SAMPLE_STEP).min(max_distance);
+        let sample_count = ((std::f64::consts::TAU * radius / SHORE_ARC_SAMPLE_SPACING).ceil()
+            as usize)
+            .max(12);
+        for index in 0..sample_count {
+            let angle = index as f64 / sample_count as f64 * std::f64::consts::TAU;
+            if is_water_at(x + angle.cos() * radius, z + angle.sin() * radius) {
                 return true;
             }
         }
@@ -248,4 +266,21 @@ fn building_placement_yaw(x: f64, z: f64) -> f64 {
     let degrees = (x * 0.017 + z * 0.013).sin().abs() * 6283.0;
     let degrees = degrees.floor() % 360.0;
     degrees.to_radians()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::any_open_water_near;
+
+    #[test]
+    fn close_shore_water_is_not_skipped_between_sparse_rings() {
+        let narrow_water_patch = |x: f64, z: f64| (x - 4.0).hypot(z) <= 0.75;
+        assert!(any_open_water_near(0.0, 0.0, 24.0, narrow_water_patch));
+    }
+
+    #[test]
+    fn water_beyond_the_shore_limit_is_rejected() {
+        let distant_water_patch = |x: f64, z: f64| (x - 30.0).hypot(z) <= 0.75;
+        assert!(!any_open_water_near(0.0, 0.0, 24.0, distant_water_patch));
+    }
 }

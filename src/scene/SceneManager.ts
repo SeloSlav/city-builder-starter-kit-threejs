@@ -82,6 +82,7 @@ export class SceneManager {
   private roadNetworkRef: RoadNetwork | null = null;
   private forestClearanceBuildings: BuildingTerrainSource[] = [];
   private forestClearanceBurgageParcelPolygons: Point2[][] = [];
+  private forestClearanceFarmFieldPolygons: Point2[][] = [];
   private lastForestClearanceSourceSignature = '';
   private readonly riverSystem: RiverSystem;
   private readonly quarrySystem: QuarrySystem;
@@ -323,10 +324,10 @@ export class SceneManager {
     }
 
     this.scene.add(this.forestManager.group);
-    this.rebuildRockSpatialIndex();
+    this.refreshForestClearance();
+    this.grassField?.syncPlacementClearance(this.forestClearanceFarmFieldPolygons);
 
     if (this.roadNetworkRef) {
-      this.refreshForestClearance();
       this.grassField?.syncRoadClearance(this.roadNetworkRef);
       this.refreshShadowMap();
     }
@@ -499,15 +500,19 @@ export class SceneManager {
   setForestClearanceSources(
     buildings: Iterable<BuildingTerrainSource>,
     burgageParcelPolygons: Iterable<Point2[]>,
+    farmFieldPolygons: Iterable<Point2[]>,
   ): void {
     const nextBuildings = [...buildings];
     const nextParcelPolygons = [...burgageParcelPolygons];
-    const signature = forestClearanceSourceSignature(nextBuildings, nextParcelPolygons);
+    const nextFarmFieldPolygons = [...farmFieldPolygons];
+    const signature = forestClearanceSourceSignature(nextBuildings, nextParcelPolygons, nextFarmFieldPolygons);
     if (signature === this.lastForestClearanceSourceSignature) return;
     this.lastForestClearanceSourceSignature = signature;
     this.forestClearanceBuildings = nextBuildings;
     this.forestClearanceBurgageParcelPolygons = nextParcelPolygons;
+    this.forestClearanceFarmFieldPolygons = nextFarmFieldPolygons;
     this.refreshForestClearance();
+    this.grassField?.syncPlacementClearance(nextFarmFieldPolygons);
   }
 
   getBridgeSamplingContext(): BridgeSamplingContext {
@@ -587,7 +592,9 @@ export class SceneManager {
       roadNetwork: this.roadNetworkRef,
       buildings: this.forestClearanceBuildings,
       burgageParcelPolygons: this.forestClearanceBurgageParcelPolygons,
+      farmFieldPolygons: this.forestClearanceFarmFieldPolygons,
     });
+    this.rebuildRockSpatialIndex();
   }
 
   private refreshShadowMap(): void {
@@ -710,6 +717,7 @@ export class SceneManager {
 function forestClearanceSourceSignature(
   buildings: BuildingTerrainSource[],
   burgageParcelPolygons: Point2[][],
+  farmFieldPolygons: Point2[][],
 ): string {
   const buildingPart = buildings
     .map((building) => `${building.kind}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
@@ -721,7 +729,13 @@ function forestClearanceSourceSignature(
       .join('-'))
     .sort()
     .join('|');
-  return `${buildingPart}§${parcelPart}`;
+  const farmFieldPart = farmFieldPolygons
+    .map((polygon) => polygon
+      .map((point) => `${point.x.toFixed(2)},${point.z.toFixed(2)}`)
+      .join('-'))
+    .sort()
+    .join('|');
+  return `${buildingPart}§${parcelPart}§${farmFieldPart}`;
 }
 
 function projectPointToPathXZ(

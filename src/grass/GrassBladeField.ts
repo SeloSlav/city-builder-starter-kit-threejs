@@ -13,6 +13,7 @@ import {
 import type { Terrain } from '../terrain/Terrain.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
 import { RoadSpatialIndex } from '../roads/roadSpatialIndex.ts';
+import { isPointInPolygon2, type Point2 } from '../utils/polygonGeometry.ts';
 import {
   createForestCores,
   createForestSpawnConfig,
@@ -43,6 +44,7 @@ type TslNode = {
 export type GrassBladeField = {
   group: THREE.Group;
   syncRoadClearance: (network: RoadNetwork) => void;
+  syncPlacementClearance: (polygons: Iterable<Point2[]>) => void;
   setBuildInteractionActive: (active: boolean) => void;
   setRoadDraftActive: (active: boolean) => void;
   updateCameraState: (
@@ -80,6 +82,7 @@ type GrassFieldContext = {
   terrainExtent: number;
   forestCores: ReturnType<typeof createForestCores>;
   isBlockedAt?: (x: number, z: number) => boolean;
+  placementClearancePolygons: Point2[][];
   roadSpatialIndex: RoadSpatialIndex | null;
 };
 
@@ -124,6 +127,7 @@ export async function createGrassBladeField(
     terrainExtent: spawnConfig.terrainExtent,
     forestCores: createForestCores(mulberry32(0x6a55b1ade), spawnConfig),
     isBlockedAt: options?.isBlockedAt,
+    placementClearancePolygons: [],
     roadSpatialIndex: null,
   };
 
@@ -363,11 +367,25 @@ export async function createGrassBladeField(
     return centerChunkX !== anchorChunkX || centerChunkZ !== anchorChunkZ;
   };
 
+  const markClearanceDirty = (): void => {
+    pendingSlots = [];
+    roadClearanceDirty = true;
+    streamBurstPending = true;
+    for (const record of slotRecords) {
+      record.worldChunkX = Number.NaN;
+      record.worldChunkZ = Number.NaN;
+    }
+  };
+
   return {
     group,
     syncRoadClearance(network: RoadNetwork) {
       context.roadSpatialIndex = RoadSpatialIndex.fromNetwork(network);
-      roadClearanceDirty = true;
+      markClearanceDirty();
+    },
+    syncPlacementClearance(polygons: Iterable<Point2[]>) {
+      context.placementClearancePolygons = [...polygons].map((polygon) => [...polygon]);
+      markClearanceDirty();
     },
     setBuildInteractionActive(active: boolean) {
       buildInteractionActive = active;
@@ -442,6 +460,7 @@ function createDisabledGrassBladeField(): GrassBladeField {
   return {
     group,
     syncRoadClearance() {},
+    syncPlacementClearance() {},
     setBuildInteractionActive() {},
     setRoadDraftActive() {},
     updateCameraState() {},
@@ -475,7 +494,7 @@ function writeSeedThreeChunkInstances(
   context: GrassFieldContext,
   maxInstancesPerMesh = Number.POSITIVE_INFINITY,
 ): number[] {
-  const { terrain, extent, terrainExtent, forestCores, isBlockedAt, roadSpatialIndex } = context;
+  const { terrain, extent, terrainExtent, forestCores, roadSpatialIndex } = context;
   const rng = mulberry32(chunkSeed(chunkX, chunkZ));
   const chunkMinX = chunkX * GRASS_BLADE_CHUNK_SIZE;
   const chunkMinZ = chunkZ * GRASS_BLADE_CHUNK_SIZE;
@@ -523,7 +542,7 @@ function writeSeedThreeChunkInstances(
     }
 
     if (!isInsidePlayableExtent(x, z, extent)) return false;
-    if (isBlockedAt?.(x, z)) return false;
+    if (isGrassPlacementBlocked(x, z, context)) return false;
     if (isGrassNearAnyRoad(x, z, roadSpatialIndex)) return false;
 
     const variantIndex = rng() < (streamMeshes[0]?.variant?.share ?? 0.62) ? 0 : 1;
@@ -614,7 +633,7 @@ function writeChunkInstances(
   context: GrassFieldContext,
   maxInstances = Number.POSITIVE_INFINITY,
 ): number {
-  const { terrain, extent, terrainExtent, forestCores, isBlockedAt, roadSpatialIndex } = context;
+  const { terrain, extent, terrainExtent, forestCores, roadSpatialIndex } = context;
   const rng = mulberry32(chunkSeed(chunkX, chunkZ));
   const chunkMinX = chunkX * GRASS_BLADE_CHUNK_SIZE;
   const chunkMinZ = chunkZ * GRASS_BLADE_CHUNK_SIZE;
@@ -665,7 +684,7 @@ function writeChunkInstances(
     if (tooClose) continue;
 
     if (!isInsidePlayableExtent(x, z, extent)) continue;
-    if (isBlockedAt?.(x, z)) continue;
+    if (isGrassPlacementBlocked(x, z, context)) continue;
     if (isGrassNearAnyRoad(x, z, roadSpatialIndex)) continue;
 
     localPlacements.push({ x, z, micro });
@@ -753,6 +772,11 @@ function createGrassBladeMaterial(): MeshStandardNodeMaterial {
   material.colorNode = (vertexColor() as TslNode).rgb;
   applyFoliageDoubleSideNormalsNode(material);
   return material;
+}
+
+function isGrassPlacementBlocked(x: number, z: number, context: GrassFieldContext): boolean {
+  if (context.isBlockedAt?.(x, z)) return true;
+  return context.placementClearancePolygons.some((polygon) => isPointInPolygon2({ x, z }, polygon));
 }
 
 function isGrassNearAnyRoad(x: number, z: number, index: RoadSpatialIndex | null): boolean {

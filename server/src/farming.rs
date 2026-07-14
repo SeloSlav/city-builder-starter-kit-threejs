@@ -1,7 +1,9 @@
 use crate::balance_generated::{
     FARM_BASE_GRAIN_PER_SQUARE_METER, FARM_FALLOW_FERTILITY_RESTORE,
     FARM_HARVEST_WORK_PER_SQUARE_METER, FARM_OATS_FERTILITY_DRAIN,
+    FARM_LARGE_FIELD_EFFICIENCY_EXPONENT, FARM_LARGE_FIELD_EFFICIENCY_FLOOR,
     FARM_OATS_MOISTURE_IDEAL, FARM_OATS_MOISTURE_TOLERANCE,
+    FARM_OPTIMAL_FIELD_AREA,
     FARM_PLOUGH_WORK_PER_SQUARE_METER, FARM_RYE_FERTILITY_DRAIN,
     FARM_RYE_MOISTURE_IDEAL, FARM_RYE_MOISTURE_TOLERANCE,
     FARM_SLOPE_PENALTY_PER_DEGREE, FARM_SOW_WORK_PER_SQUARE_METER,
@@ -79,6 +81,15 @@ pub fn shape_efficiency(corners: &ZoneCorners) -> f64 {
     (1.0 - (aspect - 1.0).max(0.0) * 0.035).clamp(0.72, 1.0)
 }
 
+pub fn field_size_efficiency(area: f64) -> f64 {
+    if area <= FARM_OPTIMAL_FIELD_AREA {
+        return 1.0;
+    }
+    (FARM_OPTIMAL_FIELD_AREA / area.max(1.0))
+        .powf(FARM_LARGE_FIELD_EFFICIENCY_EXPONENT)
+        .clamp(FARM_LARGE_FIELD_EFFICIENCY_FLOOR, 1.0)
+}
+
 pub fn moisture_suitability(crop: u8, moisture: f64) -> f64 {
     if crop == CROP_FALLOW {
         return 1.0;
@@ -123,6 +134,7 @@ pub fn expected_grain_yield(
     area.max(0.0)
         * FARM_BASE_GRAIN_PER_SQUARE_METER
         * yield_suitability(crop, moisture, fertility, average_slope_degrees, shape)
+        * field_size_efficiency(area)
 }
 
 pub fn work_required(stage: u8, area: f64, shape: f64) -> f64 {
@@ -174,4 +186,40 @@ fn cross(a: Point2, b: Point2) -> f64 {
 
 fn distance(a: Point2, b: Point2) -> f64 {
     ((a.x - b.x).powi(2) + (a.z - b.z).powi(2)).sqrt()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oversized_fields_have_soft_diminishing_returns() {
+        assert_eq!(field_size_efficiency(FARM_OPTIMAL_FIELD_AREA), 1.0);
+        let large_efficiency = field_size_efficiency(FARM_OPTIMAL_FIELD_AREA * 2.0);
+        assert!(large_efficiency < 1.0);
+        assert!(large_efficiency > FARM_LARGE_FIELD_EFFICIENCY_FLOOR);
+        assert_eq!(
+            field_size_efficiency(FARM_OPTIMAL_FIELD_AREA * 1e12),
+            FARM_LARGE_FIELD_EFFICIENCY_FLOOR
+        );
+
+        let optimal_yield = expected_grain_yield(
+            FARM_OPTIMAL_FIELD_AREA,
+            CROP_RYE,
+            FARM_RYE_MOISTURE_IDEAL,
+            1.0,
+            0.0,
+            1.0,
+        );
+        let large_yield = expected_grain_yield(
+            FARM_OPTIMAL_FIELD_AREA * 2.0,
+            CROP_RYE,
+            FARM_RYE_MOISTURE_IDEAL,
+            1.0,
+            0.0,
+            1.0,
+        );
+        assert!(large_yield > optimal_yield);
+        assert!(large_yield / 2.0 < optimal_yield);
+    }
 }

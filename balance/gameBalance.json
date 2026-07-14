@@ -252,7 +252,9 @@
   },
   "farming": {
     "minFieldArea": 48,
-    "maxFieldArea": 1600,
+    "optimalFieldArea": 1600,
+    "largeFieldEfficiencyExponent": 0.22,
+    "largeFieldEfficiencyFloor": 0.6,
     "minFieldEdge": 6,
     "workMetersPerWorkerPerSec": 20,
     "ploughWorkPerSquareMeter": 1,

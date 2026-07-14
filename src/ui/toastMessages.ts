@@ -21,7 +21,6 @@ export const TOAST_MESSAGES = {
   'building.placement.no_game_in_range': 'No game within work range',
   'building.placement.no_berries_in_range': 'No berries within work range',
   'building.placement.no_trees_in_range': 'No mature trees within work range',
-  'building.placement.no_road_access': 'Building must be placed near a road',
   'building.placement.on_road': 'Cannot build on a road',
   'building.placement.insufficient_resources': 'Not enough timber or stone',
   'building.placement.requires_staffed_chapel': 'A staffed chapel is required before founding a monastery',
@@ -126,8 +125,6 @@ export function buildingPlacementReasonToToastId(reason: BuildingPlacementFailur
       return 'building.placement.no_berries_in_range';
     case 'no_trees_in_range':
       return 'building.placement.no_trees_in_range';
-    case 'no_road_access':
-      return 'building.placement.no_road_access';
     case 'on_road':
       return 'building.placement.on_road';
     case 'insufficient_resources':

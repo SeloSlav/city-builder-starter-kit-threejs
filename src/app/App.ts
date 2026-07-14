@@ -385,6 +385,7 @@ export class App {
     this.treeRegistry = TreeRegistry.fromForestManager(forestManager);
     this.liveContext.treeRegistry = this.treeRegistry;
     this.forestVisualSync = new ForestVisualSync(forestManager);
+    this.forestVisualSync.syncAll(this.gameState.trees);
     if (this.snapshotApplierDeps) {
       this.snapshotApplierDeps.forestVisualSync = this.forestVisualSync;
     }

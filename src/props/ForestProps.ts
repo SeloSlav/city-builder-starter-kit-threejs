@@ -1,7 +1,11 @@
 import * as THREE from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 import type { Terrain } from '../terrain/Terrain.ts';
-import { ForestManager, type MixedForestInstances } from './ForestManager.ts';
+import {
+  ForestManager,
+  type ForestRockInstances,
+  type MixedForestInstances,
+} from './ForestManager.ts';
 import {
   buildUndergrowthInstances,
   createUndergrowthMaterials,
@@ -125,23 +129,22 @@ export async function createForestProps(
     );
     const seedThreeController = seedThree.createSeedThreeForestController(seedThreeForest);
     const treeInstances = createStubForestInstances(allTreePlacements);
-    forest.add(seedThreeForest.group);
-    forest.add(
-      createRockField(
-        rockPlacements,
-        terrain,
-        materials.rock,
-        materials.shadowCast,
-        materials.shadowDepth,
-        rng,
-      ),
+    const rockField = createRockField(
+      rockPlacements,
+      terrain,
+      materials.rock,
+      materials.shadowCast,
+      materials.shadowDepth,
+      rng,
     );
+    forest.add(seedThreeForest.group);
+    forest.add(rockField.group);
     forest.add(undergrowth.group);
 
     return new ForestManager(
       forest,
       treeInstances,
-      rockPlacements,
+      rockField,
       undergrowth,
       undergrowthPlacements,
       terrain,
@@ -157,24 +160,23 @@ export async function createForestProps(
   }
 
   const treeInstances = createMixedMountainForest(allTreePlacements, terrain, materials, rng);
+  const rockField = createRockField(
+    rockPlacements,
+    terrain,
+    materials.rock,
+    materials.shadowCast,
+    materials.shadowDepth,
+    rng,
+  );
 
   forest.add(treeInstances.group);
-  forest.add(
-    createRockField(
-      rockPlacements,
-      terrain,
-      materials.rock,
-      materials.shadowCast,
-      materials.shadowDepth,
-      rng,
-    ),
-  );
+  forest.add(rockField.group);
   forest.add(undergrowth.group);
 
   return new ForestManager(
     forest,
     treeInstances,
-    rockPlacements,
+    rockField,
     undergrowth,
     undergrowthPlacements,
     terrain,
@@ -989,8 +991,9 @@ function createRockField(
   shadowCast: THREE.MeshStandardMaterial,
   shadowDepth: THREE.MeshDepthMaterial,
   rng: () => number,
-): THREE.Group {
+): ForestRockInstances {
   const group = new THREE.Group();
+  const instances: ForestRockInstances['instances'] = [];
   group.name = 'Instanced mossy boulder field';
   const shapeSeeds = [1.3, 7.7, 13.2] as const;
   const profiles: RockProfile[] = ['flat', 'moderate', 'tall'];
@@ -1029,13 +1032,20 @@ function createRockField(
       matrix.compose(position, quaternion, scaleVector);
       mesh.setMatrixAt(rockIndex, matrix);
       shadowMesh.setMatrixAt(rockIndex, matrix);
+      instances.push({
+        placement: rock,
+        mesh,
+        shadowMesh,
+        instanceIndex: rockIndex,
+        matrix: matrix.clone(),
+      });
     });
     mesh.instanceMatrix.needsUpdate = true;
     shadowMesh.instanceMatrix.needsUpdate = true;
     group.add(mesh, shadowMesh);
   });
 
-  return group;
+  return { group, instances };
 }
 
 function rockInstanceScaleForProfile(

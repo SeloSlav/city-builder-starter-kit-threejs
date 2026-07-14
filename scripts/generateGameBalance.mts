@@ -239,7 +239,9 @@ export type GameBalance = {
   };
   farming: {
     minFieldArea: number;
-    maxFieldArea: number;
+    optimalFieldArea: number;
+    largeFieldEfficiencyExponent: number;
+    largeFieldEfficiencyFloor: number;
     minFieldEdge: number;
     workMetersPerWorkerPerSec: number;
     ploughWorkPerSquareMeter: number;
@@ -457,7 +459,9 @@ function generateRust(): string {
     `pub const CARPENTER_TIMBER_COST_MULTIPLIER: f64 = ${rustF64(b.production.carpenterTimberCostMultiplier)};`,
     '',
     `pub const FARM_MIN_FIELD_AREA: f64 = ${rustF64(b.farming.minFieldArea)};`,
-    `pub const FARM_MAX_FIELD_AREA: f64 = ${rustF64(b.farming.maxFieldArea)};`,
+    `pub const FARM_OPTIMAL_FIELD_AREA: f64 = ${rustF64(b.farming.optimalFieldArea)};`,
+    `pub const FARM_LARGE_FIELD_EFFICIENCY_EXPONENT: f64 = ${rustF64(b.farming.largeFieldEfficiencyExponent)};`,
+    `pub const FARM_LARGE_FIELD_EFFICIENCY_FLOOR: f64 = ${rustF64(b.farming.largeFieldEfficiencyFloor)};`,
     `pub const FARM_MIN_FIELD_EDGE: f64 = ${rustF64(b.farming.minFieldEdge)};`,
     `pub const FARM_WORK_METERS_PER_WORKER_PER_SEC: f64 = ${rustF64(b.farming.workMetersPerWorkerPerSec)};`,
     `pub const FARM_PLOUGH_WORK_PER_SQUARE_METER: f64 = ${rustF64(b.farming.ploughWorkPerSquareMeter)};`,
@@ -815,7 +819,9 @@ function generateTypeScript(): string {
     `export const CARPENTER_TIMBER_COST_MULTIPLIER = ${b.production.carpenterTimberCostMultiplier};`,
     '',
     `export const FARM_MIN_FIELD_AREA = ${b.farming.minFieldArea};`,
-    `export const FARM_MAX_FIELD_AREA = ${b.farming.maxFieldArea};`,
+    `export const FARM_OPTIMAL_FIELD_AREA = ${b.farming.optimalFieldArea};`,
+    `export const FARM_LARGE_FIELD_EFFICIENCY_EXPONENT = ${b.farming.largeFieldEfficiencyExponent};`,
+    `export const FARM_LARGE_FIELD_EFFICIENCY_FLOOR = ${b.farming.largeFieldEfficiencyFloor};`,
     `export const FARM_MIN_FIELD_EDGE = ${b.farming.minFieldEdge};`,
     `export const FARM_WORK_METERS_PER_WORKER_PER_SEC = ${b.farming.workMetersPerWorkerPerSec};`,
     `export const FARM_PLOUGH_WORK_PER_SQUARE_METER = ${b.farming.ploughWorkPerSquareMeter};`,
