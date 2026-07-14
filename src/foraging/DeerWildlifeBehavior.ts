@@ -1,5 +1,7 @@
 export type DeerBehaviorMode = 'idle' | 'graze' | 'walk' | 'flee';
 
+export type DeerSex = 'doe' | 'stag';
+
 export type DeerObserver = {
   x: number;
   z: number;
@@ -75,6 +77,30 @@ export function chooseInitialDeerMode(random: () => number): DeerBehaviorMode {
 
 export function chooseRestDuration(random: () => number): number {
   return lerp(MIN_REST_SECONDS, MAX_REST_SECONDS, random());
+}
+
+/**
+ * Keeps small resource herds doe-heavy while guaranteeing that mixed herds show
+ * both models. Five animals resolve to one stag and four does.
+ */
+export function createHerdSexDistribution(count: number, random: () => number): DeerSex[] {
+  const herdSize = Math.max(0, Math.floor(count));
+  if (herdSize === 0) return [];
+  if (herdSize === 1) return ['doe'];
+
+  const stagCount = Math.min(herdSize - 1, Math.max(1, Math.round(herdSize * 0.2)));
+  const distribution: DeerSex[] = [
+    ...Array.from({ length: stagCount }, () => 'stag' as const),
+    ...Array.from({ length: herdSize - stagCount }, () => 'doe' as const),
+  ];
+
+  for (let index = distribution.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    const current = distribution[index];
+    distribution[index] = distribution[swapIndex];
+    distribution[swapIndex] = current;
+  }
+  return distribution;
 }
 
 function updateWalking(

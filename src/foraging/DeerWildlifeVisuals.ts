@@ -7,9 +7,11 @@ import type { ForagingSite } from './ForagingLayout.ts';
 import {
   chooseInitialDeerMode,
   chooseRestDuration,
+  createHerdSexDistribution,
   type DeerBehaviorMode,
   type DeerMotionState,
   type DeerObserver,
+  type DeerSex,
   updateDeerMotion,
 } from './DeerWildlifeBehavior.ts';
 
@@ -28,9 +30,19 @@ type DeerVisual = {
   motion: DeerMotionState;
 };
 
+type DeerModelSource = {
+  scene: THREE.Group;
+  clips: ReturnType<typeof resolveAnimationClips>;
+  bounds: THREE.Box3;
+  sourceHeight: number;
+  targetHeight: number;
+};
+
 export type DeerWildlifeVisuals = {
   group: THREE.Group;
   deerCount: number;
+  doeCount: number;
+  stagCount: number;
   update: (
     dtSeconds: number,
     firstPersonObserver: DeerObserver | null,
@@ -39,10 +51,12 @@ export type DeerWildlifeVisuals = {
   dispose: () => void;
 };
 
-const DEER_MODEL_URL = '/assets/models/deer/quaternius-deer.glb';
+const DOE_MODEL_URL = '/assets/models/deer/quaternius-deer.glb';
+const STAG_MODEL_URL = '/assets/models/deer/quaternius-stag.glb';
 const DEER_PER_GAME_SITE = 5;
 const HERD_SPAWN_RADIUS = 12;
-const DEER_TARGET_HEIGHT = 1.7;
+const DOE_TARGET_HEIGHT = 1.7;
+const STAG_TARGET_HEIGHT = 2;
 const CLOSE_WORLD_MAX_CAMERA_DISTANCE = 210;
 const TAU = Math.PI * 2;
 
@@ -69,43 +83,53 @@ export async function createDeerWildlifeVisuals(
     return {
       group,
       deerCount: 0,
+      doeCount: 0,
+      stagCount: 0,
       update: () => undefined,
       dispose: () => undefined,
     };
   }
 
-  const gltf = await new GLTFLoader().loadAsync(DEER_MODEL_URL);
-  const clips = resolveAnimationClips(gltf.animations);
-  const sourceBounds = new THREE.Box3().setFromObject(gltf.scene);
-  const sourceHeight = sourceBounds.max.y - sourceBounds.min.y;
-  if (!Number.isFinite(sourceHeight) || sourceHeight <= 0.001) {
-    throw new Error('The deer model has invalid bounds.');
-  }
+  const [doeSource, stagSource] = await Promise.all([
+    loadDeerModel(DOE_MODEL_URL, DOE_TARGET_HEIGHT, 'doe'),
+    loadDeerModel(STAG_MODEL_URL, STAG_TARGET_HEIGHT, 'stag'),
+  ]);
+  const modelSources: Record<DeerSex, DeerModelSource> = {
+    doe: doeSource,
+    stag: stagSource,
+  };
 
   const rng = mulberry32(seed ^ 0xd33f51);
   const deer: DeerVisual[] = [];
+  let doeCount = 0;
+  let stagCount = 0;
 
   for (const site of gameSites) {
     const spawnPoints = createHerdSpawnPoints(site, rng, isBlockedAt);
-    for (const spawn of spawnPoints) {
-      const model = cloneSkinned(gltf.scene) as THREE.Group;
+    const distribution = createHerdSexDistribution(spawnPoints.length, rng);
+    for (let index = 0; index < spawnPoints.length; index++) {
+      const spawn = spawnPoints[index];
+      const sex = distribution[index];
+      const source = modelSources[sex];
+      const model = cloneSkinned(source.scene) as THREE.Group;
       const sizeVariation = THREE.MathUtils.lerp(0.9, 1.08, rng());
-      const modelScale = (DEER_TARGET_HEIGHT / sourceHeight) * sizeVariation;
+      const modelScale = (source.targetHeight / source.sourceHeight) * sizeVariation;
       model.scale.setScalar(modelScale);
-      model.position.y = -sourceBounds.min.y * modelScale + 0.025;
+      model.position.y = -source.bounds.min.y * modelScale + 0.025;
       configureModelMeshes(model);
 
       const root = new THREE.Group();
-      root.name = 'Rigged roaming deer';
+      root.name = sex === 'stag' ? 'Rigged roaming stag' : 'Rigged roaming doe';
+      root.userData.deerSex = sex;
       root.add(model);
       group.add(root);
 
       const mixer = new THREE.AnimationMixer(model);
       const actions: DeerAnimationSet = {
-        idle: mixer.clipAction(clips.idle, model),
-        graze: mixer.clipAction(clips.graze, model),
-        walk: mixer.clipAction(clips.walk, model),
-        flee: mixer.clipAction(clips.flee, model),
+        idle: mixer.clipAction(source.clips.idle, model),
+        graze: mixer.clipAction(source.clips.graze, model),
+        walk: mixer.clipAction(source.clips.walk, model),
+        flee: mixer.clipAction(source.clips.flee, model),
       };
       configureActions(actions);
 
@@ -131,8 +155,11 @@ export async function createDeerWildlifeVisuals(
       root.position.set(spawn.x, terrain.getHeightAt(spawn.x, spawn.z), spawn.z);
       root.rotation.y = heading;
       deer.push({ root, mixer, actions, activeMode: initialMode, motion });
+      if (sex === 'stag') stagCount++;
+      else doeCount++;
     }
   }
+  group.userData.herdComposition = { doeCount, stagCount };
 
   const update = (
     dtSeconds: number,
@@ -164,6 +191,8 @@ export async function createDeerWildlifeVisuals(
   return {
     group,
     deerCount: deer.length,
+    doeCount,
+    stagCount,
     update,
     dispose: () => {
       for (const visual of deer) {
@@ -171,8 +200,29 @@ export async function createDeerWildlifeVisuals(
         visual.mixer.uncacheRoot(visual.root.children[0]);
       }
       group.clear();
-      disposeModelResources(gltf.scene);
+      disposeModelResources(doeSource.scene);
+      disposeModelResources(stagSource.scene);
     },
+  };
+}
+
+async function loadDeerModel(
+  url: string,
+  targetHeight: number,
+  label: DeerSex,
+): Promise<DeerModelSource> {
+  const gltf = await new GLTFLoader().loadAsync(url);
+  const bounds = new THREE.Box3().setFromObject(gltf.scene);
+  const sourceHeight = bounds.max.y - bounds.min.y;
+  if (!Number.isFinite(sourceHeight) || sourceHeight <= 0.001) {
+    throw new Error(`The ${label} model has invalid bounds.`);
+  }
+  return {
+    scene: gltf.scene,
+    clips: resolveAnimationClips(gltf.animations),
+    bounds,
+    sourceHeight,
+    targetHeight,
   };
 }
 

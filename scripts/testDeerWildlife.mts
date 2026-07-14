@@ -6,6 +6,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import {
   DEER_FLEE_TRIGGER_DISTANCE,
   DEER_ROAM_RADIUS,
+  createHerdSexDistribution,
   type DeerMotionState,
   updateDeerMotion,
 } from '../src/foraging/DeerWildlifeBehavior.ts';
@@ -17,6 +18,12 @@ function fixedRandom(values: number[]): () => number {
     index++;
     return value;
   };
+}
+
+{
+  const distribution = createHerdSexDistribution(5, fixedRandom([0.18, 0.74, 0.42, 0.91]));
+  assert.equal(distribution.filter((sex) => sex === 'stag').length, 1, 'a five-deer herd should have one stag');
+  assert.equal(distribution.filter((sex) => sex === 'doe').length, 4, 'a five-deer herd should remain doe-heavy');
 }
 
 function createMotion(overrides: Partial<DeerMotionState> = {}): DeerMotionState {
@@ -67,42 +74,50 @@ function createMotion(overrides: Partial<DeerMotionState> = {}): DeerMotionState
   assert.equal(motion.mode, 'walk', 'deer should return to roaming when the observer is gone');
 }
 
-const modelBytes = fs.readFileSync('public/assets/models/deer/quaternius-deer.glb');
-const modelBuffer = modelBytes.buffer.slice(
-  modelBytes.byteOffset,
-  modelBytes.byteOffset + modelBytes.byteLength,
-) as ArrayBuffer;
-const gltf = await new Promise<Awaited<ReturnType<GLTFLoader['loadAsync']>>>((resolve, reject) => {
-  new GLTFLoader().parse(modelBuffer, '', resolve, reject);
-});
+for (const asset of [
+  { label: 'doe', path: 'public/assets/models/deer/quaternius-deer.glb', minimumJoints: 40 },
+  { label: 'stag', path: 'public/assets/models/deer/quaternius-stag.glb', minimumJoints: 35 },
+]) {
+  const modelBytes = fs.readFileSync(asset.path);
+  const modelBuffer = modelBytes.buffer.slice(
+    modelBytes.byteOffset,
+    modelBytes.byteOffset + modelBytes.byteLength,
+  ) as ArrayBuffer;
+  const gltf = await new Promise<Awaited<ReturnType<GLTFLoader['loadAsync']>>>((resolve, reject) => {
+    new GLTFLoader().parse(modelBuffer, '', resolve, reject);
+  });
 
-const directClipNames = new Set(
-  gltf.animations.filter((clip) => !clip.name.includes('|')).map((clip) => clip.name),
-);
-for (const clipName of ['Idle', 'Eating', 'Walk', 'Gallop']) {
-  assert.ok(directClipNames.has(clipName), `deer GLB should contain the ${clipName} clip`);
+  const directClipNames = new Set(
+    gltf.animations.filter((clip) => !clip.name.includes('|')).map((clip) => clip.name),
+  );
+  for (const clipName of ['Idle', 'Eating', 'Walk', 'Gallop']) {
+    assert.ok(directClipNames.has(clipName), `${asset.label} GLB should contain the ${clipName} clip`);
+  }
+
+  let sourceSkinnedMesh: THREE.SkinnedMesh | null = null;
+  gltf.scene.traverse((object) => {
+    const skinnedMesh = object as THREE.SkinnedMesh;
+    if (!sourceSkinnedMesh && skinnedMesh.isSkinnedMesh) sourceSkinnedMesh = skinnedMesh;
+  });
+  assert.ok(sourceSkinnedMesh, `${asset.label} GLB should contain a skinned mesh`);
+  assert.ok(
+    sourceSkinnedMesh.skeleton.bones.length >= asset.minimumJoints,
+    `${asset.label} GLB should retain its full articulated rig`,
+  );
+
+  const clonedScene = cloneSkinned(gltf.scene);
+  let clonedSkinnedMesh: THREE.SkinnedMesh | null = null;
+  clonedScene.traverse((object) => {
+    const skinnedMesh = object as THREE.SkinnedMesh;
+    if (!clonedSkinnedMesh && skinnedMesh.isSkinnedMesh) clonedSkinnedMesh = skinnedMesh;
+  });
+  assert.ok(clonedSkinnedMesh, `the ${asset.label} runtime clone should remain skinned`);
+  assert.notEqual(
+    clonedSkinnedMesh.skeleton,
+    sourceSkinnedMesh.skeleton,
+    `each ${asset.label} should receive an independent skeleton for animation`,
+  );
 }
-
-let sourceSkinnedMesh: THREE.SkinnedMesh | null = null;
-gltf.scene.traverse((object) => {
-  const skinnedMesh = object as THREE.SkinnedMesh;
-  if (!sourceSkinnedMesh && skinnedMesh.isSkinnedMesh) sourceSkinnedMesh = skinnedMesh;
-});
-assert.ok(sourceSkinnedMesh, 'deer GLB should contain a skinned mesh');
-assert.ok(sourceSkinnedMesh.skeleton.bones.length >= 40, 'deer GLB should retain its full articulated rig');
-
-const clonedScene = cloneSkinned(gltf.scene);
-let clonedSkinnedMesh: THREE.SkinnedMesh | null = null;
-clonedScene.traverse((object) => {
-  const skinnedMesh = object as THREE.SkinnedMesh;
-  if (!clonedSkinnedMesh && skinnedMesh.isSkinnedMesh) clonedSkinnedMesh = skinnedMesh;
-});
-assert.ok(clonedSkinnedMesh, 'the runtime clone should remain skinned');
-assert.notEqual(
-  clonedSkinnedMesh.skeleton,
-  sourceSkinnedMesh.skeleton,
-  'each deer should receive an independent skeleton for animation',
-);
 
 const mapIconSource = fs.readFileSync('src/map/ForagingMapIcons.ts', 'utf8');
 assert.match(mapIconSource, /GAME_ICON_SVG/, 'the high-zoom game resource marker should remain defined');
