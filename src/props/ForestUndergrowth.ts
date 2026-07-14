@@ -23,6 +23,11 @@ import { TREE_SHADOW_CAST_LAYER } from '../scene/SceneLayers.ts';
 import type { RendererBackendKind } from '../scene/RendererBackend.ts';
 import { seedThreeLeafUrl } from '../vegetation/seedthree/seedThreeTextures.ts';
 import {
+  BILBERRY_BUSH_CARD_SPEC,
+  BILBERRY_BUSH_WIDTH_FACTOR,
+  sampleBilberryBushScale,
+} from '../vegetation/bilberryBushVisual.ts';
+import {
   CENTRAL_CLEARING_RADIUS,
   type ForestCore,
   type ForestSpawnConfig,
@@ -151,7 +156,7 @@ const CARD_FILES: Record<UndergrowthKind, UndergrowthTextureFiles> = {
 };
 
 const CARD_GEOMETRY = {
-  bush: { quads: 7, width: 0.82, tiltMin: 0.14, tiltSpan: 0.42, heightMin: 0.7, heightSpan: 0.45, baseSpread: 0.12 },
+  bush: BILBERRY_BUSH_CARD_SPEC,
   fern: { quads: 8, width: 0.62, tiltMin: 0.38, tiltSpan: 0.42, heightMin: 0.82, heightSpan: 0.34, baseSpread: 0.08 },
   juniper: { quads: 6, width: 0.88, tiltMin: 0.18, tiltSpan: 0.48, heightMin: 0.72, heightSpan: 0.42, baseSpread: 0.1 },
 } satisfies Record<UndergrowthKind, CardGeometrySpec>;
@@ -411,7 +416,11 @@ function composeUndergrowthMatrix(
       'YXZ',
     ),
   );
-  const widthFactor = placement.kind === 'fern' ? 1.15 : placement.kind === 'juniper' ? 1.35 : 1.28;
+  const widthFactor = placement.kind === 'fern'
+    ? 1.15
+    : placement.kind === 'juniper'
+      ? 1.35
+      : BILBERRY_BUSH_WIDTH_FACTOR;
   const widthScale = placement.scale * widthFactor * THREE.MathUtils.lerp(0.9, 1.14, rng());
   const heightScale = placement.scale * THREE.MathUtils.lerp(0.92, 1.14, rng());
   scaleVector.set(widthScale, heightScale, widthScale);
@@ -429,10 +438,9 @@ function pickUndergrowthKind(rng: () => number, density: number): UndergrowthKin
 }
 
 function sampleUndergrowthScale(kind: UndergrowthKind, density: number, rng: () => number): number {
-  const densityMul = THREE.MathUtils.lerp(1.02, 1.22, density) * 1.24;
   switch (kind) {
     case 'bush':
-      return THREE.MathUtils.lerp(0.62, 1.08, Math.pow(rng(), 0.78)) * densityMul;
+      return sampleBilberryBushScale(density, rng);
     case 'fern':
       return THREE.MathUtils.lerp(0.82, 1.36, Math.pow(rng(), 0.7)) * THREE.MathUtils.lerp(0.96, 1.16, density);
     case 'juniper':
@@ -609,8 +617,8 @@ function createUndergrowthShadowGeometry(kind: UndergrowthKind): THREE.BufferGeo
       geometry.translate(0, 0.12, 0);
       break;
     case 'bush':
-      geometry.scale(0.78, 0.3, 0.78);
-      geometry.translate(0, 0.1, 0);
+      geometry.scale(1.14, 0.48, 1.14);
+      geometry.translate(0, 0.14, 0);
       break;
     default: {
       const exhaustive: never = kind;

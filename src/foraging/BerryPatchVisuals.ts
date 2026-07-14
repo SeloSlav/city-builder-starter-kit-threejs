@@ -4,6 +4,10 @@ import type { RendererBackendKind } from '../scene/RendererBackend.ts';
 import { mulberry32 } from '../props/forestField.ts';
 import { seedThreeLeafUrl } from '../vegetation/seedthree/seedThreeTextures.ts';
 import {
+  BILBERRY_BUSH_CARD_SPEC,
+  sampleBerryPatchClumpScale,
+} from '../vegetation/bilberryBushVisual.ts';
+import {
   addSeedThreeGroundCoverInstanceAttributes,
   createSeedThreeCardClumpGeometry,
   createSeedThreeGroundCoverMaterial,
@@ -28,8 +32,8 @@ export type BerryPatchVisuals = {
 };
 
 const TAU = Math.PI * 2;
-const CLUMPS_PER_PATCH = 30;
-const PATCH_RADIUS = 8.8;
+const CLUMPS_PER_PATCH = 22;
+const PATCH_RADIUS = 9.6;
 
 /**
  * Turns the authoritative berry resource sites into visible SeedThree bilberry beds.
@@ -59,15 +63,7 @@ export async function createBerryPatchVisuals(
     [0.3, 0.44, 0.16],
     0.15,
   );
-  const geometry = createSeedThreeCardClumpGeometry({
-    quads: 7,
-    width: 0.84,
-    tiltMin: 0.12,
-    tiltSpan: 0.4,
-    heightMin: 0.7,
-    heightSpan: 0.46,
-    baseSpread: 0.12,
-  });
+  const geometry = createSeedThreeCardClumpGeometry(BILBERRY_BUSH_CARD_SPEC);
   const capacity = Math.max(placements.length, 1);
   const attributes = addSeedThreeGroundCoverInstanceAttributes(geometry, capacity);
   const mesh = new THREE.InstancedMesh(geometry, material, capacity);
@@ -158,14 +154,14 @@ function createBerryClumpPlacements(
       const x = site.x + Math.cos(angle) * radius * THREE.MathUtils.lerp(0.72, 1, rng());
       const z = site.z + Math.sin(angle) * radius * THREE.MathUtils.lerp(0.78, 1.08, rng());
       if (isBlockedAt?.(x, z)) continue;
-      if (!hasMinimumClumpDistance(patch, x, z, 0.9 + rng() * 0.5)) continue;
+      if (!hasMinimumClumpDistance(patch, x, z, 1.25 + rng() * 0.65)) continue;
 
       patch.push({
         nodeId,
         x,
         z,
         yaw: rng() * TAU,
-        scale: THREE.MathUtils.lerp(0.7, 1.2, Math.pow(rng(), 0.72)),
+        scale: sampleBerryPatchClumpScale(rng),
       });
     }
 
