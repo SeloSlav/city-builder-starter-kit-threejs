@@ -11,6 +11,7 @@ import { renderQuarryInspector } from './quarryRenderer.ts';
 import { renderResidenceInspector } from './residenceRenderer.ts';
 import { renderRiverInspector } from './riverRenderer.ts';
 import { renderFarmFieldInspector } from './farmFieldRenderer.ts';
+import { renderPastureInspector } from './pastureRenderer.ts';
 
 export type InspectorLaborView = {
   visible: boolean;
@@ -82,6 +83,8 @@ export function renderInspectableTarget(
       return renderBackyardInspector(target, context);
     case 'farm-field':
       return renderFarmFieldInspector(target, context);
+    case 'pasture':
+      return renderPastureInspector(target, context);
     case 'river':
       return renderRiverInspector(target);
     default: {

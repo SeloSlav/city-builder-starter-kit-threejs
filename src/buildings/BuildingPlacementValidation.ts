@@ -1,4 +1,4 @@
-import type { BuildingKind, BuildingState, BurgageZoneState, FarmFieldState, ForagingNodeState, ResidenceState, ResourceNodeState } from '../resources/types.ts';
+import type { BuildingKind, BuildingState, BurgageZoneState, FarmFieldState, ForagingNodeState, PastureState, ResidenceState, ResourceNodeState } from '../resources/types.ts';
 import type { ResourceTotals } from '../resources/resourceTotals.ts';
 import { canAffordBuilding } from '../resources/buildingEconomy.ts';
 import { getBuildingDefinition } from '../resources/buildings.ts';
@@ -21,6 +21,7 @@ export type BuildingPlacementFailureReason =
   | 'overlapping_extent'
   | 'within_residence_zone'
   | 'within_farm_field'
+  | 'within_pasture'
   | 'on_quarry_pit'
   | 'no_quarry_in_range'
   | 'no_game_in_range'
@@ -42,6 +43,7 @@ type BuildingPlacementContext = {
   residences: Iterable<ResidenceState>;
   burgageZones: Iterable<BurgageZoneState>;
   farmFields?: Iterable<FarmFieldState>;
+  pastures?: Iterable<PastureState>;
   quarries: Iterable<ResourceNodeState>;
   foragingNodes: Iterable<ForagingNodeState>;
   stockpile: Pick<ResourceTotals, 'timber' | 'stone'>;
@@ -94,6 +96,11 @@ export function validateBuildingPlacement(
   for (const field of context.farmFields ?? []) {
     if (convexPolygonsOverlap2(footprint, field.corners)) {
       return { ok: false, reason: 'within_farm_field' };
+    }
+  }
+  for (const pasture of context.pastures ?? []) {
+    if (convexPolygonsOverlap2(footprint, pasture.corners)) {
+      return { ok: false, reason: 'within_pasture' };
     }
   }
 

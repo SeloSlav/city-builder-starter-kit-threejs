@@ -1,13 +1,17 @@
 import * as THREE from 'three';
 import {
+  CATTLE_MAX_SLOPE_DEGREES,
   FARM_MAX_ACCEPTED_SLOPE_DEGREES,
   FARM_MIN_FIELD_AREA,
   FARM_MIN_FIELD_EDGE,
   FARM_OPTIMAL_FIELD_AREA,
+  LIVESTOCK_MIN_PASTURE_AREA,
+  LIVESTOCK_MIN_PASTURE_EDGE,
+  SHEEP_MAX_SLOPE_DEGREES,
 } from '../generated/gameBalance.ts';
 import { sampleAuthoritativeHydrologyScore } from '../hydrology/sampleAuthoritativeHydrology.ts';
 import { buildingFootprintPolygonFromState, burgageZonePolygon } from '../placement/placementConflicts.ts';
-import type { GameState, FarmCrop, BuildingState } from '../resources/types.ts';
+import type { BuildingState, FarmCrop, GameState } from '../resources/types.ts';
 import type { TerrainProjector } from '../terrain/TerrainProjector.ts';
 import { convexPolygonsOverlap2, type Point2 } from '../utils/polygonGeometry.ts';
 import { FarmFieldPreview } from './FarmFieldMarkers.ts';
@@ -26,9 +30,18 @@ import {
 const MIN_CLICK_DISTANCE = 1.5;
 const CROPS: readonly FarmCrop[] = ['rye', 'oats', 'fallow'];
 
+export type LandParcelMode = 'field' | 'pasture';
 export type FarmFieldPlacementFailureReason =
-  | 'too_small' | 'edge_too_short' | 'too_steep' | 'no_farmstead'
-  | 'water' | 'quarry' | 'building' | 'residence' | 'field';
+  | 'too_small'
+  | 'edge_too_short'
+  | 'too_steep'
+  | 'no_farmstead'
+  | 'water'
+  | 'quarry'
+  | 'building'
+  | 'residence'
+  | 'field'
+  | 'pasture';
 
 type Validation =
   | { ok: true; corners: FarmFieldCorners; farmstead: BuildingState; slope: number; moisture: number }
@@ -42,7 +55,17 @@ type FarmFieldToolOptions = {
   getHeightAt: (x: number, z: number) => number;
   isWaterAt: (x: number, z: number) => boolean;
   isQuarryPitAt: (x: number, z: number) => boolean;
-  onCommit: (input: { farmsteadId: string; corners: FarmFieldCorners; crop: FarmCrop; averageSlopeDegrees: number }) => Promise<void> | void;
+  onCommit: (input: {
+    farmsteadId: string;
+    corners: FarmFieldCorners;
+    crop: FarmCrop;
+    averageSlopeDegrees: number;
+  }) => Promise<void> | void;
+  onCommitPasture: (input: {
+    farmsteadId: string;
+    corners: FarmFieldCorners;
+    averageSlopeDegrees: number;
+  }) => Promise<void> | void;
   onModeChanged: () => void;
   onPlacementRejected?: (reason: FarmFieldPlacementFailureReason) => void;
   onPlacementFailed?: (message: string) => void;
@@ -60,6 +83,7 @@ export class FarmFieldTool {
   private readonly options: FarmFieldToolOptions;
   private readonly preview: FarmFieldPreview;
   private enabled = false;
+  private mode: LandParcelMode = 'field';
   private points: Point2[] = [];
   private hoverPoint: Point2 | null = null;
   private fixedCorners: FarmFieldCorners | null = null;
@@ -86,6 +110,18 @@ export class FarmFieldTool {
 
   isEnabled(): boolean {
     return this.enabled;
+  }
+
+  getMode(): LandParcelMode {
+    return this.mode;
+  }
+
+  setMode(mode: LandParcelMode): void {
+    if (this.mode !== mode) {
+      this.mode = mode;
+      this.clearDraft();
+    }
+    this.setEnabled(true);
   }
 
   hasDraft(): boolean {
@@ -118,7 +154,7 @@ export class FarmFieldTool {
   }
 
   cycleCrop(): void {
-    if (!this.enabled) return;
+    if (!this.enabled || this.mode !== 'field') return;
     const index = CROPS.indexOf(this.crop);
     this.crop = CROPS[(index + 1) % CROPS.length];
     this.refreshPreview();
@@ -132,15 +168,22 @@ export class FarmFieldTool {
   }
 
   getStatusDetail(): string {
-    if (this.points.length === 0 && !this.fixedCorners) return `Click to start the field baseline · crop: ${cropLabel(this.crop)} (C to change) · full yield through ${FARM_OPTIMAL_FIELD_AREA.toLocaleString()} m²`;
-    if (this.points.length === 1) return 'Click to set the other end of the field baseline';
-    if (!this.fixedCorners) return 'Click to set field depth';
+    const parcel = this.mode === 'pasture' ? 'pasture' : 'field';
+    if (this.points.length === 0 && !this.fixedCorners) {
+      return this.mode === 'pasture'
+        ? 'Click to start the pasture baseline · draw within a livestock work extent'
+        : `Click to start the field baseline · crop: ${cropLabel(this.crop)} (C to change) · full yield through ${FARM_OPTIMAL_FIELD_AREA.toLocaleString()} m²`;
+    }
+    if (this.points.length === 1) return `Click to set the other end of the ${parcel} baseline`;
+    if (!this.fixedCorners) return `Click to set ${parcel} depth`;
     if (!this.validation.ok) return this.failureDetail(this.validation.reason);
     const area = Math.round(fieldArea(this.validation.corners));
-    const sizeEfficiency = Math.round(fieldSizeEfficiency(area) * 100);
     const slope = this.validation.slope.toFixed(1);
     const moisture = Math.round(this.validation.moisture * 100);
-    return `${cropLabel(this.crop)} · ${area} m² · ${sizeEfficiency}% size efficiency · ${slope}° slope · ${moisture}% moisture · hammer or Enter to place`;
+    if (this.mode === 'pasture') {
+      return `${area} m² pasture · ${slope}° slope · ${moisture}% moisture · hammer or Enter to place`;
+    }
+    return `${cropLabel(this.crop)} · ${area} m² · ${Math.round(fieldSizeEfficiency(area) * 100)}% size efficiency · ${slope}° slope · ${moisture}% moisture · hammer or Enter to place`;
   }
 
   getBuildButtonPosition(): { clientX: number; clientY: number } | null {
@@ -158,26 +201,32 @@ export class FarmFieldTool {
 
   commitDraft(): void {
     if (!this.validation.ok) {
-      if (!this.validation.ok) this.options.onPlacementRejected?.(this.validation.reason);
+      this.options.onPlacementRejected?.(this.validation.reason);
       return;
     }
     const commit = this.validation;
-    void Promise.resolve(this.options.onCommit({
-      farmsteadId: commit.farmstead.id,
-      corners: commit.corners,
-      crop: this.crop,
-      averageSlopeDegrees: commit.slope,
-    })).then(() => {
+    const pending = this.mode === 'pasture'
+      ? this.options.onCommitPasture({
+          farmsteadId: commit.farmstead.id,
+          corners: commit.corners,
+          averageSlopeDegrees: commit.slope,
+        })
+      : this.options.onCommit({
+          farmsteadId: commit.farmstead.id,
+          corners: commit.corners,
+          crop: this.crop,
+          averageSlopeDegrees: commit.slope,
+        });
+    void Promise.resolve(pending).then(() => {
       this.clearDraft();
       this.options.onModeChanged();
     }).catch((error: unknown) => {
-      this.options.onPlacementFailed?.(error instanceof Error ? error.message : 'Field placement failed.');
+      this.options.onPlacementFailed?.(error instanceof Error ? error.message : 'Land parcel placement failed.');
     });
   }
 
   update(): void {
-    if (!this.enabled) return;
-    if (this.options.isBlocked() || !this.pointerDirty) return;
+    if (!this.enabled || this.options.isBlocked() || !this.pointerDirty) return;
     this.pointerDirty = false;
     if (!this.pointerInside) return;
     const point = this.options.terrainProjector.pick(this.pointerClientX, this.pointerClientY);
@@ -225,7 +274,8 @@ export class FarmFieldTool {
     const picked = this.options.terrainProjector.pick(event.clientX, event.clientY);
     if (!picked) return;
     const point = { x: picked.x, z: picked.z };
-    if (this.points.length > 0 && Math.hypot(point.x - this.points[this.points.length - 1].x, point.z - this.points[this.points.length - 1].z) < MIN_CLICK_DISTANCE) return;
+    if (this.points.length > 0
+      && Math.hypot(point.x - this.points[this.points.length - 1].x, point.z - this.points[this.points.length - 1].z) < MIN_CLICK_DISTANCE) return;
     event.preventDefault();
     event.stopPropagation();
     if (this.fixedCorners) {
@@ -261,7 +311,7 @@ export class FarmFieldTool {
       this.commitDraft();
       return;
     }
-    if (event.key.toLowerCase() === 'c') {
+    if (event.key.toLowerCase() === 'c' && this.mode === 'field') {
       event.preventDefault();
       event.stopPropagation();
       this.cycleCrop();
@@ -279,7 +329,7 @@ export class FarmFieldTool {
     this.points = [];
     this.fixedCorners = null;
     this.validation = { ok: false, reason: 'too_small', corners: null };
-    this.preview.show(null, false, this.crop);
+    this.preview.show(null, false, this.mode === 'pasture' ? 'fallow' : this.crop);
   }
 
   private refreshPreview(): void {
@@ -289,23 +339,30 @@ export class FarmFieldTool {
         : null
     );
     this.validation = this.validate(corners);
-    this.preview.show(corners, this.validation.ok, this.crop);
+    this.preview.show(corners, this.validation.ok, this.mode === 'pasture' ? 'fallow' : this.crop);
   }
 
   private validate(corners: FarmFieldCorners | null): Validation {
     if (!corners) return { ok: false, reason: 'too_small', corners: null };
+    const minArea = this.mode === 'pasture' ? LIVESTOCK_MIN_PASTURE_AREA : FARM_MIN_FIELD_AREA;
+    const minEdge = this.mode === 'pasture' ? LIVESTOCK_MIN_PASTURE_EDGE : FARM_MIN_FIELD_EDGE;
     const area = fieldArea(corners);
-    if (area < FARM_MIN_FIELD_AREA) return { ok: false, reason: 'too_small', corners };
-    if (fieldEdgeLengths(corners).some((edge) => edge < FARM_MIN_FIELD_EDGE)) return { ok: false, reason: 'edge_too_short', corners };
+    if (area < minArea) return { ok: false, reason: 'too_small', corners };
+    if (fieldEdgeLengths(corners).some((edge) => edge < minEdge)) {
+      return { ok: false, reason: 'edge_too_short', corners };
+    }
+
     const slope = sampleAverageSlopeDegrees(corners, this.options.getHeightAt);
     const center = fieldCentroid(corners);
     const moisture = sampleAuthoritativeHydrologyScore(center.x, center.z);
-    if (slope > FARM_MAX_ACCEPTED_SLOPE_DEGREES) return { ok: false, reason: 'too_steep', corners, slope, moisture };
     const state = this.options.getState();
     let farmstead: BuildingState | null = null;
-    let distance = Infinity;
+    let distance = Number.POSITIVE_INFINITY;
     for (const building of state.buildings.values()) {
-      if (building.kind !== 'threshing_barn') continue;
+      const eligible = this.mode === 'pasture'
+        ? building.kind === 'pastoral_farmstead' || building.kind === 'swineherd'
+        : building.kind === 'threshing_barn';
+      if (!eligible) continue;
       const next = Math.hypot(building.x - center.x, building.z - center.z);
       if (next <= building.workRadius && next < distance) {
         farmstead = building;
@@ -313,32 +370,61 @@ export class FarmFieldTool {
       }
     }
     if (!farmstead) return { ok: false, reason: 'no_farmstead', corners, slope, moisture };
+    const maxSlope = this.mode === 'pasture'
+      ? state.livestockHerds.get(farmstead.id)?.species === 'cattle'
+        ? CATTLE_MAX_SLOPE_DEGREES
+        : SHEEP_MAX_SLOPE_DEGREES
+      : FARM_MAX_ACCEPTED_SLOPE_DEGREES;
+    if (slope > maxSlope) return { ok: false, reason: 'too_steep', corners, slope, moisture };
+
     const samples = [...corners, center];
-    if (samples.some((point) => this.options.isWaterAt(point.x, point.z))) return { ok: false, reason: 'water', corners, slope, moisture };
-    if (samples.some((point) => this.options.isQuarryPitAt(point.x, point.z))) return { ok: false, reason: 'quarry', corners, slope, moisture };
+    if (samples.some((point) => this.options.isWaterAt(point.x, point.z))) {
+      return { ok: false, reason: 'water', corners, slope, moisture };
+    }
+    if (samples.some((point) => this.options.isQuarryPitAt(point.x, point.z))) {
+      return { ok: false, reason: 'quarry', corners, slope, moisture };
+    }
     for (const building of state.buildings.values()) {
-      if (convexPolygonsOverlap2(corners, buildingFootprintPolygonFromState(building))) return { ok: false, reason: 'building', corners, slope, moisture };
+      if (convexPolygonsOverlap2(corners, buildingFootprintPolygonFromState(building))) {
+        return { ok: false, reason: 'building', corners, slope, moisture };
+      }
     }
     for (const zone of state.burgageZones.values()) {
-      if (convexPolygonsOverlap2(corners, burgageZonePolygon(zone))) return { ok: false, reason: 'residence', corners, slope, moisture };
+      if (convexPolygonsOverlap2(corners, burgageZonePolygon(zone))) {
+        return { ok: false, reason: 'residence', corners, slope, moisture };
+      }
     }
     for (const field of state.farmFields.values()) {
-      if (convexPolygonsOverlap2(corners, field.corners)) return { ok: false, reason: 'field', corners, slope, moisture };
+      if (convexPolygonsOverlap2(corners, field.corners)) {
+        return { ok: false, reason: 'field', corners, slope, moisture };
+      }
+    }
+    for (const pasture of state.pastures.values()) {
+      if (convexPolygonsOverlap2(corners, pasture.corners)) {
+        return { ok: false, reason: 'pasture', corners, slope, moisture };
+      }
     }
     return { ok: true, corners, farmstead, slope, moisture };
   }
 
   private failureDetail(reason: FarmFieldPlacementFailureReason): string {
+    const parcel = this.mode === 'pasture' ? 'Pasture' : 'Field';
     switch (reason) {
-      case 'too_small': return `Field too small · at least ${FARM_MIN_FIELD_AREA} m²`;
-      case 'edge_too_short': return `Each edge must be at least ${FARM_MIN_FIELD_EDGE} m`;
-      case 'too_steep': return `Ground too steep · maximum ${FARM_MAX_ACCEPTED_SLOPE_DEGREES}° average`;
-      case 'no_farmstead': return "Field center must lie within a farmstead's work extent";
-      case 'water': return 'Field cannot cover open water';
-      case 'quarry': return 'Field cannot cover a quarry pit';
-      case 'building': return 'Field overlaps a building';
-      case 'residence': return 'Field overlaps a residence plot';
-      case 'field': return 'Field overlaps existing farmland';
+      case 'too_small':
+        return `${parcel} too small · at least ${this.mode === 'pasture' ? LIVESTOCK_MIN_PASTURE_AREA : FARM_MIN_FIELD_AREA} m²`;
+      case 'edge_too_short':
+        return `Each edge must be at least ${this.mode === 'pasture' ? LIVESTOCK_MIN_PASTURE_EDGE : FARM_MIN_FIELD_EDGE} m`;
+      case 'too_steep': return `Ground too steep for this ${this.mode === 'pasture' ? 'herd' : 'crop'}`;
+      case 'no_farmstead':
+        return this.mode === 'pasture'
+          ? 'Pasture center must lie within a pastoral farmstead or swineherd work extent'
+          : "Field center must lie within a farmstead's work extent";
+      case 'water': return `${parcel} cannot cover open water`;
+      case 'quarry': return `${parcel} cannot cover a quarry pit`;
+      case 'building': return `${parcel} overlaps a building`;
+      case 'residence': return `${parcel} overlaps a residence plot`;
+      case 'field': return `${parcel} overlaps existing farmland`;
+      case 'pasture': return `${parcel} overlaps an existing pasture`;
     }
   }
 }

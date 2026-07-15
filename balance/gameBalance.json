@@ -273,6 +273,54 @@
     "maxAcceptedSlopeDegrees": 18,
     "fieldSalvageFraction": 0
   },
+  "livestock": {
+    "minPastureArea": 64,
+    "minPastureEdge": 6,
+    "pastureSalvageFraction": 0,
+    "cattle": {
+      "starterHerd": 3,
+      "maxHerd": 10,
+      "areaPerHead": 190,
+      "maxSlopeDegrees": 15,
+      "moistureIdeal": 0.58,
+      "moistureTolerance": 0.52,
+      "foodPerCyclePerHead": 0.72,
+      "preservedFoodPerCyclePerHead": 0.18,
+      "grainPerUnsupportedHead": 0.34,
+      "breedingPerCycle": 0.018,
+      "healthRecoveryPerCycle": 0.035,
+      "healthLossPerCycle": 0.08,
+      "fertilityBonus": 0.03,
+      "maxFertilizedFields": 2,
+      "ploughWorkMultiplier": 0.78
+    },
+    "sheep": {
+      "starterHerd": 6,
+      "maxHerd": 18,
+      "areaPerHead": 105,
+      "maxSlopeDegrees": 28,
+      "moistureIdeal": 0.38,
+      "moistureTolerance": 0.72,
+      "foodPerCyclePerHead": 0.32,
+      "preservedFoodPerCyclePerHead": 0.08,
+      "grainPerUnsupportedHead": 0.18,
+      "woolGoldPerCyclePerHead": 0.075,
+      "breedingPerCycle": 0.025,
+      "healthRecoveryPerCycle": 0.04,
+      "healthLossPerCycle": 0.065
+    },
+    "swine": {
+      "starterHerd": 4,
+      "maxHerd": 14,
+      "areaPerHead": 120,
+      "matureTreesPerHead": 2.5,
+      "foodPerCyclePerHead": 0.62,
+      "grainPerUnsupportedHead": 0.5,
+      "breedingPerCycle": 0.022,
+      "healthRecoveryPerCycle": 0.03,
+      "healthLossPerCycle": 0.09
+    }
+  },
   "buildings": {
     "lumber_mill": {
       "label": "Lumber mill",
@@ -440,6 +488,44 @@
       "requiresRoad": true,
       "facesRoad": true,
       "requiresMatureTrees": false,
+      "requiresQuarryStone": false,
+      "requiresGame": false,
+      "requiresBerries": false,
+      "requiresWaterShore": false,
+      "requiresHillside": false
+    },
+    "pastoral_farmstead": {
+      "label": "Pastoral farmstead",
+      "cost": { "timber": 40, "stone": 20 },
+      "storage": { "timber": 0, "firewood": 0, "stone": 0, "food": 120, "grain": 90, "preservedFood": 70 },
+      "workRadius": 110,
+      "pickRadius": 10,
+      "harvestInterval": 10,
+      "regrowRatePerSecond": 0,
+      "maxLabor": 3,
+      "acceptsLabor": true,
+      "requiresRoad": true,
+      "facesRoad": true,
+      "requiresMatureTrees": false,
+      "requiresQuarryStone": false,
+      "requiresGame": false,
+      "requiresBerries": false,
+      "requiresWaterShore": false,
+      "requiresHillside": false
+    },
+    "swineherd": {
+      "label": "Woodland swineherd",
+      "cost": { "timber": 34, "stone": 10 },
+      "storage": { "timber": 0, "firewood": 0, "stone": 0, "food": 150, "grain": 120 },
+      "workRadius": 120,
+      "pickRadius": 9,
+      "harvestInterval": 12,
+      "regrowRatePerSecond": 0,
+      "maxLabor": 2,
+      "acceptsLabor": true,
+      "requiresRoad": false,
+      "facesRoad": false,
+      "requiresMatureTrees": true,
       "requiresQuarryStone": false,
       "requiresGame": false,
       "requiresBerries": false,
@@ -645,6 +731,13 @@
       "foodSelfShare": 0,
       "foodPerPersonPerSec": 0,
       "goldPerPersonPerSec": 0.015
+    },
+    "hen_yard": {
+      "label": "Hen yard",
+      "cost": { "timber": 6, "stone": 1 },
+      "foodSelfShare": 0.82,
+      "foodPerPersonPerSec": 0.0105,
+      "goldPerPersonPerSec": 0.002
     }
   }
 }

@@ -56,6 +56,26 @@ type BackyardGardenBalance = {
   goldPerPersonPerSec: number;
 };
 
+type LivestockSpeciesBalance = {
+  starterHerd: number;
+  maxHerd: number;
+  areaPerHead: number;
+  foodPerCyclePerHead: number;
+  grainPerUnsupportedHead: number;
+  breedingPerCycle: number;
+  healthRecoveryPerCycle: number;
+  healthLossPerCycle: number;
+  maxSlopeDegrees?: number;
+  moistureIdeal?: number;
+  moistureTolerance?: number;
+  preservedFoodPerCyclePerHead?: number;
+  woolGoldPerCyclePerHead?: number;
+  fertilityBonus?: number;
+  maxFertilizedFields?: number;
+  ploughWorkMultiplier?: number;
+  matureTreesPerHead?: number;
+};
+
 type MarketplaceGoldBuyOffer = {
   id: string;
   kind: 'goldBuy';
@@ -260,6 +280,14 @@ export type GameBalance = {
     maxAcceptedSlopeDegrees: number;
     fieldSalvageFraction: number;
   };
+  livestock: {
+    minPastureArea: number;
+    minPastureEdge: number;
+    pastureSalvageFraction: number;
+    cattle: LivestockSpeciesBalance;
+    sheep: LivestockSpeciesBalance;
+    swine: LivestockSpeciesBalance;
+  };
   buildings: Record<string, BuildingBalance>;
   backyardGardens: Record<string, BackyardGardenBalance>;
   marketplaceTrade: MarketplaceTradeBalance;
@@ -295,6 +323,8 @@ const simKindByKind: Record<string, string | null> = {
   carpenter: 'Carpenter',
   ferry_landing: 'FerryLanding',
   vineyard: 'Vineyard',
+  pastoral_farmstead: 'PastoralFarmstead',
+  swineherd: 'Swineherd',
 };
 
 function rustF64(value: number): string {
@@ -480,6 +510,47 @@ function generateRust(): string {
     `pub const FARM_MAX_ACCEPTED_SLOPE_DEGREES: f64 = ${rustF64(b.farming.maxAcceptedSlopeDegrees)};`,
     `pub const FARM_FIELD_SALVAGE_FRACTION: f64 = ${rustF64(b.farming.fieldSalvageFraction)};`,
     '',
+    `pub const LIVESTOCK_MIN_PASTURE_AREA: f64 = ${rustF64(b.livestock.minPastureArea)};`,
+    `pub const LIVESTOCK_MIN_PASTURE_EDGE: f64 = ${rustF64(b.livestock.minPastureEdge)};`,
+    `pub const LIVESTOCK_PASTURE_SALVAGE_FRACTION: f64 = ${rustF64(b.livestock.pastureSalvageFraction)};`,
+    `pub const CATTLE_STARTER_HERD: u32 = ${b.livestock.cattle.starterHerd};`,
+    `pub const CATTLE_MAX_HERD: u32 = ${b.livestock.cattle.maxHerd};`,
+    `pub const CATTLE_AREA_PER_HEAD: f64 = ${rustF64(b.livestock.cattle.areaPerHead)};`,
+    `pub const CATTLE_MAX_SLOPE_DEGREES: f64 = ${rustF64(b.livestock.cattle.maxSlopeDegrees ?? 0)};`,
+    `pub const CATTLE_MOISTURE_IDEAL: f64 = ${rustF64(b.livestock.cattle.moistureIdeal ?? 0)};`,
+    `pub const CATTLE_MOISTURE_TOLERANCE: f64 = ${rustF64(b.livestock.cattle.moistureTolerance ?? 1)};`,
+    `pub const CATTLE_FOOD_PER_CYCLE_PER_HEAD: f64 = ${rustF64(b.livestock.cattle.foodPerCyclePerHead)};`,
+    `pub const CATTLE_PRESERVED_FOOD_PER_CYCLE_PER_HEAD: f64 = ${rustF64(b.livestock.cattle.preservedFoodPerCyclePerHead ?? 0)};`,
+    `pub const CATTLE_GRAIN_PER_UNSUPPORTED_HEAD: f64 = ${rustF64(b.livestock.cattle.grainPerUnsupportedHead)};`,
+    `pub const CATTLE_BREEDING_PER_CYCLE: f64 = ${rustF64(b.livestock.cattle.breedingPerCycle)};`,
+    `pub const CATTLE_HEALTH_RECOVERY_PER_CYCLE: f64 = ${rustF64(b.livestock.cattle.healthRecoveryPerCycle)};`,
+    `pub const CATTLE_HEALTH_LOSS_PER_CYCLE: f64 = ${rustF64(b.livestock.cattle.healthLossPerCycle)};`,
+    `pub const CATTLE_FERTILITY_BONUS: f64 = ${rustF64(b.livestock.cattle.fertilityBonus ?? 0)};`,
+    `pub const CATTLE_MAX_FERTILIZED_FIELDS: usize = ${b.livestock.cattle.maxFertilizedFields ?? 0};`,
+    `pub const CATTLE_PLOUGH_WORK_MULTIPLIER: f64 = ${rustF64(b.livestock.cattle.ploughWorkMultiplier ?? 1)};`,
+    `pub const SHEEP_STARTER_HERD: u32 = ${b.livestock.sheep.starterHerd};`,
+    `pub const SHEEP_MAX_HERD: u32 = ${b.livestock.sheep.maxHerd};`,
+    `pub const SHEEP_AREA_PER_HEAD: f64 = ${rustF64(b.livestock.sheep.areaPerHead)};`,
+    `pub const SHEEP_MAX_SLOPE_DEGREES: f64 = ${rustF64(b.livestock.sheep.maxSlopeDegrees ?? 0)};`,
+    `pub const SHEEP_MOISTURE_IDEAL: f64 = ${rustF64(b.livestock.sheep.moistureIdeal ?? 0)};`,
+    `pub const SHEEP_MOISTURE_TOLERANCE: f64 = ${rustF64(b.livestock.sheep.moistureTolerance ?? 1)};`,
+    `pub const SHEEP_FOOD_PER_CYCLE_PER_HEAD: f64 = ${rustF64(b.livestock.sheep.foodPerCyclePerHead)};`,
+    `pub const SHEEP_PRESERVED_FOOD_PER_CYCLE_PER_HEAD: f64 = ${rustF64(b.livestock.sheep.preservedFoodPerCyclePerHead ?? 0)};`,
+    `pub const SHEEP_GRAIN_PER_UNSUPPORTED_HEAD: f64 = ${rustF64(b.livestock.sheep.grainPerUnsupportedHead)};`,
+    `pub const SHEEP_WOOL_GOLD_PER_CYCLE_PER_HEAD: f64 = ${rustF64(b.livestock.sheep.woolGoldPerCyclePerHead ?? 0)};`,
+    `pub const SHEEP_BREEDING_PER_CYCLE: f64 = ${rustF64(b.livestock.sheep.breedingPerCycle)};`,
+    `pub const SHEEP_HEALTH_RECOVERY_PER_CYCLE: f64 = ${rustF64(b.livestock.sheep.healthRecoveryPerCycle)};`,
+    `pub const SHEEP_HEALTH_LOSS_PER_CYCLE: f64 = ${rustF64(b.livestock.sheep.healthLossPerCycle)};`,
+    `pub const SWINE_STARTER_HERD: u32 = ${b.livestock.swine.starterHerd};`,
+    `pub const SWINE_MAX_HERD: u32 = ${b.livestock.swine.maxHerd};`,
+    `pub const SWINE_AREA_PER_HEAD: f64 = ${rustF64(b.livestock.swine.areaPerHead)};`,
+    `pub const SWINE_MATURE_TREES_PER_HEAD: f64 = ${rustF64(b.livestock.swine.matureTreesPerHead ?? 0)};`,
+    `pub const SWINE_FOOD_PER_CYCLE_PER_HEAD: f64 = ${rustF64(b.livestock.swine.foodPerCyclePerHead)};`,
+    `pub const SWINE_GRAIN_PER_UNSUPPORTED_HEAD: f64 = ${rustF64(b.livestock.swine.grainPerUnsupportedHead)};`,
+    `pub const SWINE_BREEDING_PER_CYCLE: f64 = ${rustF64(b.livestock.swine.breedingPerCycle)};`,
+    `pub const SWINE_HEALTH_RECOVERY_PER_CYCLE: f64 = ${rustF64(b.livestock.swine.healthRecoveryPerCycle)};`,
+    `pub const SWINE_HEALTH_LOSS_PER_CYCLE: f64 = ${rustF64(b.livestock.swine.healthLossPerCycle)};`,
+    '',
   ];
 
   lines.push('#[derive(Clone, Copy, Debug, PartialEq, Eq)]');
@@ -501,6 +572,8 @@ function generateRust(): string {
   lines.push('    Carpenter,');
   lines.push('    FerryLanding,');
   lines.push('    Vineyard,');
+  lines.push('    PastoralFarmstead,');
+  lines.push('    Swineherd,');
   lines.push('}');
   lines.push('');
   lines.push('#[derive(Clone, Copy, Debug)]');
@@ -839,6 +912,47 @@ function generateTypeScript(): string {
     `export const FARM_SLOPE_PENALTY_PER_DEGREE = ${b.farming.slopePenaltyPerDegree};`,
     `export const FARM_MAX_ACCEPTED_SLOPE_DEGREES = ${b.farming.maxAcceptedSlopeDegrees};`,
     `export const FARM_FIELD_SALVAGE_FRACTION = ${b.farming.fieldSalvageFraction};`,
+    '',
+    `export const LIVESTOCK_MIN_PASTURE_AREA = ${b.livestock.minPastureArea};`,
+    `export const LIVESTOCK_MIN_PASTURE_EDGE = ${b.livestock.minPastureEdge};`,
+    `export const LIVESTOCK_PASTURE_SALVAGE_FRACTION = ${b.livestock.pastureSalvageFraction};`,
+    `export const CATTLE_STARTER_HERD = ${b.livestock.cattle.starterHerd};`,
+    `export const CATTLE_MAX_HERD = ${b.livestock.cattle.maxHerd};`,
+    `export const CATTLE_AREA_PER_HEAD = ${b.livestock.cattle.areaPerHead};`,
+    `export const CATTLE_MAX_SLOPE_DEGREES = ${b.livestock.cattle.maxSlopeDegrees ?? 0};`,
+    `export const CATTLE_MOISTURE_IDEAL = ${b.livestock.cattle.moistureIdeal ?? 0};`,
+    `export const CATTLE_MOISTURE_TOLERANCE = ${b.livestock.cattle.moistureTolerance ?? 1};`,
+    `export const CATTLE_FOOD_PER_CYCLE_PER_HEAD = ${b.livestock.cattle.foodPerCyclePerHead};`,
+    `export const CATTLE_PRESERVED_FOOD_PER_CYCLE_PER_HEAD = ${b.livestock.cattle.preservedFoodPerCyclePerHead ?? 0};`,
+    `export const CATTLE_GRAIN_PER_UNSUPPORTED_HEAD = ${b.livestock.cattle.grainPerUnsupportedHead};`,
+    `export const CATTLE_BREEDING_PER_CYCLE = ${b.livestock.cattle.breedingPerCycle};`,
+    `export const CATTLE_HEALTH_RECOVERY_PER_CYCLE = ${b.livestock.cattle.healthRecoveryPerCycle};`,
+    `export const CATTLE_HEALTH_LOSS_PER_CYCLE = ${b.livestock.cattle.healthLossPerCycle};`,
+    `export const CATTLE_FERTILITY_BONUS = ${b.livestock.cattle.fertilityBonus ?? 0};`,
+    `export const CATTLE_MAX_FERTILIZED_FIELDS = ${b.livestock.cattle.maxFertilizedFields ?? 0};`,
+    `export const CATTLE_PLOUGH_WORK_MULTIPLIER = ${b.livestock.cattle.ploughWorkMultiplier ?? 1};`,
+    `export const SHEEP_STARTER_HERD = ${b.livestock.sheep.starterHerd};`,
+    `export const SHEEP_MAX_HERD = ${b.livestock.sheep.maxHerd};`,
+    `export const SHEEP_AREA_PER_HEAD = ${b.livestock.sheep.areaPerHead};`,
+    `export const SHEEP_MAX_SLOPE_DEGREES = ${b.livestock.sheep.maxSlopeDegrees ?? 0};`,
+    `export const SHEEP_MOISTURE_IDEAL = ${b.livestock.sheep.moistureIdeal ?? 0};`,
+    `export const SHEEP_MOISTURE_TOLERANCE = ${b.livestock.sheep.moistureTolerance ?? 1};`,
+    `export const SHEEP_FOOD_PER_CYCLE_PER_HEAD = ${b.livestock.sheep.foodPerCyclePerHead};`,
+    `export const SHEEP_PRESERVED_FOOD_PER_CYCLE_PER_HEAD = ${b.livestock.sheep.preservedFoodPerCyclePerHead ?? 0};`,
+    `export const SHEEP_GRAIN_PER_UNSUPPORTED_HEAD = ${b.livestock.sheep.grainPerUnsupportedHead};`,
+    `export const SHEEP_WOOL_GOLD_PER_CYCLE_PER_HEAD = ${b.livestock.sheep.woolGoldPerCyclePerHead ?? 0};`,
+    `export const SHEEP_BREEDING_PER_CYCLE = ${b.livestock.sheep.breedingPerCycle};`,
+    `export const SHEEP_HEALTH_RECOVERY_PER_CYCLE = ${b.livestock.sheep.healthRecoveryPerCycle};`,
+    `export const SHEEP_HEALTH_LOSS_PER_CYCLE = ${b.livestock.sheep.healthLossPerCycle};`,
+    `export const SWINE_STARTER_HERD = ${b.livestock.swine.starterHerd};`,
+    `export const SWINE_MAX_HERD = ${b.livestock.swine.maxHerd};`,
+    `export const SWINE_AREA_PER_HEAD = ${b.livestock.swine.areaPerHead};`,
+    `export const SWINE_MATURE_TREES_PER_HEAD = ${b.livestock.swine.matureTreesPerHead ?? 0};`,
+    `export const SWINE_FOOD_PER_CYCLE_PER_HEAD = ${b.livestock.swine.foodPerCyclePerHead};`,
+    `export const SWINE_GRAIN_PER_UNSUPPORTED_HEAD = ${b.livestock.swine.grainPerUnsupportedHead};`,
+    `export const SWINE_BREEDING_PER_CYCLE = ${b.livestock.swine.breedingPerCycle};`,
+    `export const SWINE_HEALTH_RECOVERY_PER_CYCLE = ${b.livestock.swine.healthRecoveryPerCycle};`,
+    `export const SWINE_HEALTH_LOSS_PER_CYCLE = ${b.livestock.swine.healthLossPerCycle};`,
     '',
     'export type BuildingResourceCost = {',
     '  timber: number;',

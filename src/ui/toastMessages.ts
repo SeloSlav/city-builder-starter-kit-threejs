@@ -16,6 +16,7 @@ export const TOAST_MESSAGES = {
   'building.placement.overlapping_extent': 'Another building of the same type already covers this functional extent',
   'building.placement.within_residence_zone': 'Cannot build inside a residence plot',
   'building.placement.within_farm_field': 'Cannot build inside cultivated farmland',
+  'building.placement.within_pasture': 'Cannot build inside a fenced pasture',
   'building.placement.on_quarry_pit': 'Cannot build on a quarry pit',
   'building.placement.no_quarry_in_range': 'No quarry stone within work range',
   'building.placement.no_game_in_range': 'No game within work range',
@@ -115,6 +116,8 @@ export function buildingPlacementReasonToToastId(reason: BuildingPlacementFailur
       return 'building.placement.within_residence_zone';
     case 'within_farm_field':
       return 'building.placement.within_farm_field';
+    case 'within_pasture':
+      return 'building.placement.within_pasture';
     case 'on_quarry_pit':
       return 'building.placement.on_quarry_pit';
     case 'no_quarry_in_range':

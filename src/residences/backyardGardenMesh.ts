@@ -374,6 +374,47 @@ function addHerbGarden(group: THREE.Group, width: number, depth: number, seed: n
   addMesh(group, new THREE.CylinderGeometry(0.21, 0.28, 0.42, 10), MATERIALS.terracotta, -width * 0.4, 0.22, -depth * 0.38);
 }
 
+function addHenYard(group: THREE.Group, width: number, depth: number, seed: number): void {
+  const rng = mulberry32(seed ^ 0x4e57a11);
+  addMesh(group, new THREE.BoxGeometry(width, 0.035, depth), MATERIALS.grass, 0, 0.018, 0);
+  const coopWidth = Math.min(2.4, width * 0.42);
+  const coopDepth = Math.min(1.9, depth * 0.38);
+  const coopX = -width * 0.24;
+  const coopZ = -depth * 0.24;
+  addMesh(group, new THREE.BoxGeometry(coopWidth, 1.15, coopDepth), MATERIALS.timber, coopX, 0.72, coopZ);
+  addMesh(group, new THREE.ConeGeometry(Math.max(coopWidth, coopDepth) * 0.72, 0.75, 4), MATERIALS.darkTimber, coopX, 1.65, coopZ, new THREE.Euler(0, Math.PI * 0.25, 0));
+  addMesh(group, new THREE.BoxGeometry(0.62, 0.72, 0.08), MATERIALS.darkSoil, coopX + 0.35, 0.58, coopZ + coopDepth * 0.52, new THREE.Euler(), undefined, 'HenCoopDoor');
+  for (let rung = 0; rung < 4; rung++) {
+    addMesh(group, new THREE.BoxGeometry(0.82, 0.07, 0.08), MATERIALS.wicker, coopX + 0.35, 0.18 + rung * 0.18, coopZ + coopDepth * 0.68 + rung * 0.12);
+  }
+  for (const x of [-width * 0.48, width * 0.48]) {
+    for (const z of [-depth * 0.44, depth * 0.44]) {
+      addMesh(group, new THREE.CylinderGeometry(0.045, 0.06, 0.95, 6), MATERIALS.darkTimber, x, 0.48, z);
+    }
+  }
+  for (const z of [-depth * 0.44, depth * 0.44]) {
+    addMesh(group, new THREE.BoxGeometry(width * 0.96, 0.055, 0.055), MATERIALS.wicker, 0, 0.45, z);
+    addMesh(group, new THREE.BoxGeometry(width * 0.96, 0.055, 0.055), MATERIALS.wicker, 0, 0.78, z);
+  }
+  for (const x of [-width * 0.48, width * 0.48]) {
+    addMesh(group, new THREE.BoxGeometry(0.055, 0.055, depth * 0.88), MATERIALS.wicker, x, 0.45, 0);
+    addMesh(group, new THREE.BoxGeometry(0.055, 0.055, depth * 0.88), MATERIALS.wicker, x, 0.78, 0);
+  }
+  // Lightweight fallback birds are replaced by the freely licensed animated asset when available.
+  for (let i = 0; i < Math.max(3, Math.min(6, Math.round(width * depth / 6))); i++) {
+    const x = (rng() - 0.34) * width * 0.72;
+    const z = (rng() - 0.2) * depth * 0.62;
+    const bird = new THREE.Group();
+    bird.name = 'HenFallback';
+    addMesh(bird, new THREE.SphereGeometry(0.19, 7, 5), i === 0 ? MATERIALS.darkTimber : MATERIALS.wicker, 0, 0.22, 0, new THREE.Euler(), new THREE.Vector3(1.12, 0.88, 0.82));
+    addMesh(bird, new THREE.SphereGeometry(0.11, 7, 5), MATERIALS.wicker, 0.15, 0.38, 0);
+    addMesh(bird, new THREE.ConeGeometry(0.045, 0.14, 5), MATERIALS.terracotta, 0.27, 0.38, 0, new THREE.Euler(0, 0, -Math.PI * 0.5));
+    bird.position.set(x, 0, z);
+    bird.rotation.y = rng() * Math.PI * 2;
+    group.add(bird);
+  }
+}
+
 export function createBackyardGardenMesh(
   kind: BackyardGardenKind,
   options: BackyardGardenMeshOptions = {},
@@ -403,6 +444,9 @@ export function createBackyardGardenMesh(
       break;
     case 'herb_garden':
       addHerbGarden(group, width, depth, seed);
+      break;
+    case 'hen_yard':
+      addHenYard(group, width, depth, seed);
       break;
     default: {
       const unreachable: never = kind;

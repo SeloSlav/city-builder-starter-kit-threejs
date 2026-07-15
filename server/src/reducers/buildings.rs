@@ -19,7 +19,8 @@ use crate::placement_validation::{
 };
 use crate::roads::load_owner_road_network;
 use crate::simulation::drain_trips_for_building;
-use crate::tables::{farm_field, Building, WorldConfig};
+use crate::tables::{farm_field, livestock_herd, pasture, Building, WorldConfig};
+use crate::reducers::livestock::{starter_herd, SPECIES_CATTLE, SPECIES_SWINE};
 
 fn overlaps_same_kind_functional_extent(ctx: &ReducerContext, kind: &str, x: f64, z: f64) -> bool {
     let Some(def) = building_def(kind) else {
@@ -70,6 +71,19 @@ fn building_overlaps_farm_field(ctx: &ReducerContext, kind: &str, x: f64, z: f64
             Point2 { x: field.corner_bx, z: field.corner_bz },
             Point2 { x: field.corner_cx, z: field.corner_cz },
             Point2 { x: field.corner_dx, z: field.corner_dz },
+        ];
+        zone_overlaps_footprint(&polygon, x, z, def.pick_radius)
+    })
+}
+
+fn building_overlaps_pasture(ctx: &ReducerContext, kind: &str, x: f64, z: f64) -> bool {
+    let Some(def) = building_def(kind) else { return false; };
+    ctx.db.pasture().iter().any(|pasture| {
+        let polygon = [
+            Point2 { x: pasture.corner_ax, z: pasture.corner_az },
+            Point2 { x: pasture.corner_bx, z: pasture.corner_bz },
+            Point2 { x: pasture.corner_cx, z: pasture.corner_cz },
+            Point2 { x: pasture.corner_dx, z: pasture.corner_dz },
         ];
         zone_overlaps_footprint(&polygon, x, z, def.pick_radius)
     })
@@ -173,6 +187,9 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
     if building_overlaps_farm_field(ctx, &kind, x, z) {
         return Err("Cannot build inside cultivated farmland.".to_string());
     }
+    if building_overlaps_pasture(ctx, &kind, x, z) {
+        return Err("Cannot build inside a fenced pasture.".to_string());
+    }
 
     if building_overlaps_road_surface(ctx, owner, &kind, x, z) {
         return Err("Cannot build on a road.".to_string());
@@ -253,7 +270,7 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
     }
 
     let building_id = config.next_building_id;
-    ctx.db.building().insert(Building {
+    let inserted = ctx.db.building().insert(Building {
         id: 0,
         owner,
         kind,
@@ -276,6 +293,16 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
         assigned_labor: 0,
         gold: 0.0,
     });
+
+    if inserted.kind == "pastoral_farmstead" {
+        ctx.db
+            .livestock_herd()
+            .insert(starter_herd(inserted.id, owner, SPECIES_CATTLE));
+    } else if inserted.kind == "swineherd" {
+        ctx.db
+            .livestock_herd()
+            .insert(starter_herd(inserted.id, owner, SPECIES_SWINE));
+    }
 
     ctx.db.world_config().id().update(WorldConfig {
         next_building_id: building_id + 1,
@@ -323,6 +350,11 @@ pub fn demolish_building(ctx: &ReducerContext, building_id: u64) -> Result<(), S
     {
         return Err("Remove or reassign this farmstead's fields first.".to_string());
     }
+    if matches!(building.kind.as_str(), "pastoral_farmstead" | "swineherd")
+        && ctx.db.pasture().farmstead_id().filter(&building_id).next().is_some()
+    {
+        return Err("Remove this livestock building's pastures first.".to_string());
+    }
 
     let trip_cargo = drain_trips_for_building(ctx, building_id);
 
@@ -345,6 +377,15 @@ pub fn demolish_building(ctx: &ReducerContext, building_id: u64) -> Result<(), S
     credit_treasury_commodity(ctx, owner, CommodityKind::Honey, building.honey + trip_cargo.honey);
     credit_treasury_commodity(ctx, owner, CommodityKind::Wine, building.wine + trip_cargo.wine);
 
+    if ctx
+        .db
+        .livestock_herd()
+        .building_id()
+        .find(&building_id)
+        .is_some()
+    {
+        ctx.db.livestock_herd().building_id().delete(&building_id);
+    }
     ctx.db.building().id().delete(building_id);
 
     Ok(())

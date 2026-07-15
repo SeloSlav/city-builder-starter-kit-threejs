@@ -25,6 +25,10 @@ import {
   createVineyardMesh,
   createWatermillMesh,
 } from './meshes/expandedBuildingMeshes.ts';
+import {
+  createPastoralFarmsteadMesh,
+  createSwineherdMesh,
+} from './meshes/livestockBuildingMeshes.ts';
 
 export function createBuildingMesh(kind: BuildingKind): THREE.Group {
   switch (kind) {
@@ -56,6 +60,8 @@ export function createBuildingMesh(kind: BuildingKind): THREE.Group {
     case 'carpenter': return createCarpenterMesh();
     case 'ferry_landing': return createFerryLandingMesh();
     case 'vineyard': return createVineyardMesh();
+    case 'pastoral_farmstead': return createPastoralFarmsteadMesh();
+    case 'swineherd': return createSwineherdMesh();
     default: {
       const unreachable: never = kind;
       return unreachable;

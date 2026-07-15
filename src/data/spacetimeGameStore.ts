@@ -19,7 +19,7 @@ import {
 } from '../network/spacetimedbClient.ts';
 import type { RoadNetworkSnapshot } from '../roads/RoadNetwork.ts';
 import type { BackyardGardenKind } from '../residences/backyardGarden.ts';
-import type { FarmCrop } from '../resources/types.ts';
+import type { FarmCrop, LivestockSpecies } from '../resources/types.ts';
 import { ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT } from '../economy/villageEconomy.ts';
 import { DEFAULT_PARISH_POLICY, type ParishPolicyState } from '../economy/chapelParish.ts';
 import { DEFAULT_MONASTERY_POLICY, type MonasteryPolicyState } from '../economy/monasteryPolicy.ts';
@@ -37,6 +37,8 @@ import type {
   ResourceNodeState,
   ForagingNodeState,
   FarmFieldState,
+  LivestockHerdState,
+  PastureState,
   ResidenceState,
   ResourceStockpile,
   TreeEntityState,
@@ -71,6 +73,8 @@ export type SpacetimeGameSnapshot = {
   trees: Map<string, TreeEntityState>;
   buildings: Map<string, BuildingState>;
   farmFields: Map<string, FarmFieldState>;
+  pastures: Map<string, PastureState>;
+  livestockHerds: Map<string, LivestockHerdState>;
   burgageZones: Map<string, BurgageZoneState>;
   residences: Map<string, ResidenceState>;
   backyardGardens: Map<string, BackyardGardenState>;
@@ -97,6 +101,8 @@ function createEmptyTableState(): GameTableSyncState {
     trees: new Map(),
     buildings: new Map(),
     farmFields: new Map(),
+    pastures: new Map(),
+    livestockHerds: new Map(),
     burgageZones: new Map(),
     residences: new Map(),
     backyardGardens: new Map(),
@@ -149,6 +155,8 @@ export class SpacetimeGameStore {
       trees: new Map(state.trees),
       buildings: new Map(state.buildings),
       farmFields: new Map(state.farmFields),
+      pastures: new Map(state.pastures),
+      livestockHerds: new Map(state.livestockHerds),
       burgageZones: new Map(state.burgageZones),
       residences: new Map(state.residences),
       backyardGardens: new Map(state.backyardGardens),
@@ -217,6 +225,8 @@ export class SpacetimeGameStore {
       trees: new Map(state.trees),
       buildings: new Map(state.buildings),
       farmFields: new Map(state.farmFields),
+      pastures: new Map(state.pastures),
+      livestockHerds: new Map(state.livestockHerds),
       burgageZones: new Map(state.burgageZones),
       residences: new Map(state.residences),
       backyardGardens: new Map(state.backyardGardens),
@@ -276,6 +286,22 @@ export class SpacetimeGameStore {
 
   demolishFarmField(fieldId: string): Promise<void> {
     return spacetimeReducers.demolishFarmField(fieldId);
+  }
+
+  placePasture(input: {
+    farmsteadId: string;
+    corners: Array<{ x: number; z: number }>;
+    averageSlopeDegrees: number;
+  }): Promise<void> {
+    return spacetimeReducers.placePasture(input);
+  }
+
+  demolishPasture(pastureId: string): Promise<void> {
+    return spacetimeReducers.demolishPasture(pastureId);
+  }
+
+  setLivestockSpecies(buildingId: string, species: Exclude<LivestockSpecies, 'swine'>): Promise<void> {
+    return spacetimeReducers.setLivestockSpecies(buildingId, species);
   }
 
   setEconomicActivityTaxRate(taxRate: number): Promise<void> {

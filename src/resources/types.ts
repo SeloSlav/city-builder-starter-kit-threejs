@@ -106,6 +106,31 @@ export type FarmFieldState = {
   lastYield: number;
 };
 
+export const LIVESTOCK_SPECIES = ['cattle', 'sheep', 'swine'] as const;
+export type LivestockSpecies = (typeof LIVESTOCK_SPECIES)[number];
+
+export type PastureState = {
+  id: string;
+  farmsteadId: string;
+  corners: FarmFieldState['corners'];
+  area: number;
+  averageSlopeDegrees: number;
+  moisture: number;
+};
+
+export type LivestockHerdState = {
+  buildingId: string;
+  species: LivestockSpecies;
+  headCount: number;
+  health: number;
+  breedingProgress: number;
+  pastureCapacity: number;
+  suppliedCapacity: number;
+  lastFoodOutput: number;
+  lastPreservedOutput: number;
+  lastWoolGold: number;
+};
+
 export type BurgageFrontageEdge = 0 | 1 | 2 | 3;
 
 export type BurgageZoneState = {
@@ -151,6 +176,8 @@ export type GameState = {
   trees: Map<string, TreeEntityState>;
   buildings: Map<string, BuildingState>;
   farmFields: Map<string, FarmFieldState>;
+  pastures: Map<string, PastureState>;
+  livestockHerds: Map<string, LivestockHerdState>;
   burgageZones: Map<string, BurgageZoneState>;
   residences: Map<string, ResidenceState>;
   backyardGardens: Map<string, BackyardGardenState>;
@@ -180,6 +207,12 @@ export type InspectableTarget =
       kind: 'farm-field';
       field: FarmFieldState;
       farmstead: BuildingState | null;
+    }
+  | {
+      kind: 'pasture';
+      pasture: PastureState;
+      farmstead: BuildingState | null;
+      herd: LivestockHerdState | null;
     }
   | {
       kind: 'river';

@@ -1,7 +1,12 @@
 import type { DbConnection } from '../generated/index.ts';
 import { getConnection } from '../network/spacetimedbClient.ts';
 import type { BackyardGardenKind } from '../residences/backyardGarden.ts';
-import type { BuildingKind, BurgageFrontageEdge, FarmCrop } from '../resources/types.ts';
+import type {
+  BuildingKind,
+  BurgageFrontageEdge,
+  FarmCrop,
+  LivestockSpecies,
+} from '../resources/types.ts';
 import type { WorldLayout } from '../resources/WorldLayout.ts';
 import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
 import { computeWorldBootstrapDataFromLayout } from '../world/worldBootstrapData.ts';
@@ -10,6 +15,7 @@ import type { WorldGenerationSettings } from '../world/worldGenerationSettings.t
 import {
   parseBuildingServerId,
   parseFarmFieldServerId,
+  parsePastureServerId,
   parseResidenceServerId,
   parseZoneServerId,
 } from './spacetimeIds.ts';
@@ -168,6 +174,48 @@ export async function demolishFarmField(fieldId: string): Promise<void> {
   const serverId = parseFarmFieldServerId(fieldId);
   if (serverId === null) throw new Error('Invalid farm field id.');
   await callReducer('demolishFarmField', 'demolish_farm_field', { fieldId: serverId });
+}
+
+export async function placePasture(input: {
+  farmsteadId: string;
+  corners: Array<{ x: number; z: number }>;
+  averageSlopeDegrees: number;
+}): Promise<void> {
+  const farmsteadId = parseBuildingServerId(input.farmsteadId);
+  if (farmsteadId === null || input.corners.length !== 4) {
+    throw new Error('Invalid pasture placement.');
+  }
+  const [a, b, c, d] = input.corners;
+  await callReducer('placePasture', 'place_pasture', {
+    farmsteadId,
+    cornerAx: a.x,
+    cornerAz: a.z,
+    cornerBx: b.x,
+    cornerBz: b.z,
+    cornerCx: c.x,
+    cornerCz: c.z,
+    cornerDx: d.x,
+    cornerDz: d.z,
+    averageSlopeDegrees: input.averageSlopeDegrees,
+  });
+}
+
+export async function demolishPasture(pastureId: string): Promise<void> {
+  const serverId = parsePastureServerId(pastureId);
+  if (serverId === null) throw new Error('Invalid pasture id.');
+  await callReducer('demolishPasture', 'demolish_pasture', { pastureId: serverId });
+}
+
+export async function setLivestockSpecies(
+  buildingId: string,
+  species: Exclude<LivestockSpecies, 'swine'>,
+): Promise<void> {
+  const serverId = parseBuildingServerId(buildingId);
+  if (serverId === null) throw new Error('Invalid pastoral farmstead id.');
+  await callReducer('setLivestockSpecies', 'set_livestock_species', {
+    buildingId: serverId,
+    species: species === 'sheep' ? 1 : 0,
+  });
 }
 
 export async function setEconomicActivityTaxRate(taxRate: number): Promise<void> {

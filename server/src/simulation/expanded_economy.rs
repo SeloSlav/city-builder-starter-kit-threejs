@@ -162,7 +162,11 @@ fn step_farmstead_fields(ctx: &ReducerContext, farmstead: &mut Building) {
         }
         let corners = field_corners(field);
         let shape = shape_efficiency(&corners);
-        let required = work_required(field.stage, field.area, shape).max(1e-6);
+        let (plough_multiplier, manure_bonus) =
+            super::livestock::cattle_support_for_field(ctx, field);
+        let required = (work_required(field.stage, field.area, shape)
+            * if field.stage == STAGE_PLOUGHING { plough_multiplier } else { 1.0 })
+            .max(1e-6);
         let remaining = required * (1.0_f64 - field.stage_progress).max(0.0_f64);
         let expected_harvest = if field.stage == STAGE_HARVESTING {
             Some(expected_grain_yield(
@@ -208,7 +212,11 @@ fn step_farmstead_fields(ctx: &ReducerContext, farmstead: &mut Building) {
                 field.stage_progress = 0.0;
             }
             STAGE_HARVESTING => {
-                finish_field_cycle(field, expected_harvest.unwrap_or_default());
+                finish_field_cycle_with_manure(
+                    field,
+                    expected_harvest.unwrap_or_default(),
+                    manure_bonus,
+                );
             }
             _ => {}
         }
@@ -220,9 +228,14 @@ fn step_farmstead_fields(ctx: &ReducerContext, farmstead: &mut Building) {
 }
 
 fn finish_field_cycle(field: &mut FarmField, harvested: f64) {
+    finish_field_cycle_with_manure(field, harvested, 0.0);
+}
+
+fn finish_field_cycle_with_manure(field: &mut FarmField, harvested: f64, manure_bonus: f64) {
     field.last_yield = harvested;
     field.harvest_count = field.harvest_count.saturating_add(1);
-    field.fertility = fertility_after_harvest(field.crop, field.fertility);
+    field.fertility = (fertility_after_harvest(field.crop, field.fertility) + manure_bonus)
+        .clamp(0.0, 1.0);
     field.crop = field.next_crop;
     field.stage = STAGE_PLOUGHING;
     field.stage_progress = 0.0;
@@ -288,7 +301,7 @@ pub fn step_smokehouse(
         clock,
         &smokehouse,
         CommodityKind::Food,
-        &["hunters_hall", "foragers_shed", "granary"],
+        &["hunters_hall", "foragers_shed", "granary", "swineherd"],
         SMOKEHOUSE_FOOD_PER_CYCLE * 2.0,
     );
     request_connected_commodity(ctx, tick, clock, &smokehouse, CommodityKind::Firewood, &["woodcutters_lodge"], SMOKEHOUSE_FIREWOOD_PER_CYCLE * 3.0);
@@ -541,7 +554,7 @@ fn ensure_water_for_process(
     ensure_building_water(ctx, tick, network, building, needed)
 }
 
-fn dispatch_to_building(
+pub(crate) fn dispatch_to_building(
     ctx: &ReducerContext,
     tick: &SimTickContext,
     clock: &GameClock,
@@ -644,7 +657,7 @@ fn dispatch_monastery_covered_need(
     );
 }
 
-fn dispatch_need(
+pub(crate) fn dispatch_need(
     ctx: &ReducerContext,
     tick: &SimTickContext,
     clock: &GameClock,
@@ -702,7 +715,7 @@ fn need_to_commodity(kind: ResidenceNeedKind) -> CommodityKind {
     }
 }
 
-fn request_connected_commodity(
+pub(crate) fn request_connected_commodity(
     ctx: &ReducerContext,
     tick: &SimTickContext,
     clock: &GameClock,

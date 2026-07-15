@@ -5,6 +5,8 @@ import { BuildingMarkers } from '../buildings/BuildingMarkers.ts';
 import { BuildingTool } from '../buildings/BuildingTool.ts';
 import { FarmFieldMarkers } from '../farming/FarmFieldMarkers.ts';
 import { FarmFieldTool } from '../farming/FarmFieldTool.ts';
+import { PastureMarkers } from '../farming/PastureMarkers.ts';
+import { LivestockVisuals } from '../farming/LivestockVisuals.ts';
 import { BurgageTool } from '../residences/BurgageTool.ts';
 import { ResidenceMarkers } from '../residences/ResidenceMarkers.ts';
 import { BackyardGardenMarkers } from '../residences/BackyardGardenMarkers.ts';
@@ -68,6 +70,8 @@ export class App {
   private backyardGardenMarkers: BackyardGardenMarkers | null = null;
   private burgageFencing: BurgageFencing | null = null;
   private farmFieldMarkers: FarmFieldMarkers | null = null;
+  private pastureMarkers: PastureMarkers | null = null;
+  private livestockVisuals: LivestockVisuals | null = null;
   private toolbar: BuildToolbar | null = null;
   private cityAdminPanel: CityAdministrationPanel | null = null;
   private toastManager: ToastManager | null = null;
@@ -129,6 +133,8 @@ export class App {
     this.backyardGardenMarkers = session.backyardGardenMarkers;
     this.burgageFencing = session.burgageFencing;
     this.farmFieldMarkers = session.farmFieldMarkers;
+    this.pastureMarkers = session.pastureMarkers;
+    this.livestockVisuals = session.livestockVisuals;
     this.toolbar = session.toolbar;
     this.toastManager = session.toastManager;
     this.disposeTooltips = session.disposeTooltips;
@@ -215,6 +221,8 @@ export class App {
       settlementWorld: {
         residenceMarkers: this.residenceMarkers,
         farmFieldMarkers: this.farmFieldMarkers,
+        pastureMarkers: this.pastureMarkers,
+        livestockVisuals: this.livestockVisuals,
         backyardGardenMarkers: this.backyardGardenMarkers,
         deliveryAgents: this.deliveryAgents,
         villagers: this.villagers,
@@ -291,6 +299,8 @@ export class App {
     disposeSettlementWorld({
       residenceMarkers: this.residenceMarkers,
       farmFieldMarkers: this.farmFieldMarkers,
+      pastureMarkers: this.pastureMarkers,
+      livestockVisuals: this.livestockVisuals,
       backyardGardenMarkers: this.backyardGardenMarkers,
       deliveryAgents: this.deliveryAgents,
       villagers: this.villagers,
@@ -367,6 +377,8 @@ export class App {
     tickSettlementWorld(
       {
         residenceMarkers: this.residenceMarkers,
+        backyardGardenMarkers: this.backyardGardenMarkers,
+        livestockVisuals: this.livestockVisuals,
         deliveryAgents: this.deliveryAgents,
         villagers: this.villagers,
       },
@@ -425,7 +437,7 @@ export class App {
       canBuild: farmFieldEnabled ? this.farmFieldTool.isDraftBuildable() : burgageEnabled ? this.burgageTool.isDraftBuildable() : this.roadTool.isDraftBuildable(),
       hasDraft: farmFieldEnabled ? this.farmFieldTool.hasDraft() : burgageEnabled ? this.burgageTool.hasDraft() : this.roadTool.hasDraft(),
       mode: farmFieldEnabled
-        ? 'farm-fields'
+        ? this.farmFieldTool.getMode() === 'pasture' ? 'pastures' : 'farm-fields'
         : burgageEnabled
         ? 'residences'
         : this.roadTool.isEnabled()

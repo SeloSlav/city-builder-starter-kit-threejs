@@ -6,7 +6,7 @@ import { getBuildingDefinition } from '../resources/buildings.ts';
 export type ToolbarStats = {
   canBuild: boolean;
   hasDraft: boolean;
-  mode: BuildingKind | 'road' | 'residences' | 'farm-fields' | 'idle';
+  mode: BuildingKind | 'road' | 'residences' | 'farm-fields' | 'pastures' | 'idle';
   statusDetail?: string | null;
 };
 
@@ -15,7 +15,7 @@ export function isBuildingToolMode(mode: ToolbarStats['mode']): mode is Building
 }
 
 export function isConstructionToolMode(mode: ToolbarStats['mode']): boolean {
-  return isBuildingToolMode(mode) || mode === 'residences' || mode === 'farm-fields';
+  return isBuildingToolMode(mode) || mode === 'residences' || mode === 'farm-fields' || mode === 'pastures';
 }
 
 export function isBuilderHudMode(mode: ToolbarStats['mode']): boolean {
@@ -38,6 +38,8 @@ export function describeBuilderTitle(mode: ToolbarStats['mode']): string {
       return 'Residences';
     case 'farm-fields':
       return 'Farm fields';
+    case 'pastures':
+      return 'Pastures and pannage';
     case 'idle':
       return 'Builder';
     default: {
@@ -82,6 +84,14 @@ export function describeBuilderHelp(mode: ToolbarStats['mode']): string {
           <li><span>Place field</span><span class="road-controls-key">Hammer or Enter</span></li>
           <li><span>Cancel / exit</span><span class="road-controls-key">Esc</span></li>
         `;
+    case 'pastures':
+      return `
+          <li><span>Set baseline</span><span class="road-controls-key">1st + 2nd click</span></li>
+          <li><span>Set pasture depth</span><span class="road-controls-key">3rd click</span></li>
+          <li><span>Undo last point</span><span class="road-controls-key">R-click or Backspace</span></li>
+          <li><span>Fence pasture</span><span class="road-controls-key">Hammer or Enter</span></li>
+          <li><span>Cancel / exit</span><span class="road-controls-key">Esc</span></li>
+        `;
     case 'idle':
       return '';
     default: {
@@ -110,6 +120,9 @@ export function describeToolbarStatus(stats: ToolbarStats): string {
   }
   if (stats.mode === 'farm-fields') {
     return stats.statusDetail ?? "Draw a field inside a farmstead's work extent";
+  }
+  if (stats.mode === 'pastures') {
+    return stats.statusDetail ?? "Draw a pasture inside a livestock building's work extent";
   }
   if (stats.mode !== 'road') return 'Road tool off';
   if (stats.canBuild) return 'Ready to build';

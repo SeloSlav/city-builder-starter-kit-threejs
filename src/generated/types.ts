@@ -132,6 +132,21 @@ export const ForagingNode = __t.object("ForagingNode", {
 });
 export type ForagingNode = __Infer<typeof ForagingNode>;
 
+export const LivestockHerd = __t.object("LivestockHerd", {
+  buildingId: __t.u64(),
+  owner: __t.identity(),
+  species: __t.u8(),
+  headCount: __t.u32(),
+  health: __t.f64(),
+  breedingProgress: __t.f64(),
+  pastureCapacity: __t.f64(),
+  suppliedCapacity: __t.f64(),
+  lastFoodOutput: __t.f64(),
+  lastPreservedOutput: __t.f64(),
+  lastWoolGold: __t.f64(),
+});
+export type LivestockHerd = __Infer<typeof LivestockHerd>;
+
 export const MarketState = __t.object("MarketState", {
   owner: __t.identity(),
   timberPriceMult: __t.f64(),
@@ -147,6 +162,24 @@ export const MarketState = __t.object("MarketState", {
   bulletin: __t.string(),
 });
 export type MarketState = __Infer<typeof MarketState>;
+
+export const Pasture = __t.object("Pasture", {
+  id: __t.u64(),
+  owner: __t.identity(),
+  farmsteadId: __t.u64(),
+  cornerAx: __t.f64(),
+  cornerAz: __t.f64(),
+  cornerBx: __t.f64(),
+  cornerBz: __t.f64(),
+  cornerCx: __t.f64(),
+  cornerCz: __t.f64(),
+  cornerDx: __t.f64(),
+  cornerDz: __t.f64(),
+  area: __t.f64(),
+  averageSlopeDegrees: __t.f64(),
+  moisture: __t.f64(),
+});
+export type Pasture = __Infer<typeof Pasture>;
 
 export const PlayerResources = __t.object("PlayerResources", {
   owner: __t.identity(),

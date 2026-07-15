@@ -9,6 +9,7 @@ import { renderWoodcuttersLodgeInspector } from './woodcuttersLodgeRenderer.ts';
 import { renderWellInspector } from './wellRenderer.ts';
 import type { InspectorRenderContext, InspectorView } from './renderInspectableTarget.ts';
 import { renderExpandedBuildingInspector } from './expandedBuildingRenderer.ts';
+import { renderLivestockBuildingInspector } from './livestockBuildingRenderer.ts';
 
 export function renderBuildingInspector(
   target: Extract<InspectableTarget, { kind: 'building' }>,
@@ -44,6 +45,9 @@ export function renderBuildingInspector(
     case 'ferry_landing':
     case 'vineyard':
       return renderExpandedBuildingInspector(target, context);
+    case 'pastoral_farmstead':
+    case 'swineherd':
+      return renderLivestockBuildingInspector(target, context);
     default: {
       const unreachable: never = building.kind;
       throw new Error(`Unhandled building kind: ${unreachable}`);

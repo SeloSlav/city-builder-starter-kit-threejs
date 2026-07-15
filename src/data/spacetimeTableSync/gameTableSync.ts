@@ -6,6 +6,7 @@ import { syncBurgageZones } from './syncBurgageZones.ts';
 import { syncDeliveryTrips } from './syncDeliveryTrips.ts';
 import { syncForagingNodes } from './syncForagingNodes.ts';
 import { syncFarmFields } from './syncFarmFields.ts';
+import { syncLivestockHerds, syncPastures } from './syncLivestock.ts';
 import { syncMarketState } from './syncMarketState.ts';
 import { syncPlayerResources } from './syncPlayerResources.ts';
 import { syncQuarries } from './syncQuarries.ts';
@@ -40,6 +41,11 @@ export class GameTableSync {
     this.state.trees = syncTrees(db.tree_entity ? db.tree_entity.iter() : []);
     this.state.buildings = syncBuildings(db.building ? db.building.iter() : [], this.state.identityHex);
     this.state.farmFields = syncFarmFields(db.farm_field ? db.farm_field.iter() : [], this.state.identityHex);
+    this.state.pastures = syncPastures(db.pasture ? db.pasture.iter() : [], this.state.identityHex);
+    this.state.livestockHerds = syncLivestockHerds(
+      db.livestock_herd ? db.livestock_herd.iter() : [],
+      this.state.identityHex,
+    );
     this.state.burgageZones = syncBurgageZones(
       db.burgage_zone ? db.burgage_zone.iter() : [],
       this.state.identityHex,
@@ -128,6 +134,20 @@ export class GameTableSync {
     bindTable(db.farm_field, () => {
       this.state.farmFields = syncFarmFields(
         db.farm_field ? db.farm_field.iter() : [],
+        this.state.identityHex,
+      );
+    });
+
+    bindTable(db.pasture, () => {
+      this.state.pastures = syncPastures(
+        db.pasture ? db.pasture.iter() : [],
+        this.state.identityHex,
+      );
+    });
+
+    bindTable(db.livestock_herd, () => {
+      this.state.livestockHerds = syncLivestockHerds(
+        db.livestock_herd ? db.livestock_herd.iter() : [],
         this.state.identityHex,
       );
     });

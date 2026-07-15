@@ -5,6 +5,8 @@ import { BuildingMarkers } from '../buildings/BuildingMarkers.ts';
 import { BuildingTool } from '../buildings/BuildingTool.ts';
 import { FarmFieldMarkers } from '../farming/FarmFieldMarkers.ts';
 import { FarmFieldTool, type FarmFieldPlacementFailureReason } from '../farming/FarmFieldTool.ts';
+import { PastureMarkers } from '../farming/PastureMarkers.ts';
+import { LivestockVisuals } from '../farming/LivestockVisuals.ts';
 import { BurgageTool } from '../residences/BurgageTool.ts';
 import { MAX_ZONE_DEPTH, MIN_ZONE_DEPTH } from '../residences/burgageLayout.ts';
 import { ResidenceMarkers } from '../residences/ResidenceMarkers.ts';
@@ -97,6 +99,8 @@ export type BootstrappedSession = {
   backyardGardenMarkers: BackyardGardenMarkers;
   burgageFencing: BurgageFencing;
   farmFieldMarkers: FarmFieldMarkers;
+  pastureMarkers: PastureMarkers;
+  livestockVisuals: LivestockVisuals;
   toolbar: BuildToolbar;
   toastManager: ToastManager;
   disposeTooltips: () => void;
@@ -429,6 +433,7 @@ export async function bootstrapAppSession(
       case 'building': return 'Field overlaps a building.';
       case 'residence': return 'Field overlaps a residence plot.';
       case 'field': return 'Field overlaps existing farmland.';
+      case 'pasture': return 'This parcel overlaps an existing pasture.';
     }
   };
 
@@ -443,6 +448,10 @@ export async function bootstrapAppSession(
     onCommit: async (input) => {
       requireSessionReady();
       await spacetimeStore.placeFarmField(input);
+    },
+    onCommitPasture: async (input) => {
+      requireSessionReady();
+      await spacetimeStore.placePasture(input);
     },
     onModeChanged: () => bridge.syncToolbar(),
     onPlacementRejected: (reason) => toastManager?.show(fieldFailureMessage(reason), { variant: 'error' }),
@@ -462,6 +471,14 @@ export async function bootstrapAppSession(
   });
   const burgageFencing = new BurgageFencing(sceneManager.selectionGroup);
   const farmFieldMarkers = new FarmFieldMarkers(
+    sceneManager.selectionGroup,
+    (x, z) => sceneManager.terrain.getHeightAt(x, z),
+  );
+  const pastureMarkers = new PastureMarkers(
+    sceneManager.selectionGroup,
+    (x, z) => sceneManager.terrain.getHeightAt(x, z),
+  );
+  const livestockVisuals = new LivestockVisuals(
     sceneManager.selectionGroup,
     (x, z) => sceneManager.terrain.getHeightAt(x, z),
   );
@@ -520,7 +537,7 @@ export async function bootstrapAppSession(
         return;
       }
       const wasEnabled = farmFieldTool.isEnabled();
-      farmFieldTool.setEnabled(true);
+      farmFieldTool.setMode('field');
       if (farmFieldTool.isEnabled()) {
         roadTool.setEnabled(false);
         buildingTool.setMode('off');
@@ -529,6 +546,27 @@ export async function bootstrapAppSession(
         if (!wasEnabled) {
           toastManager?.show(
             'Draw a baseline, set field depth, then choose rye, oats, or fallow with C.',
+            { variant: 'info', durationMs: 6000 },
+          );
+        }
+      }
+      bridge.syncToolbar();
+    },
+    onSelectPastures: () => {
+      if (!sessionGate.isReady()) {
+        toastManager?.show('SpacetimeDB is not connected.', { variant: 'error' });
+        return;
+      }
+      const wasEnabled = farmFieldTool.isEnabled() && farmFieldTool.getMode() === 'pasture';
+      farmFieldTool.setMode('pasture');
+      if (farmFieldTool.isEnabled()) {
+        roadTool.setEnabled(false);
+        buildingTool.setMode('off');
+        burgageTool.setEnabled(false);
+        resourceInspector?.clearSelection();
+        if (!wasEnabled) {
+          toastManager?.show(
+            'Draw fenced pasture inside a pastoral farmstead or woodland swineherd work extent.',
             { variant: 'info', durationMs: 6000 },
           );
         }
@@ -735,6 +773,8 @@ export async function bootstrapAppSession(
     backyardGardenMarkers,
     burgageFencing,
     farmFieldMarkers,
+    pastureMarkers,
+    livestockVisuals,
     toolbar,
     toastManager,
     disposeTooltips,

@@ -22,6 +22,15 @@ export function farmFieldClientId(serverId: bigint | number): string {
   return `farm-field-${serverId}`;
 }
 
+export function pastureClientId(serverId: bigint | number): string {
+  return `pasture-${serverId}`;
+}
+
+export function parsePastureServerId(pastureId: string): bigint | null {
+  const match = /^pasture-(\d+)$/.exec(pastureId);
+  return match ? BigInt(match[1]) : null;
+}
+
 export function parseFarmFieldServerId(fieldId: string): bigint | null {
   const match = /^farm-field-(\d+)$/.exec(fieldId);
   return match ? BigInt(match[1]) : null;

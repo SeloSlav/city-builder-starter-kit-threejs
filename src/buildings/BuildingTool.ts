@@ -364,6 +364,7 @@ export class BuildingTool {
       residences: state.residences.values(),
       burgageZones: state.burgageZones.values(),
       farmFields: state.farmFields.values(),
+      pastures: state.pastures.values(),
       quarries: state.quarries.values(),
       foragingNodes: state.foragingNodes.values(),
       stockpile: totals,

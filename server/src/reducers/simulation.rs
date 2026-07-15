@@ -8,7 +8,7 @@ use crate::simulation::{
     step_reforester, step_residence, step_stone_quarry, step_well, step_woodcutters_lodge,
     step_apiary, step_brewery, step_carpenter, step_ferry_landing,
     step_granary, step_monastery, step_smokehouse, step_threshing_barn, step_vineyard,
-    step_watermill,
+    step_watermill, step_pastoral_farmstead, step_swineherd,
     SimTickContext,
 };
 use crate::economy::step_regional_markets;
@@ -81,7 +81,9 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
             | crate::building_defs::BuildingSimKind::Watermill
             | crate::building_defs::BuildingSimKind::Carpenter
             | crate::building_defs::BuildingSimKind::FerryLanding
-            | crate::building_defs::BuildingSimKind::Vineyard => {
+            | crate::building_defs::BuildingSimKind::Vineyard
+            | crate::building_defs::BuildingSimKind::PastoralFarmstead
+            | crate::building_defs::BuildingSimKind::Swineherd => {
                 expanded_ids.push((sim_kind, building.id))
             }
         }
@@ -170,6 +172,12 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
             }
             crate::building_defs::BuildingSimKind::Vineyard => {
                 step_vineyard(ctx, &tick, &clock, building)
+            }
+            crate::building_defs::BuildingSimKind::PastoralFarmstead => {
+                step_pastoral_farmstead(ctx, &tick, &clock, building)
+            }
+            crate::building_defs::BuildingSimKind::Swineherd => {
+                step_swineherd(ctx, &tick, &clock, building)
             }
             _ => {}
         }

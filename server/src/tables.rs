@@ -213,6 +213,59 @@ pub struct FarmField {
     pub last_yield: f64,
 }
 
+/// A player-drawn grazing parcel tied to a pastoral farmstead or woodland swineherd.
+/// Unlike arable fields, pannage pastures retain mature trees so mast capacity changes
+/// naturally when the surrounding woodland is felled or regrows.
+#[spacetimedb::table(
+    accessor = pasture,
+    public,
+    index(accessor = owner, btree(columns = [owner])),
+    index(accessor = farmstead_id, btree(columns = [farmstead_id]))
+)]
+#[derive(Clone)]
+pub struct Pasture {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub owner: Identity,
+    pub farmstead_id: u64,
+    pub corner_ax: f64,
+    pub corner_az: f64,
+    pub corner_bx: f64,
+    pub corner_bz: f64,
+    pub corner_cx: f64,
+    pub corner_cz: f64,
+    pub corner_dx: f64,
+    pub corner_dz: f64,
+    pub area: f64,
+    pub average_slope_degrees: f64,
+    pub moisture: f64,
+}
+
+/// Authoritative herd state. Species: 0 cattle, 1 sheep, 2 swine.
+#[spacetimedb::table(
+    accessor = livestock_herd,
+    public,
+    index(accessor = owner, btree(columns = [owner]))
+)]
+#[derive(Clone)]
+pub struct LivestockHerd {
+    #[primary_key]
+    pub building_id: u64,
+    pub owner: Identity,
+    pub species: u8,
+    pub head_count: u32,
+    pub health: f64,
+    pub breeding_progress: f64,
+    /// Supported heads after terrain and woodland-mast modifiers.
+    pub pasture_capacity: f64,
+    /// Supported heads after any grain supplement consumed this cycle.
+    pub supplied_capacity: f64,
+    pub last_food_output: f64,
+    pub last_preserved_output: f64,
+    pub last_wool_gold: f64,
+}
+
 #[spacetimedb::table(accessor = road_network_state, public)]
 pub struct RoadNetworkState {
     #[primary_key]

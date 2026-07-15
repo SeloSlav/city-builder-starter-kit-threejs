@@ -21,9 +21,11 @@ export const BUILDING_KIND_TO_MENU_ACTION: Record<BuildingKind, PlacementBuildMe
   carpenter: 'carpenter',
   ferry_landing: 'ferry-landing',
   vineyard: 'vineyard',
+  pastoral_farmstead: 'pastoral-farmstead',
+  swineherd: 'swineherd',
 };
 
-export type BuildingMenuAction = Exclude<PlacementBuildMenuAction, 'residences' | 'grain-field'>;
+export type BuildingMenuAction = Exclude<PlacementBuildMenuAction, 'residences' | 'grain-field' | 'pasture'>;
 
 export const MENU_ACTION_TO_BUILDING_KIND: Record<BuildingMenuAction, BuildingKind> = {
   'lumber-mill': 'lumber_mill',
@@ -45,13 +47,16 @@ export const MENU_ACTION_TO_BUILDING_KIND: Record<BuildingMenuAction, BuildingKi
   carpenter: 'carpenter',
   'ferry-landing': 'ferry_landing',
   vineyard: 'vineyard',
+  'pastoral-farmstead': 'pastoral_farmstead',
+  swineherd: 'swineherd',
 };
 
 export function toolbarModeToMenuAction(
-  mode: BuildingKind | 'road' | 'residences' | 'farm-fields' | 'idle',
+  mode: BuildingKind | 'road' | 'residences' | 'farm-fields' | 'pastures' | 'idle',
 ): PlacementBuildMenuAction | null {
   if (mode === 'idle' || mode === 'road') return null;
   if (mode === 'residences') return 'residences';
   if (mode === 'farm-fields') return 'grain-field';
+  if (mode === 'pastures') return 'pasture';
   return BUILDING_KIND_TO_MENU_ACTION[mode];
 }

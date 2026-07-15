@@ -51,8 +51,11 @@ const composeEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 const composeColor = new THREE.Color();
 /** Caps peak reed opacity so shoreline tufts stay muted against meadow grass. */
 const REED_PEAK_OPACITY = 0.9;
-/** The generated card is full-height; keep mature cattails around 1.2–2.1 metres. */
-const REED_HEIGHT_MULTIPLIER = 1.08;
+/**
+ * Standing first-person eye height is 1.55 m. Keep most mature cattails above
+ * that sightline, with the tallest wet-edge clumps approaching three metres.
+ */
+const REED_HEIGHT_MULTIPLIER = 1.28;
 const REED_SHORE_MIN = 0.55;
 const REED_SHORE_MAX = 4.8;
 
@@ -380,17 +383,25 @@ function resolveReedScaleVector(
   return scaleVector.set(width, height, width);
 }
 
-/** Taller near the water line, shorter on the outer muddy fringe. */
+/**
+ * Taller near the water line, shorter on the outer muddy fringe. The broad
+ * distribution deliberately mixes young reeds with shoulder-high and
+ * overhead mature cattails instead of scaling every shoreline clump alike.
+ */
 function resolveReedScale(shore: number, rng: () => number): number {
   const shoreT = THREE.MathUtils.clamp((shore - REED_SHORE_MIN) / (REED_SHORE_MAX - REED_SHORE_MIN), 0, 1);
   const inlandCurve = Math.pow(shoreT, 0.82);
-  const minScale = THREE.MathUtils.lerp(1.12, 0.58, inlandCurve);
-  const maxScale = THREE.MathUtils.lerp(1.88, 0.96, Math.pow(shoreT, 0.72));
-  const roll = Math.pow(rng(), 1.06);
+  const minScale = THREE.MathUtils.lerp(1.3, 0.72, inlandCurve);
+  const maxScale = THREE.MathUtils.lerp(2.15, 1.35, Math.pow(shoreT, 0.72));
+  const roll = Math.pow(rng(), 0.9);
   let scale = THREE.MathUtils.lerp(minScale, maxScale, roll);
 
-  if (shoreT > 0.5 && rng() < 0.24) {
-    scale *= THREE.MathUtils.lerp(0.58, 0.84, rng());
+  // Young shoots break up the silhouette, especially toward the dry fringe.
+  if (rng() < THREE.MathUtils.lerp(0.1, 0.28, shoreT)) {
+    scale *= THREE.MathUtils.lerp(0.62, 0.82, rng());
+  } else if (shoreT < 0.38 && rng() < 0.16) {
+    // A few exceptionally mature cattails punctuate the wettest edge.
+    scale *= THREE.MathUtils.lerp(1.08, 1.2, rng());
   }
 
   return scale;

@@ -36,7 +36,7 @@ import {
 } from '../logistics/waterLogistics.ts';
 import { areRoadConnected, formatRoadAccess, nearestRoadDistance } from '../roads/roadConnectivity.ts';
 import { backyardIconPosition } from '../residences/backyardPosition.ts';
-import type { BuildingKind, BuildingState, BurgageZoneState, GameState, InspectableTarget, ResourceNodeState, ResidenceState } from './types.ts';
+import type { BuildingKind, BuildingState, BurgageZoneState, GameState, InspectableTarget, LivestockHerdState, PastureState, ResourceNodeState, ResidenceState } from './types.ts';
 import type { WorldLayoutRegistry } from './WorldLayoutRegistry.ts';
 import { buildingKindLabel, findNearestBuilding as findBuilding } from './WorldLayoutRegistry.ts';
 import { countTreesNearBuilding } from './ForestVisualSync.ts';
@@ -150,12 +150,23 @@ export class WorldQueries {
     const building = findBuilding(state.buildings.values(), x, z);
     const residenceTarget = findNearestResidenceTarget(state, x, z);
     let fieldTarget: Extract<InspectableTarget, { kind: 'farm-field' }> | null = null;
+    let pastureTarget: Extract<InspectableTarget, { kind: 'pasture' }> | null = null;
     for (const field of state.farmFields.values()) {
       if (!isPointInPolygon2({ x, z }, field.corners)) continue;
       fieldTarget = {
         kind: 'farm-field',
         field,
         farmstead: state.buildings.get(field.farmsteadId) ?? null,
+      };
+      break;
+    }
+    for (const pasture of state.pastures.values()) {
+      if (!isPointInPolygon2({ x, z }, pasture.corners)) continue;
+      pastureTarget = {
+        kind: 'pasture',
+        pasture,
+        farmstead: state.buildings.get(pasture.farmsteadId) ?? null,
+        herd: state.livestockHerds.get(pasture.farmsteadId) ?? null,
       };
       break;
     }
@@ -192,6 +203,7 @@ export class WorldQueries {
 
     if (residenceTarget) return residenceTarget;
 
+    if (pastureTarget) return pastureTarget;
     if (fieldTarget) return fieldTarget;
 
     if (building) {
@@ -245,6 +257,16 @@ export class WorldQueries {
     const distance = nearestRoadDistance(x, z, network);
     if (!Number.isFinite(distance) || distance > NEAREST_ROAD_MAX_DISTANCE) return null;
     return distance;
+  }
+
+  getLivestockHerd(buildingId: string): LivestockHerdState | null {
+    return this.getGameState().livestockHerds.get(buildingId) ?? null;
+  }
+
+  getPasturesForBuilding(buildingId: string): PastureState[] {
+    return [...this.getGameState().pastures.values()].filter(
+      (pasture) => pasture.farmsteadId === buildingId,
+    );
   }
 
   private deliverySnapshot() {

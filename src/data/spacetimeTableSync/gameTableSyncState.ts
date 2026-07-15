@@ -10,6 +10,8 @@ import type {
   BurgageZoneState,
   ForagingNodeState,
   FarmFieldState,
+  LivestockHerdState,
+  PastureState,
   ResourceNodeState,
   ResidenceState,
   ResourceStockpile,
@@ -30,6 +32,8 @@ export type GameTableSyncState = {
   trees: Map<string, TreeEntityState>;
   buildings: Map<string, BuildingState>;
   farmFields: Map<string, FarmFieldState>;
+  pastures: Map<string, PastureState>;
+  livestockHerds: Map<string, LivestockHerdState>;
   burgageZones: Map<string, BurgageZoneState>;
   residences: Map<string, ResidenceState>;
   backyardGardens: Map<string, BackyardGardenState>;

@@ -9,7 +9,7 @@ import {
   type PopulationStats,
   type ResourceTotals,
 } from './resourceTotals.ts';
-import type { FarmCrop, GameState, InspectableTarget } from './types.ts';
+import type { FarmCrop, GameState, InspectableTarget, LivestockSpecies } from './types.ts';
 import type { WorldQueries } from './WorldQueries.ts';
 import { renderInspectableTarget } from './inspector/renderInspectableTarget.ts';
 import { handleSupplementalPanelClick } from './inspector/supplementalPanel.ts';
@@ -41,6 +41,8 @@ type ResourceInspectorOptions = {
   onDemolishFarmField?: (fieldId: string) => void | Promise<void>;
   onSetFarmFieldCrop?: (fieldId: string, crop: FarmCrop) => void | Promise<void>;
   onSetFarmFieldPriority?: (fieldId: string, priority: number) => void | Promise<void>;
+  onDemolishPasture?: (pastureId: string) => void | Promise<void>;
+  onSetLivestockSpecies?: (buildingId: string, species: Exclude<LivestockSpecies, 'swine'>) => void | Promise<void>;
   onSelectionChange?: (target: InspectableTarget | null) => void;
   isBlocked: () => boolean;
 };
@@ -76,7 +78,6 @@ export class ResourceInspector {
   private selectedTarget: InspectableTarget | null = null;
   private selectedX = 0;
   private selectedZ = 0;
-  private selectedRadius = 6;
   private populationStats: PopulationStats = {
     total: 0,
     assigned: 0,
@@ -198,6 +199,10 @@ export class ResourceInspector {
     }
     if (this.selectedTarget.kind === 'farm-field') {
       void this.options.onDemolishFarmField?.(this.selectedTarget.field.id);
+      return;
+    }
+    if (this.selectedTarget.kind === 'pasture') {
+      void this.options.onDemolishPasture?.(this.selectedTarget.pasture.id);
     }
   };
 
@@ -212,6 +217,13 @@ export class ResourceInspector {
       const priorityValue = (event.target as HTMLElement).closest<HTMLElement>('[data-field-priority]')?.dataset.fieldPriority;
       if (priorityValue != null) {
         void this.options.onSetFarmFieldPriority?.(this.selectedTarget.field.id, Number(priorityValue));
+        return;
+      }
+    }
+    if (this.selectedTarget?.kind === 'building' && this.selectedTarget.building.kind === 'pastoral_farmstead') {
+      const species = (event.target as HTMLElement).closest<HTMLElement>('[data-livestock-species]')?.dataset.livestockSpecies;
+      if (species === 'cattle' || species === 'sheep') {
+        void this.options.onSetLivestockSpecies?.(this.selectedTarget.building.id, species);
         return;
       }
     }
@@ -329,6 +341,11 @@ export class ResourceInspector {
       this.renderTarget(latest);
       return;
     }
+    if (this.selectedTarget.kind === 'pasture' && latest.kind === 'pasture' && latest.pasture.id === this.selectedTarget.pasture.id) {
+      this.selectedTarget = latest;
+      this.renderTarget(latest);
+      return;
+    }
     this.clearSelection(false);
   }
 
@@ -368,33 +385,30 @@ export class ResourceInspector {
     if (target.kind === 'quarry') {
       this.selectedX = target.definition.x;
       this.selectedZ = target.definition.z;
-      this.selectedRadius = target.definition.pickRadius * 0.42;
     } else if (target.kind === 'foraging') {
       this.selectedX = target.definition.x;
       this.selectedZ = target.definition.z;
-      this.selectedRadius = target.definition.pickRadius * 0.42;
     } else if (target.kind === 'building') {
       this.selectedX = target.building.x;
       this.selectedZ = target.building.z;
-      this.selectedRadius = 0;
     } else if (target.kind === 'residence') {
       this.selectedX = target.residence.x;
       this.selectedZ = target.residence.z;
-      this.selectedRadius = 4.2;
     } else if (target.kind === 'backyard') {
       const position = backyardIconPosition(target.residence, target.zone);
       this.selectedX = position?.x ?? target.residence.x;
       this.selectedZ = position?.z ?? target.residence.z;
-      this.selectedRadius = 3.8;
     } else if (target.kind === 'farm-field') {
       const center = target.field.corners.reduce((sum, point) => ({ x: sum.x + point.x / 4, z: sum.z + point.z / 4 }), { x: 0, z: 0 });
       this.selectedX = center.x;
       this.selectedZ = center.z;
-      this.selectedRadius = Math.max(3, Math.sqrt(target.field.area) * 0.18);
+    } else if (target.kind === 'pasture') {
+      const center = target.pasture.corners.reduce((sum, point) => ({ x: sum.x + point.x / 4, z: sum.z + point.z / 4 }), { x: 0, z: 0 });
+      this.selectedX = center.x;
+      this.selectedZ = center.z;
     } else {
       this.selectedX = target.x;
       this.selectedZ = target.z;
-      this.selectedRadius = 6;
     }
     this.renderTarget(target);
     this.updateMarker();
@@ -471,8 +485,8 @@ export class ResourceInspector {
       return;
     }
 
-    const y = this.options.sceneManager.terrain.getHeightAt(this.selectedX, this.selectedZ) + 0.35;
-    this.marker.scale.set(this.selectedRadius, 1, this.selectedRadius);
+    const y = this.options.sceneManager.terrain.getHeightAt(this.selectedX, this.selectedZ) + 2.1;
+    this.marker.scale.set(0.85, 1.15, 0.85);
     this.marker.position.set(this.selectedX, y, this.selectedZ);
     this.marker.visible = true;
   }
@@ -491,8 +505,7 @@ export class ResourceInspector {
 }
 
 function createSelectionMarker(): THREE.Mesh {
-  const geometry = new THREE.RingGeometry(0.72, 1, 48);
-  geometry.rotateX(-Math.PI * 0.5);
+  const geometry = new THREE.OctahedronGeometry(0.32, 0);
   const material = new THREE.MeshBasicMaterial({
     color: 0xd7b463,
     transparent: true,
@@ -501,7 +514,7 @@ function createSelectionMarker(): THREE.Mesh {
     side: THREE.DoubleSide,
   });
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = 'Resource selection marker';
+  mesh.name = 'Resource inspection beacon';
   mesh.renderOrder = 12;
   return mesh;
 }

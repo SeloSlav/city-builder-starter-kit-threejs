@@ -174,6 +174,47 @@ pub const FARM_SLOPE_PENALTY_PER_DEGREE: f64 = 0.025;
 pub const FARM_MAX_ACCEPTED_SLOPE_DEGREES: f64 = 18.0;
 pub const FARM_FIELD_SALVAGE_FRACTION: f64 = 0.0;
 
+pub const LIVESTOCK_MIN_PASTURE_AREA: f64 = 64.0;
+pub const LIVESTOCK_MIN_PASTURE_EDGE: f64 = 6.0;
+pub const LIVESTOCK_PASTURE_SALVAGE_FRACTION: f64 = 0.0;
+pub const CATTLE_STARTER_HERD: u32 = 3;
+pub const CATTLE_MAX_HERD: u32 = 10;
+pub const CATTLE_AREA_PER_HEAD: f64 = 190.0;
+pub const CATTLE_MAX_SLOPE_DEGREES: f64 = 15.0;
+pub const CATTLE_MOISTURE_IDEAL: f64 = 0.58;
+pub const CATTLE_MOISTURE_TOLERANCE: f64 = 0.52;
+pub const CATTLE_FOOD_PER_CYCLE_PER_HEAD: f64 = 0.72;
+pub const CATTLE_PRESERVED_FOOD_PER_CYCLE_PER_HEAD: f64 = 0.18;
+pub const CATTLE_GRAIN_PER_UNSUPPORTED_HEAD: f64 = 0.34;
+pub const CATTLE_BREEDING_PER_CYCLE: f64 = 0.018;
+pub const CATTLE_HEALTH_RECOVERY_PER_CYCLE: f64 = 0.035;
+pub const CATTLE_HEALTH_LOSS_PER_CYCLE: f64 = 0.08;
+pub const CATTLE_FERTILITY_BONUS: f64 = 0.03;
+pub const CATTLE_MAX_FERTILIZED_FIELDS: usize = 2;
+pub const CATTLE_PLOUGH_WORK_MULTIPLIER: f64 = 0.78;
+pub const SHEEP_STARTER_HERD: u32 = 6;
+pub const SHEEP_MAX_HERD: u32 = 18;
+pub const SHEEP_AREA_PER_HEAD: f64 = 105.0;
+pub const SHEEP_MAX_SLOPE_DEGREES: f64 = 28.0;
+pub const SHEEP_MOISTURE_IDEAL: f64 = 0.38;
+pub const SHEEP_MOISTURE_TOLERANCE: f64 = 0.72;
+pub const SHEEP_FOOD_PER_CYCLE_PER_HEAD: f64 = 0.32;
+pub const SHEEP_PRESERVED_FOOD_PER_CYCLE_PER_HEAD: f64 = 0.08;
+pub const SHEEP_GRAIN_PER_UNSUPPORTED_HEAD: f64 = 0.18;
+pub const SHEEP_WOOL_GOLD_PER_CYCLE_PER_HEAD: f64 = 0.075;
+pub const SHEEP_BREEDING_PER_CYCLE: f64 = 0.025;
+pub const SHEEP_HEALTH_RECOVERY_PER_CYCLE: f64 = 0.04;
+pub const SHEEP_HEALTH_LOSS_PER_CYCLE: f64 = 0.065;
+pub const SWINE_STARTER_HERD: u32 = 4;
+pub const SWINE_MAX_HERD: u32 = 14;
+pub const SWINE_AREA_PER_HEAD: f64 = 120.0;
+pub const SWINE_MATURE_TREES_PER_HEAD: f64 = 2.5;
+pub const SWINE_FOOD_PER_CYCLE_PER_HEAD: f64 = 0.62;
+pub const SWINE_GRAIN_PER_UNSUPPORTED_HEAD: f64 = 0.5;
+pub const SWINE_BREEDING_PER_CYCLE: f64 = 0.022;
+pub const SWINE_HEALTH_RECOVERY_PER_CYCLE: f64 = 0.03;
+pub const SWINE_HEALTH_LOSS_PER_CYCLE: f64 = 0.09;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BuildingSimKind {
     LumberMill,
@@ -193,6 +234,8 @@ pub enum BuildingSimKind {
     Carpenter,
     FerryLanding,
     Vineyard,
+    PastoralFarmstead,
+    Swineherd,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -526,6 +569,66 @@ const THRESHING_BARN: BuildingDef = BuildingDef {
     sim_kind: Some(BuildingSimKind::ThreshingBarn),
 };
 
+const PASTORAL_FARMSTEAD: BuildingDef = BuildingDef {
+    kind: "pastoral_farmstead",
+    cost_timber: 40.0,
+    cost_stone: 20.0,
+    storage_timber: 0.0,
+    storage_firewood: 0.0,
+    storage_stone: 0.0,
+    storage_water: 0.0,
+    storage_food: 120.0,
+    storage_grain: 90.0,
+    storage_flour: 0.0,
+    storage_ale: 0.0,
+    storage_preserved_food: 70.0,
+    storage_honey: 0.0,
+    storage_wine: 0.0,
+    accepts_labor: true,
+    max_labor: 3,
+    work_radius: 110.0,
+    action_interval: 10.0,
+    pick_radius: 10.0,
+    requires_road: true,
+    requires_mature_trees: false,
+    requires_quarry_stone: false,
+    requires_game: false,
+    requires_berries: false,
+    requires_water_shore: false,
+    requires_hillside: false,
+    sim_kind: Some(BuildingSimKind::PastoralFarmstead),
+};
+
+const SWINEHERD: BuildingDef = BuildingDef {
+    kind: "swineherd",
+    cost_timber: 34.0,
+    cost_stone: 10.0,
+    storage_timber: 0.0,
+    storage_firewood: 0.0,
+    storage_stone: 0.0,
+    storage_water: 0.0,
+    storage_food: 150.0,
+    storage_grain: 120.0,
+    storage_flour: 0.0,
+    storage_ale: 0.0,
+    storage_preserved_food: 0.0,
+    storage_honey: 0.0,
+    storage_wine: 0.0,
+    accepts_labor: true,
+    max_labor: 2,
+    work_radius: 120.0,
+    action_interval: 12.0,
+    pick_radius: 9.0,
+    requires_road: false,
+    requires_mature_trees: true,
+    requires_quarry_stone: false,
+    requires_game: false,
+    requires_berries: false,
+    requires_water_shore: false,
+    requires_hillside: false,
+    sim_kind: Some(BuildingSimKind::Swineherd),
+};
+
 const MONASTERY: BuildingDef = BuildingDef {
     kind: "monastery",
     cost_timber: 90.0,
@@ -796,7 +899,7 @@ const VINEYARD: BuildingDef = BuildingDef {
     sim_kind: Some(BuildingSimKind::Vineyard),
 };
 
-const ALL: &[BuildingDef] = &[LUMBER_MILL, REFORESTER, WOODCUTTERS_LODGE, STONE_QUARRY, WELL, HUNTERS_HALL, FORAGERS_SHED, CHAPEL, MARKETPLACE, THRESHING_BARN, MONASTERY, BREWERY, SMOKEHOUSE, GRANARY, APIARY, WATERMILL, CARPENTER, FERRY_LANDING, VINEYARD];
+const ALL: &[BuildingDef] = &[LUMBER_MILL, REFORESTER, WOODCUTTERS_LODGE, STONE_QUARRY, WELL, HUNTERS_HALL, FORAGERS_SHED, CHAPEL, MARKETPLACE, THRESHING_BARN, PASTORAL_FARMSTEAD, SWINEHERD, MONASTERY, BREWERY, SMOKEHOUSE, GRANARY, APIARY, WATERMILL, CARPENTER, FERRY_LANDING, VINEYARD];
 
 pub fn building_def(kind: &str) -> Option<&'static BuildingDef> {
     ALL.iter().find(|def| def.kind == kind)
@@ -814,6 +917,7 @@ pub enum BackyardGardenKind {
     VegetableGarden = 3,
     FlowerGarden = 4,
     HerbGarden = 5,
+    HenYard = 6,
 }
 
 impl BackyardGardenKind {
@@ -824,6 +928,7 @@ impl BackyardGardenKind {
             3 => Some(Self::VegetableGarden),
             4 => Some(Self::FlowerGarden),
             5 => Some(Self::HerbGarden),
+            6 => Some(Self::HenYard),
             _ => None,
         }
     }
@@ -897,7 +1002,18 @@ const BACKYARD_HERB_GARDEN: BackyardGardenDef = BackyardGardenDef {
     gold_per_person_per_sec: 0.015,
 };
 
-const ALL_BACKYARD_GARDENS: &[BackyardGardenDef] = &[BACKYARD_APPLE_ORCHARD, BACKYARD_CHERRY_ORCHARD, BACKYARD_VEGETABLE_GARDEN, BACKYARD_FLOWER_GARDEN, BACKYARD_HERB_GARDEN];
+const BACKYARD_HEN_YARD: BackyardGardenDef = BackyardGardenDef {
+    kind: BackyardGardenKind::HenYard,
+    slug: "hen_yard",
+    label: "Hen yard",
+    cost_timber: 6.0,
+    cost_stone: 1.0,
+    food_self_share: 0.82,
+    food_per_person_per_sec: 0.0105,
+    gold_per_person_per_sec: 0.002,
+};
+
+const ALL_BACKYARD_GARDENS: &[BackyardGardenDef] = &[BACKYARD_APPLE_ORCHARD, BACKYARD_CHERRY_ORCHARD, BACKYARD_VEGETABLE_GARDEN, BACKYARD_FLOWER_GARDEN, BACKYARD_HERB_GARDEN, BACKYARD_HEN_YARD];
 
 pub fn backyard_garden_def(kind: BackyardGardenKind) -> &'static BackyardGardenDef {
     ALL_BACKYARD_GARDENS

@@ -1,7 +1,7 @@
 import type { ToastManager } from '../ui/ToastManager.ts';
 import type { SpacetimeGameStore } from '../data/spacetimeGameStore.ts';
 import type { BackyardGardenKind } from '../residences/backyardGarden.ts';
-import type { FarmCrop, GameState } from '../resources/types.ts';
+import type { FarmCrop, GameState, LivestockSpecies } from '../resources/types.ts';
 import { describeBackyardGardenShortfall } from '../resources/buildingEconomy.ts';
 import { computeResourceTotals } from '../resources/resourceTotals.ts';
 
@@ -18,6 +18,8 @@ export type InspectorSpacetimeActions = {
   onDemolishFarmField: (fieldId: string) => Promise<void>;
   onSetFarmFieldCrop: (fieldId: string, crop: FarmCrop) => Promise<void>;
   onSetFarmFieldPriority: (fieldId: string, priority: number) => Promise<void>;
+  onDemolishPasture: (pastureId: string) => Promise<void>;
+  onSetLivestockSpecies: (buildingId: string, species: Exclude<LivestockSpecies, 'swine'>) => Promise<void>;
 };
 
 export function createInspectorSpacetimeActions(
@@ -141,6 +143,19 @@ export function createInspectorSpacetimeActions(
       const store = requireReady();
       if (!store) return;
       await runReducer(() => store.setFarmFieldPriority(fieldId, priority), 'Could not change field priority.');
+    },
+    onDemolishPasture: async (pastureId) => {
+      const store = requireReady();
+      if (!store) return;
+      await runReducer(() => store.demolishPasture(pastureId), 'Could not remove pasture.');
+    },
+    onSetLivestockSpecies: async (buildingId, species) => {
+      const store = requireReady();
+      if (!store) return;
+      await runReducer(
+        () => store.setLivestockSpecies(buildingId, species),
+        'Could not change livestock specialization.',
+      );
     },
   };
 }

@@ -25,6 +25,7 @@ mod tick_context;
 mod well;
 mod woodcutters_lodge;
 mod expanded_economy;
+mod livestock;
 pub mod spatial;
 
 pub use backyard_garden::{clear_backyard_garden_for_residence, step_backyard_gardens};
@@ -56,3 +57,4 @@ pub use expanded_economy::{
     step_granary, step_monastery, step_smokehouse, step_threshing_barn, step_vineyard,
     step_watermill,
 };
+pub use livestock::{step_pastoral_farmstead, step_swineherd};
