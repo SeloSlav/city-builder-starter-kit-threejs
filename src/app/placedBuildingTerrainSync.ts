@@ -17,7 +17,7 @@ export function collectPlacedBuildingSources(gameState: GameState | null): Build
 
 export function getPlacedBuildingSignature(buildings: Map<string, BuildingState>): string {
   return [...buildings.values()]
-    .map((building) => `${building.id}:${building.kind}:${building.assignedLabor}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
+    .map((building) => `${building.id}:${building.kind}:${building.x.toFixed(2)}:${building.z.toFixed(2)}`)
     .sort()
     .join('|');
 }

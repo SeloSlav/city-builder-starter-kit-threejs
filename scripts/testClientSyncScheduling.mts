@@ -220,11 +220,16 @@ function testTreeVisualSyncSkipsUnchangedSnapshots(): void {
   });
   let syncAllCalls = 0;
   let syncTreeCalls = 0;
+  let buildingSyncCalls = 0;
   let fenceSyncCalls = 0;
   let forestClearanceCalls = 0;
   const deps = {
     sceneManager: null,
-    buildingMarkers: null,
+    buildingMarkers: {
+      syncBuildings: () => {
+        buildingSyncCalls += 1;
+      },
+    },
     terrainMinimap: null,
     burgageFencing: {
       syncZones: () => {
@@ -257,6 +262,7 @@ function testTreeVisualSyncSkipsUnchangedSnapshots(): void {
   const applier = new SpacetimeSnapshotApplier();
   applier.apply(deps as never, first, null);
   assert.equal(syncAllCalls, 1);
+  assert.equal(buildingSyncCalls, 1);
   assert.equal(fenceSyncCalls, 1);
   assert.equal(forestClearanceCalls, 1);
 
@@ -264,6 +270,7 @@ function testTreeVisualSyncSkipsUnchangedSnapshots(): void {
   applier.apply(deps as never, tickOnly, first);
   assert.equal(syncAllCalls, 1);
   assert.equal(syncTreeCalls, 0);
+  assert.equal(buildingSyncCalls, 1);
   assert.equal(fenceSyncCalls, 1);
   assert.equal(forestClearanceCalls, 1);
 
@@ -276,6 +283,35 @@ function testTreeVisualSyncSkipsUnchangedSnapshots(): void {
   const treeChanged = { ...tickOnly, tick: 2, trees: changedTrees };
   applier.apply(deps as never, treeChanged, tickOnly);
   assert.equal(syncTreeCalls, 1);
+
+  const changedBuildings = new Map(treeChanged.buildings);
+  changedBuildings.set('building-1', {
+    id: 'building-1',
+    kind: 'lumber_mill',
+    x: 0,
+    z: 0,
+    workRadius: 10,
+    assignedLabor: 1,
+  });
+  const buildingAdded = { ...treeChanged, tick: 3, buildings: changedBuildings };
+  applier.apply(deps as never, buildingAdded, treeChanged);
+  assert.equal(buildingSyncCalls, 2);
+
+  const laborChanged = new Map(buildingAdded.buildings);
+  laborChanged.set('building-1', {
+    ...laborChanged.get('building-1')!,
+    assignedLabor: 2,
+  });
+  applier.apply(
+    deps as never,
+    { ...buildingAdded, tick: 4, buildings: laborChanged },
+    buildingAdded,
+  );
+  assert.equal(
+    buildingSyncCalls,
+    2,
+    'labor-only updates should not rebuild building geometry or terrain pads',
+  );
 }
 
 function testWorldGenerationReferenceStaysStableAcrossTicks(): void {
