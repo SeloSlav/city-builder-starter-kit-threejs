@@ -125,12 +125,20 @@ function addFrontWindow(
     stoneMaterial('mortar'),
     new THREE.Vector3(x, y - height * 0.5 - 0.1, z + 0.09),
   );
-  addMesh(
+  const mullion = addMesh(
     group,
     new THREE.BoxGeometry(0.055, height * 0.88, 0.055),
     timberMaterial('dark'),
     new THREE.Vector3(x, y, z + 0.125),
   );
+  mullion.name = 'Residence front window vertical mullion';
+  const transom = addMesh(
+    group,
+    new THREE.BoxGeometry(width * 0.88, 0.055, 0.055),
+    timberMaterial('dark'),
+    new THREE.Vector3(x, y, z + 0.13),
+  );
+  transom.name = 'Residence front window horizontal transom';
   if (!shutters) return;
 
   for (const side of [-1, 1] as const) {
@@ -171,12 +179,20 @@ function addSideWindow(
     stoneMaterial('mortar'),
     new THREE.Vector3(x + side * 0.09, y - height * 0.5 - 0.1, z),
   );
-  addMesh(
+  const mullion = addMesh(
     group,
     new THREE.BoxGeometry(0.055, height * 0.88, 0.055),
     timberMaterial('dark'),
     new THREE.Vector3(x + side * 0.125, y, z),
   );
+  mullion.name = 'Residence side window vertical mullion';
+  const transom = addMesh(
+    group,
+    new THREE.BoxGeometry(0.055, 0.055, width * 0.88),
+    timberMaterial('dark'),
+    new THREE.Vector3(x + side * 0.13, y, z),
+  );
+  transom.name = 'Residence side window horizontal transom';
 }
 
 function addPlankDoor(

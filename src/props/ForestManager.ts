@@ -100,8 +100,12 @@ export class ForestManager {
   private readonly terrain: Terrain;
   private readonly seedThreeForest: SeedThreeForestController | null;
   private readonly hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+  private roadRemovedTrees = new Set<number>();
+  private placementRemovedTrees = new Set<number>();
   private removedTrees = new Set<number>();
   private missingTreeEntities = new Set<number>();
+  private roadRemovedUndergrowth = new Set<number>();
+  private placementRemovedUndergrowth = new Set<number>();
   private removedUndergrowth = new Set<number>();
   private removedRocks = new Set<number>();
   private treePhases = new Map<number, TreePhase>();
@@ -255,63 +259,83 @@ export class ForestManager {
     });
   }
 
-  syncRoadClearance(network: RoadNetwork): void {
-    this.syncPlacementClearance({ roadNetwork: network });
+  syncRoadClearance(network: RoadNetwork | null): void {
+    const edges = network ? [...network.edges.values()] : [];
+    const nextRoadRemovedTrees = new Set<number>();
+    for (let treeIndex = 0; treeIndex < this.placements.length; treeIndex++) {
+      if (this.isTreeNearAnyEdge(this.placements[treeIndex], edges)) {
+        nextRoadRemovedTrees.add(treeIndex);
+      }
+    }
+    this.roadRemovedTrees = nextRoadRemovedTrees;
+    this.applyTreeClearance(removedIndexSetUnion(
+      this.roadRemovedTrees,
+      this.placementRemovedTrees,
+    ));
+
+    if (this.undergrowth) {
+      const nextRoadRemovedUndergrowth = new Set<number>();
+      for (let index = 0; index < this.undergrowthPlacements.length; index++) {
+        const placement = this.undergrowthPlacements[index];
+        if (isUndergrowthNearAnyEdge(
+          placement.x,
+          placement.z,
+          edges,
+          UNDERGROWTH_CLEAR_MARGIN,
+        )) {
+          nextRoadRemovedUndergrowth.add(index);
+        }
+      }
+      this.roadRemovedUndergrowth = nextRoadRemovedUndergrowth;
+      this.applyUndergrowthClearance(removedIndexSetUnion(
+        this.roadRemovedUndergrowth,
+        this.placementRemovedUndergrowth,
+      ));
+    }
+
+    if (network) {
+      this.syncRoadStumps(network);
+    } else {
+      updateRoadStumpInstances(this.stumpMesh, [], this.terrain);
+    }
   }
 
   syncPlacementClearance(clearance: ForestPlacementClearance): void {
-    const edges = clearance.roadNetwork ? [...clearance.roadNetwork.edges.values()] : [];
+    if (clearance.roadNetwork !== undefined) {
+      this.syncRoadClearance(clearance.roadNetwork);
+    }
     const buildings = clearance.buildings ? [...clearance.buildings] : [];
     const burgageParcelPolygons = clearance.burgageParcelPolygons ? [...clearance.burgageParcelPolygons] : [];
     const farmFieldPolygons = clearance.farmFieldPolygons ? [...clearance.farmFieldPolygons] : [];
-    const nextRemoved = new Set<number>();
+    const nextPlacementRemovedTrees = new Set<number>();
 
     for (let treeIndex = 0; treeIndex < this.placements.length; treeIndex++) {
       const placement = this.placements[treeIndex];
-      if (this.isTreeNearAnyEdge(placement, edges)) {
-        nextRemoved.add(treeIndex);
-        continue;
-      }
       if (this.isTreeNearAnyBuilding(placement, buildings)) {
-        nextRemoved.add(treeIndex);
+        nextPlacementRemovedTrees.add(treeIndex);
         continue;
       }
       if (this.isTreeNearAnyBurgageParcel(placement, burgageParcelPolygons)) {
-        nextRemoved.add(treeIndex);
+        nextPlacementRemovedTrees.add(treeIndex);
         continue;
       }
       if (this.isTreeInsideAnyFarmField(placement, farmFieldPolygons)) {
-        nextRemoved.add(treeIndex);
+        nextPlacementRemovedTrees.add(treeIndex);
       }
     }
 
-    const treesChanged = !removedIndexSetsEqual(nextRemoved, this.removedTrees);
-    if (treesChanged) {
-      const previousRemoved = this.removedTrees;
-      this.removedTrees = nextRemoved;
+    this.placementRemovedTrees = nextPlacementRemovedTrees;
+    this.applyTreeClearance(removedIndexSetUnion(
+      this.roadRemovedTrees,
+      this.placementRemovedTrees,
+    ));
 
-      for (let treeIndex = 0; treeIndex < this.placements.length; treeIndex++) {
-        const wasRemoved = previousRemoved.has(treeIndex);
-        const isRemoved = nextRemoved.has(treeIndex);
-        if (wasRemoved === isRemoved) continue;
-
-        if (isRemoved || this.missingTreeEntities.has(treeIndex)) {
-          this.hideTree(treeIndex);
-          this.hideHarvestStump(treeIndex);
-          this.hideSapling(treeIndex);
-        } else {
-          this.restoreTreePhaseVisual(treeIndex);
-        }
-      }
-
-      this.commitTreeInstanceUpdates();
-    }
-
-    this.syncUndergrowthClearance(edges, buildings, burgageParcelPolygons, farmFieldPolygons);
+    this.syncPlacementUndergrowthClearance(
+      buildings,
+      burgageParcelPolygons,
+      farmFieldPolygons,
+    );
     this.syncRockClearance(buildings, farmFieldPolygons);
-    if (clearance.roadNetwork) {
-      this.syncRoadStumps(clearance.roadNetwork);
-    }
   }
 
   dispose(): void {
@@ -324,32 +348,60 @@ export class ForestManager {
     this.disposeResources();
   }
 
-  private syncUndergrowthClearance(
-    edges: RoadEdge[],
+  private syncPlacementUndergrowthClearance(
     buildings: BuildingTerrainSource[],
     burgageParcelPolygons: Point2[][],
     farmFieldPolygons: Point2[][],
   ): void {
     if (!this.undergrowth) return;
 
-    const nextRemoved = new Set<number>();
+    const nextPlacementRemovedUndergrowth = new Set<number>();
     for (let index = 0; index < this.undergrowthPlacements.length; index++) {
       const placement = this.undergrowthPlacements[index];
-      if (isUndergrowthNearAnyEdge(placement.x, placement.z, edges, UNDERGROWTH_CLEAR_MARGIN)) {
-        nextRemoved.add(index);
-        continue;
-      }
       if (this.isUndergrowthNearAnyBuilding(placement.x, placement.z, buildings)) {
-        nextRemoved.add(index);
+        nextPlacementRemovedUndergrowth.add(index);
         continue;
       }
       if (this.isUndergrowthNearAnyBurgageParcel(placement.x, placement.z, burgageParcelPolygons)) {
-        nextRemoved.add(index);
+        nextPlacementRemovedUndergrowth.add(index);
         continue;
       }
       if (this.isUndergrowthNearAnyFarmField(placement.x, placement.z, farmFieldPolygons)) {
-        nextRemoved.add(index);
+        nextPlacementRemovedUndergrowth.add(index);
       }
+    }
+
+    this.placementRemovedUndergrowth = nextPlacementRemovedUndergrowth;
+    this.applyUndergrowthClearance(removedIndexSetUnion(
+      this.roadRemovedUndergrowth,
+      this.placementRemovedUndergrowth,
+    ));
+  }
+
+  private applyTreeClearance(nextRemoved: Set<number>): void {
+    if (removedIndexSetsEqual(nextRemoved, this.removedTrees)) return;
+
+    const previousRemoved = this.removedTrees;
+    this.removedTrees = nextRemoved;
+    for (let treeIndex = 0; treeIndex < this.placements.length; treeIndex++) {
+      const wasRemoved = previousRemoved.has(treeIndex);
+      const isRemoved = nextRemoved.has(treeIndex);
+      if (wasRemoved === isRemoved) continue;
+
+      if (isRemoved || this.missingTreeEntities.has(treeIndex)) {
+        this.hideTree(treeIndex);
+        this.hideHarvestStump(treeIndex);
+        this.hideSapling(treeIndex);
+      } else {
+        this.restoreTreePhaseVisual(treeIndex);
+      }
+    }
+    this.commitTreeInstanceUpdates();
+  }
+
+  private applyUndergrowthClearance(nextRemoved: Set<number>): void {
+    if (!this.undergrowth || removedIndexSetsEqual(nextRemoved, this.removedUndergrowth)) {
+      return;
     }
 
     for (let index = 0; index < this.undergrowthPlacements.length; index++) {
@@ -666,4 +718,12 @@ function removedIndexSetsEqual(a: Set<number>, b: Set<number>): boolean {
     if (!b.has(index)) return false;
   }
   return true;
+}
+
+function removedIndexSetUnion(left: Set<number>, right: Set<number>): Set<number> {
+  if (left.size === 0) return new Set(right);
+  if (right.size === 0) return new Set(left);
+  const union = new Set(left);
+  for (const index of right) union.add(index);
+  return union;
 }

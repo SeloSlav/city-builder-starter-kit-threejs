@@ -71,7 +71,7 @@ export class SpacetimeSnapshotApplier {
       });
     }
 
-    syncSettlementWorld(deps.settlementWorld, state);
+    syncSettlementWorld(deps.settlementWorld, state, previous);
     deps.burgageFencing?.syncZones(
       state.burgageZones.values(),
       state.residences.values(),

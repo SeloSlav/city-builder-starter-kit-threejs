@@ -82,8 +82,14 @@ export class GameTableSync {
 
   attachHandlers(connection: DbConnection): void {
     const db = connection.db;
+    let notifyPending = false;
     const notify = (): void => {
-      this.onChanged();
+      if (notifyPending) return;
+      notifyPending = true;
+      queueMicrotask(() => {
+        notifyPending = false;
+        this.onChanged();
+      });
     };
 
     const bindTable = (
@@ -92,9 +98,15 @@ export class GameTableSync {
       withDelete = true,
     ): void => {
       if (!table) return;
+      let applyPending = false;
       const handler = (): void => {
-        apply();
-        notify();
+        if (applyPending) return;
+        applyPending = true;
+        queueMicrotask(() => {
+          applyPending = false;
+          apply();
+          notify();
+        });
       };
       table.onInsert(handler);
       table.onUpdate(handler);

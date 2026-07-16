@@ -24,24 +24,64 @@ export type SettlementWorldSyncTargets = {
 export function syncSettlementWorld(
   targets: SettlementWorldSyncTargets,
   state: GameState,
+  previous: GameState | null = null,
 ): void {
   const { getHeightAt } = targets;
-  targets.residenceMarkers?.syncResidences(state.residences.values(), getHeightAt);
-  targets.farmFieldMarkers?.syncFields(state.farmFields.values());
-  targets.pastureMarkers?.syncPastures(state.pastures.values(), state.livestockHerds);
-  targets.livestockVisuals?.sync(state.pastures.values(), state.livestockHerds);
-  targets.backyardGardenMarkers?.syncGardens({
-    residences: state.residences.values(),
-    zones: state.burgageZones.values(),
-    gardens: state.backyardGardens,
-    getHeightAt,
-  });
-  targets.deliveryAgents?.syncTrips(state.deliveryTrips.values());
-  targets.deliveryAgents?.applyTripStates(state.deliveryTrips.values());
-  targets.villagers?.sync({
-    residences: state.residences.values(),
-    roadNetwork: targets.getRoadNetwork(),
-  });
+  const residencesChanged = !previous || !mapEntriesShareValues(
+    state.residences,
+    previous.residences,
+  );
+  const farmFieldsChanged = !previous || !mapEntriesShareValues(
+    state.farmFields,
+    previous.farmFields,
+  );
+  const pasturesChanged = !previous || !mapEntriesShareValues(
+    state.pastures,
+    previous.pastures,
+  );
+  const livestockChanged = !previous || !mapEntriesShareValues(
+    state.livestockHerds,
+    previous.livestockHerds,
+  );
+  const burgageZonesChanged = !previous || !mapEntriesShareValues(
+    state.burgageZones,
+    previous.burgageZones,
+  );
+  const gardensChanged = !previous || !mapEntriesShareValues(
+    state.backyardGardens,
+    previous.backyardGardens,
+  );
+  const deliveryTripsChanged = !previous || !mapEntriesShareValues(
+    state.deliveryTrips,
+    previous.deliveryTrips,
+  );
+
+  if (residencesChanged) {
+    targets.residenceMarkers?.syncResidences(state.residences.values(), getHeightAt);
+    targets.villagers?.sync({
+      residences: state.residences.values(),
+      roadNetwork: targets.getRoadNetwork(),
+    });
+  }
+  if (farmFieldsChanged) {
+    targets.farmFieldMarkers?.syncFields(state.farmFields.values());
+  }
+  if (pasturesChanged || livestockChanged) {
+    targets.pastureMarkers?.syncPastures(state.pastures.values(), state.livestockHerds);
+    targets.livestockVisuals?.sync(state.pastures.values(), state.livestockHerds);
+  }
+  if (residencesChanged || burgageZonesChanged || gardensChanged) {
+    targets.backyardGardenMarkers?.syncGardens({
+      residences: state.residences.values(),
+      zones: state.burgageZones.values(),
+      gardens: state.backyardGardens,
+      getHeightAt,
+    });
+  }
+  if (deliveryTripsChanged) {
+    targets.deliveryAgents?.syncTrips(state.deliveryTrips.values());
+    targets.deliveryAgents?.applyTripStates(state.deliveryTrips.values());
+  }
 }
 
 export function tickSettlementWorld(
@@ -70,4 +110,15 @@ export function disposeSettlementWorld(
   targets.backyardGardenMarkers?.dispose();
   targets.deliveryAgents?.dispose();
   targets.villagers?.dispose();
+}
+
+function mapEntriesShareValues<K, V>(
+  current: ReadonlyMap<K, V>,
+  previous: ReadonlyMap<K, V>,
+): boolean {
+  if (current.size !== previous.size) return false;
+  for (const [key, value] of current) {
+    if (previous.get(key) !== value) return false;
+  }
+  return true;
 }

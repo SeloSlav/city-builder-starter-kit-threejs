@@ -233,12 +233,21 @@ export function addSmallWindow(
     sharedBuildingMaterial('glass'),
     new THREE.Vector3(x, y, z + 0.06),
   );
-  addMesh(
+  const mullion = addMesh(
     group,
     new THREE.BoxGeometry(0.055, height * 0.86, 0.055),
     timberMaterial('dark'),
     new THREE.Vector3(x, y, z + 0.12),
   );
+  mullion.name = 'Small window vertical mullion';
+
+  const transom = addMesh(
+    group,
+    new THREE.BoxGeometry(width * 0.86, 0.055, 0.055),
+    timberMaterial('dark'),
+    new THREE.Vector3(x, y, z + 0.125),
+  );
+  transom.name = 'Small window horizontal transom';
 }
 
 export function addBarrel(group: THREE.Group, x: number, z: number, scale = 1): void {

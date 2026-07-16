@@ -334,6 +334,9 @@ export class SceneManager {
     }
 
     this.scene.add(this.forestManager.group);
+    if (this.roadNetworkRef) {
+      this.forestManager.syncRoadClearance(this.roadNetworkRef);
+    }
     this.refreshForestClearance();
     this.grassField?.syncPlacementClearance(this.forestClearanceFarmFieldPolygons);
 
@@ -591,7 +594,7 @@ export class SceneManager {
     }
 
     this.rebuildJunctions(network);
-    this.refreshForestClearance();
+    this.forestManager?.syncRoadClearance(network);
     this.grassField?.syncRoadClearance(network);
     updateTerrainRoadWear(this.terrain, network);
     this.refreshShadowMap();
@@ -599,7 +602,6 @@ export class SceneManager {
 
   private refreshForestClearance(): void {
     this.forestManager?.syncPlacementClearance({
-      roadNetwork: this.roadNetworkRef,
       buildings: this.forestClearanceBuildings,
       burgageParcelPolygons: this.forestClearanceBurgageParcelPolygons,
       farmFieldPolygons: this.forestClearanceFarmFieldPolygons,
