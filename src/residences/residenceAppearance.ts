@@ -60,3 +60,9 @@ export function pickResidenceAppearance(seed: number): ResidenceAppearance {
   const trim = pick(TRIM_COLORS, rng);
   return { facade, roof, archetype, entrySide, trim };
 }
+
+export function residenceGroundDoorLocalX(
+  appearance: Pick<ResidenceAppearance, 'archetype' | 'entrySide'>,
+): number {
+  return appearance.entrySide * (appearance.archetype === 'working_lean_to' ? 1.18 : 1.38);
+}

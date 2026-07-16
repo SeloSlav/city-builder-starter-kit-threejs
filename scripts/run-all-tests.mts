@@ -22,6 +22,7 @@ const tests = [
   'test:backyard-gardens',
   'test:building-art',
   'test:camera-controller',
+  'test:client-sync',
   'test:deer-wildlife',
   'test:livestock',
   'test:civic-logistics',

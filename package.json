@@ -35,6 +35,7 @@
     "test:backyard-gardens": "npx tsx scripts/testBackyardGardenVisuals.mts",
     "test:building-art": "npx tsx scripts/testBuildingArtDirection.mts",
     "test:camera-controller": "npx tsx scripts/testCameraController.mts",
+    "test:client-sync": "npx tsx scripts/testClientSyncScheduling.mts",
     "test:deer-wildlife": "npx tsx scripts/testDeerWildlife.mts",
     "test:livestock": "npx tsx scripts/testLivestock.mts",
     "test:civic-logistics": "npx tsx scripts/testCivicLogistics.mts",

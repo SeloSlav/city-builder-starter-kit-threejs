@@ -15,6 +15,7 @@ import { areBuildingShadowsEnabled } from '../scene/shadowPreference.ts';
 import { ChimneySmokeEmitter } from './ResidenceChimneySmoke.ts';
 import {
   pickResidenceAppearance,
+  residenceGroundDoorLocalX,
   type ResidenceArchetype,
   type ResidenceTrimColor,
 } from './residenceAppearance.ts';
@@ -414,7 +415,7 @@ export function createResidenceMesh(seed = 0, tier: 1 | 2 | 3 = 1): THREE.Group 
     new THREE.Vector3(0, wallTop - 0.07, 0),
   );
 
-  const doorX = entrySide * (archetype === 'working_lean_to' ? 1.18 : 1.38);
+  const doorX = residenceGroundDoorLocalX(appearance);
   addPlankDoor(group, doorX, foundationHeight + 0.08, frontZ + 0.03);
   addFrontWindow(
     group,

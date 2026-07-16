@@ -2,8 +2,17 @@ import * as THREE from 'three';
 import type { Point2 } from '../utils/polygonGeometry.ts';
 import type { BurgageZoneState } from '../resources/types.ts';
 import { timberMaterial } from '../buildings/buildingMaterials.ts';
-import { getParcelFenceSegments } from './burgageLayout.ts';
+import { hashStringSeed } from '../utils/random.ts';
+import {
+  getParcelFenceSegments,
+  type BurgageParcelLayout,
+  type ParcelFenceOpening,
+} from './burgageLayout.ts';
 import { layoutFromBurgageZone } from './burgageZoneLayout.ts';
+import {
+  pickResidenceAppearance,
+  residenceGroundDoorLocalX,
+} from './residenceAppearance.ts';
 
 const MAX_POSTS = 640;
 const MAX_RAILS = 1920;
@@ -11,8 +20,17 @@ const POST_SPACING = 2.2;
 const POST_HEIGHT = 1.08;
 const RAIL_HEIGHTS = [0.34, 0.64, 0.9] as const;
 const TERRAIN_LIFT = 0.14;
+const FRONT_GATE_WIDTH = 1.8;
 
 type FenceSegment = readonly [Point2, Point2];
+type FencedResidence = {
+  id: string;
+  zoneId: string;
+  parcelIndex: number;
+  x: number;
+  z: number;
+  yaw: number;
+};
 
 function fenceSignature(segments: FenceSegment[]): string {
   return segments
@@ -20,33 +38,73 @@ function fenceSignature(segments: FenceSegment[]): string {
     .join('|');
 }
 
-function occupiedParcelIndicesByZone(
-  residences: Iterable<{ zoneId: string; parcelIndex: number }>,
-): Map<string, Set<number>> {
-  const byZone = new Map<string, Set<number>>();
+function residencesByZone(
+  residences: Iterable<FencedResidence>,
+): Map<string, FencedResidence[]> {
+  const byZone = new Map<string, FencedResidence[]>();
   for (const residence of residences) {
-    let parcelIndices = byZone.get(residence.zoneId);
-    if (!parcelIndices) {
-      parcelIndices = new Set();
-      byZone.set(residence.zoneId, parcelIndices);
+    let zoneResidences = byZone.get(residence.zoneId);
+    if (!zoneResidences) {
+      zoneResidences = [];
+      byZone.set(residence.zoneId, zoneResidences);
     }
-    parcelIndices.add(residence.parcelIndex);
+    zoneResidences.push(residence);
   }
   return byZone;
 }
 
+function projectResidenceDoorToFrontage(
+  residence: FencedResidence,
+  parcel: BurgageParcelLayout,
+): Point2 {
+  const appearance = pickResidenceAppearance(hashStringSeed(residence.id));
+  const doorLocalX = residenceGroundDoorLocalX(appearance);
+  const cos = Math.cos(residence.yaw);
+  const sin = Math.sin(residence.yaw);
+  const doorPoint = {
+    x: residence.x + doorLocalX * cos,
+    z: residence.z - doorLocalX * sin,
+  };
+
+  const dx = parcel.frontRight.x - parcel.frontLeft.x;
+  const dz = parcel.frontRight.z - parcel.frontLeft.z;
+  const lengthSq = dx * dx + dz * dz;
+  const t = lengthSq <= 1e-6
+    ? 0.5
+    : THREE.MathUtils.clamp(
+      ((doorPoint.x - parcel.frontLeft.x) * dx + (doorPoint.z - parcel.frontLeft.z) * dz) / lengthSq,
+      0,
+      1,
+    );
+  return {
+    x: parcel.frontLeft.x + dx * t,
+    z: parcel.frontLeft.z + dz * t,
+  };
+}
+
 function collectFenceSegments(
   zones: Iterable<BurgageZoneState>,
-  residences: Iterable<{ zoneId: string; parcelIndex: number }>,
+  residences: Iterable<FencedResidence>,
 ): FenceSegment[] {
-  const occupiedByZone = occupiedParcelIndicesByZone(residences);
+  const residencesForZone = residencesByZone(residences);
   const segments: FenceSegment[] = [];
   for (const zone of zones) {
     const layout = layoutFromBurgageZone(zone);
     if (!layout) continue;
-    const occupied = occupiedByZone.get(zone.id);
-    if (!occupied || occupied.size === 0) continue;
-    segments.push(...getParcelFenceSegments(layout, occupied));
+    const zoneResidences = residencesForZone.get(zone.id);
+    if (!zoneResidences || zoneResidences.length === 0) continue;
+
+    const occupied = new Set(zoneResidences.map((residence) => residence.parcelIndex));
+    const openings = new Map<number, ParcelFenceOpening>();
+    for (const residence of zoneResidences) {
+      const parcel = layout.parcels.find((candidate) => candidate.index === residence.parcelIndex);
+      if (!parcel) continue;
+      openings.set(residence.parcelIndex, {
+        center: projectResidenceDoorToFrontage(residence, parcel),
+        width: FRONT_GATE_WIDTH,
+      });
+    }
+    segments.push(...getParcelFenceSegments(layout, occupied, openings));
   }
   return segments;
 }
@@ -95,7 +153,7 @@ export class BurgageFencing {
 
   syncZones(
     zones: Iterable<BurgageZoneState>,
-    residences: Iterable<{ zoneId: string; parcelIndex: number }>,
+    residences: Iterable<FencedResidence>,
     getHeightAt: (x: number, z: number) => number,
   ): void {
     const segments = collectFenceSegments(zones, residences);

@@ -26,6 +26,11 @@ export type ResidencePlacement = {
   yaw: number;
 };
 
+export type ParcelFenceOpening = {
+  center: Point2;
+  width: number;
+};
+
 export type BurgageLayoutResult = {
   frontageLength: number;
   maxPlotCount: number;
@@ -329,10 +334,44 @@ function fenceEdgeKey(a: Point2, b: Point2): string {
   return `${bx},${bz}|${ax},${az}`;
 }
 
+/** Split a frontage rail so the unbuilt span reads as a walk-through gate. */
+function splitFenceEdgeAroundOpening(
+  start: Point2,
+  end: Point2,
+  opening: ParcelFenceOpening,
+): Array<[Point2, Point2]> {
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  const length = Math.hypot(dx, dz);
+  if (length <= 1e-6 || opening.width <= 0) return [[start, end]];
+
+  const dirX = dx / length;
+  const dirZ = dz / length;
+  const projected = (opening.center.x - start.x) * dirX + (opening.center.z - start.z) * dirZ;
+  const halfGap = Math.min(opening.width * 0.5, length * 0.4);
+  const centerDistance = Math.max(halfGap, Math.min(length - halfGap, projected));
+  const gapStartDistance = centerDistance - halfGap;
+  const gapEndDistance = centerDistance + halfGap;
+  const gapStart = {
+    x: start.x + dirX * gapStartDistance,
+    z: start.z + dirZ * gapStartDistance,
+  };
+  const gapEnd = {
+    x: start.x + dirX * gapEndDistance,
+    z: start.z + dirZ * gapEndDistance,
+  };
+
+  const result: Array<[Point2, Point2]> = [];
+  if (gapStartDistance >= 0.5) result.push([start, gapStart]);
+  if (length - gapEndDistance >= 0.5) result.push([gapEnd, end]);
+  return result;
+}
+
 /** Unique parcel perimeter edges — shared lot lines appear once between neighbors. */
 export function getParcelFenceSegments(
   layout: BurgageLayoutResult,
   occupiedParcelIndices?: ReadonlySet<number>,
+  frontageOpenings?: ReadonlyMap<number, ParcelFenceOpening>,
 ): Array<[Point2, Point2]> {
   const seen = new Map<string, [Point2, Point2]>();
   for (const parcel of layout.parcels) {
@@ -341,8 +380,14 @@ export function getParcelFenceSegments(
     for (let i = 0; i < poly.length; i++) {
       const start = poly[i];
       const end = poly[(i + 1) % poly.length];
-      const key = fenceEdgeKey(start, end);
-      if (!seen.has(key)) seen.set(key, [start, end]);
+      const opening = i === 0 ? frontageOpenings?.get(parcel.index) : undefined;
+      const edgeSegments = opening
+        ? splitFenceEdgeAroundOpening(start, end, opening)
+        : [[start, end] as [Point2, Point2]];
+      for (const edgeSegment of edgeSegments) {
+        const key = fenceEdgeKey(edgeSegment[0], edgeSegment[1]);
+        if (!seen.has(key)) seen.set(key, edgeSegment);
+      }
     }
   }
   return [...seen.values()];
