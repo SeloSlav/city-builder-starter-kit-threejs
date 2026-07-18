@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
   FARM_LARGE_FIELD_EFFICIENCY_FLOOR,
   FARM_MIN_FIELD_AREA,
@@ -20,6 +21,10 @@ import {
   sampleAverageSlopeDegrees,
 } from '../src/farming/farmFieldMath.ts';
 import { sampleAuthoritativeHydrologyScore } from '../src/hydrology/sampleAuthoritativeHydrology.ts';
+import {
+  AGRICULTURE_BUILD_MENU_ENTRIES,
+  renderBuildMenuCards,
+} from '../src/ui/buildMenuCards.ts';
 
 const rectangle = rectangleFromBaseline(
   { x: 0, z: 0 },
@@ -101,5 +106,19 @@ assert.equal(MILL_WATER_PER_HARVEST, 0, 'lumber should not consume well water');
 assert.equal(WATERMILL_WATER_PER_CYCLE, 0, 'a river-powered mill should not consume well water');
 assert.ok(GRANARY_WATER_PER_CYCLE > 0, 'bakery production should consume well water');
 assert.ok(GRANARY_FIREWOOD_PER_CYCLE > 0, 'bakery production should consume fuel');
+
+const agricultureMenu = renderBuildMenuCards(AGRICULTURE_BUILD_MENU_ENTRIES);
+assert.doesNotMatch(agricultureMenu, /data-action="grain-field"/, 'fields must be started from a selected farmstead');
+assert.doesNotMatch(agricultureMenu, /data-action="pasture"/, 'pastures must be started from a selected livestock holding');
+
+const farmFieldTool = fs.readFileSync('src/farming/FarmFieldTool.ts', 'utf8');
+assert.match(farmFieldTool, /state\.buildings\.get\(this\.farmsteadId\)/, 'parcel placement must stay pinned to the selected holding');
+assert.doesNotMatch(farmFieldTool, /let distance = Number\.POSITIVE_INFINITY/, 'parcel placement must not silently choose the nearest holding');
+assert.match(farmFieldTool, /corners\.some\(\(point\)/, 'the whole parcel must stay inside the selected work extent');
+
+const farmsteadInspector = fs.readFileSync('src/resources/inspector/expandedBuildingRenderer.ts', 'utf8');
+const livestockInspector = fs.readFileSync('src/resources/inspector/livestockBuildingRenderer.ts', 'utf8');
+assert.match(farmsteadInspector, /data-land-parcel="field"/, 'farmsteads need a contextual field-layout action');
+assert.match(livestockInspector, /data-land-parcel="pasture"/, 'livestock holdings need a contextual pasture action');
 
 console.log('farming and water-chain tests passed');

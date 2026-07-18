@@ -149,7 +149,8 @@ A real-time Three.js sandbox for growing a **medieval settlement** on a procedur
 | Select well | Build menu (`B`) → **Well** (`E`) |
 | Select chapel | Build menu (`B`) → **Chapel** (`C`) |
 | Select Pauline monastery | Build menu (`B`) → **Pauline monastery** (`O`) |
-| Select grain field | Industry menu (`V`) → **Rye and oat field** (`G`) |
+| Lay out a grain field | Select a **Farmstead** → **Lay out farm field** |
+| Fence pasture or pannage | Select a **Pastoral farmstead** or **Woodland swineherd** → pasture action |
 | Select brewhouse | Industry menu (`V`) → **Brewhouse** (`B`) |
 | Select lumber mill | Industry menu (`V`) → **Lumber mill** (`L`) |
 | Select stonecutter's camp | Industry menu (`V`) → **Stonecutter's camp** (`S`) |

@@ -4,7 +4,6 @@ import {
   FARM_MAX_ACCEPTED_SLOPE_DEGREES,
   FARM_MIN_FIELD_AREA,
   FARM_MIN_FIELD_EDGE,
-  FARM_OPTIMAL_FIELD_AREA,
   LIVESTOCK_MIN_PASTURE_AREA,
   LIVESTOCK_MIN_PASTURE_EDGE,
   SHEEP_MAX_SLOPE_DEGREES,
@@ -84,6 +83,7 @@ export class FarmFieldTool {
   private readonly preview: FarmFieldPreview;
   private enabled = false;
   private mode: LandParcelMode = 'field';
+  private farmsteadId: string | null = null;
   private points: Point2[] = [];
   private hoverPoint: Point2 | null = null;
   private fixedCorners: FarmFieldCorners | null = null;
@@ -116,12 +116,17 @@ export class FarmFieldTool {
     return this.mode;
   }
 
-  setMode(mode: LandParcelMode): void {
-    if (this.mode !== mode) {
+  setMode(mode: LandParcelMode, farmsteadId: string): void {
+    if (this.mode !== mode || this.farmsteadId !== farmsteadId) {
       this.mode = mode;
+      this.farmsteadId = farmsteadId;
       this.clearDraft();
     }
     this.setEnabled(true);
+  }
+
+  getFarmsteadId(): string | null {
+    return this.farmsteadId;
   }
 
   hasDraft(): boolean {
@@ -144,7 +149,10 @@ export class FarmFieldTool {
     if (enabled && this.options.isBlocked()) return;
     if (enabled === this.enabled) return;
     this.enabled = enabled;
-    if (!enabled) this.clearDraft();
+    if (!enabled) {
+      this.clearDraft();
+      this.farmsteadId = null;
+    }
     else this.pointerDirty = true;
     this.options.onModeChanged();
   }
@@ -171,8 +179,8 @@ export class FarmFieldTool {
     const parcel = this.mode === 'pasture' ? 'pasture' : 'field';
     if (this.points.length === 0 && !this.fixedCorners) {
       return this.mode === 'pasture'
-        ? 'Click to start the pasture baseline · draw within a livestock work extent'
-        : `Click to start the field baseline · crop: ${cropLabel(this.crop)} (C to change) · full yield through ${FARM_OPTIMAL_FIELD_AREA.toLocaleString()} m²`;
+        ? 'Click to start the pasture baseline · keep the parcel inside this holding’s work extent'
+        : `Click to start the field baseline · crop: ${cropLabel(this.crop)} (C to change) · keep it inside this farmstead’s work extent`;
     }
     if (this.points.length === 1) return `Click to set the other end of the ${parcel} baseline`;
     if (!this.fixedCorners) return `Click to set ${parcel} depth`;
@@ -356,20 +364,16 @@ export class FarmFieldTool {
     const center = fieldCentroid(corners);
     const moisture = sampleAuthoritativeHydrologyScore(center.x, center.z);
     const state = this.options.getState();
-    let farmstead: BuildingState | null = null;
-    let distance = Number.POSITIVE_INFINITY;
-    for (const building of state.buildings.values()) {
-      const eligible = this.mode === 'pasture'
-        ? building.kind === 'pastoral_farmstead' || building.kind === 'swineherd'
-        : building.kind === 'threshing_barn';
-      if (!eligible) continue;
-      const next = Math.hypot(building.x - center.x, building.z - center.z);
-      if (next <= building.workRadius && next < distance) {
-        farmstead = building;
-        distance = next;
-      }
+    const farmstead = this.farmsteadId ? state.buildings.get(this.farmsteadId) ?? null : null;
+    const eligible = farmstead && (this.mode === 'pasture'
+      ? farmstead.kind === 'pastoral_farmstead' || farmstead.kind === 'swineherd'
+      : farmstead.kind === 'threshing_barn');
+    if (!farmstead || !eligible) return { ok: false, reason: 'no_farmstead', corners, slope, moisture };
+    if (corners.some((point) =>
+      Math.hypot(point.x - farmstead.x, point.z - farmstead.z) > farmstead.workRadius
+    )) {
+      return { ok: false, reason: 'no_farmstead', corners, slope, moisture };
     }
-    if (!farmstead) return { ok: false, reason: 'no_farmstead', corners, slope, moisture };
     const maxSlope = this.mode === 'pasture'
       ? state.livestockHerds.get(farmstead.id)?.species === 'cattle'
         ? CATTLE_MAX_SLOPE_DEGREES
@@ -417,8 +421,8 @@ export class FarmFieldTool {
       case 'too_steep': return `Ground too steep for this ${this.mode === 'pasture' ? 'herd' : 'crop'}`;
       case 'no_farmstead':
         return this.mode === 'pasture'
-          ? 'Pasture center must lie within a pastoral farmstead or swineherd work extent'
-          : "Field center must lie within a farmstead's work extent";
+          ? 'Keep the entire pasture inside this livestock holding’s work extent'
+          : 'Keep the entire field inside this farmstead’s work extent';
       case 'water': return `${parcel} cannot cover open water`;
       case 'quarry': return `${parcel} cannot cover a quarry pit`;
       case 'building': return `${parcel} overlaps a building`;

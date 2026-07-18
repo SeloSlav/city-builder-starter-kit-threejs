@@ -27,7 +27,7 @@ export const BUILDING_KIND_TO_MENU_ACTION: Record<BuildingKind, PlacementBuildMe
   swineherd: 'swineherd',
 };
 
-export type BuildingMenuAction = Exclude<PlacementBuildMenuAction, 'residences' | 'grain-field' | 'pasture'>;
+export type BuildingMenuAction = Exclude<PlacementBuildMenuAction, 'residences'>;
 
 export const MENU_ACTION_TO_BUILDING_KIND: Record<BuildingMenuAction, BuildingKind> = {
   'lumber-mill': 'lumber_mill',
@@ -60,7 +60,6 @@ export function toolbarModeToMenuAction(
 ): PlacementBuildMenuAction | null {
   if (mode === 'idle' || mode === 'road') return null;
   if (mode === 'residences') return 'residences';
-  if (mode === 'farm-fields') return 'grain-field';
-  if (mode === 'pastures') return 'pasture';
+  if (mode === 'farm-fields' || mode === 'pastures') return null;
   return BUILDING_KIND_TO_MENU_ACTION[mode];
 }

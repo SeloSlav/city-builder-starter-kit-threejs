@@ -49,6 +49,8 @@ type ResourceInspectorOptions = {
   onSetFarmFieldPriority?: (fieldId: string, priority: number) => void | Promise<void>;
   onDemolishPasture?: (pastureId: string) => void | Promise<void>;
   onSetLivestockSpecies?: (buildingId: string, species: Exclude<LivestockSpecies, 'swine'>) => void | Promise<void>;
+  onBeginFarmFieldPlacement?: (farmsteadId: string) => void;
+  onBeginPasturePlacement?: (farmsteadId: string) => void;
   onSelectionChange?: (target: InspectableTarget | null) => void;
   isBlocked: () => boolean;
 };
@@ -225,6 +227,18 @@ export class ResourceInspector {
       const priorityValue = (event.target as HTMLElement).closest<HTMLElement>('[data-field-priority]')?.dataset.fieldPriority;
       if (priorityValue != null) {
         void this.options.onSetFarmFieldPriority?.(this.selectedTarget.field.id, Number(priorityValue));
+        return;
+      }
+    }
+    if (this.selectedTarget?.kind === 'building') {
+      const building = this.selectedTarget.building;
+      const landParcel = (event.target as HTMLElement).closest<HTMLElement>('[data-land-parcel]')?.dataset.landParcel;
+      if (landParcel === 'field' && building.kind === 'threshing_barn') {
+        this.options.onBeginFarmFieldPlacement?.(building.id);
+        return;
+      }
+      if (landParcel === 'pasture' && (building.kind === 'pastoral_farmstead' || building.kind === 'swineherd')) {
+        this.options.onBeginPasturePlacement?.(building.id);
         return;
       }
     }

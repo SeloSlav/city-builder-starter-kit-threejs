@@ -89,9 +89,14 @@ pub fn place_pasture(
     }
 
     let center = centroid(&corners);
-    let distance = ((center.x - farmstead.x).powi(2) + (center.z - farmstead.z).powi(2)).sqrt();
-    if distance > farmstead.work_radius {
-        return Err("Pasture lies outside the building's working range.".to_string());
+    if [corners.a, corners.b, corners.c, corners.d]
+        .iter()
+        .any(|point| {
+            ((point.x - farmstead.x).powi(2) + (point.z - farmstead.z).powi(2)).sqrt()
+                > farmstead.work_radius
+        })
+    {
+        return Err("The entire pasture must lie inside the building's working range.".to_string());
     }
 
     let polygon = [

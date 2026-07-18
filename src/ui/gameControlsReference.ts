@@ -71,7 +71,6 @@ export const GAME_CONTROL_SECTIONS: readonly GameControlSection[] = [
   {
     title: 'Agriculture build menu',
     entries: [
-      { action: 'Draw farm field', keys: 'G' },
       { action: 'Farmstead', keys: 'T' },
       { action: 'Grain watermill', keys: 'M' },
       { action: 'Village granary', keys: 'N' },
@@ -97,6 +96,8 @@ export const GAME_CONTROL_SECTIONS: readonly GameControlSection[] = [
     title: 'Inspection & world',
     entries: [
       { action: 'Inspect buildings and resources', keys: 'Left-click' },
+      { action: 'Lay out farm field', keys: 'Farmstead inspector' },
+      { action: 'Fence pasture / pannage', keys: 'Livestock inspector' },
       { action: 'Close inspector / panel', keys: 'Esc' },
       { action: 'Rotate residence frontage', keys: 'F (while placing)' },
       { action: 'Adjust residence plot count', keys: '+ / − on layout HUD' },

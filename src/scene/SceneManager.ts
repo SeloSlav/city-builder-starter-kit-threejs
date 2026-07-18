@@ -88,6 +88,7 @@ export class SceneManager {
   private berryPatchVisuals: BerryPatchVisuals | null = null;
   private deerWildlifeVisuals: DeerWildlifeVisuals | null = null;
   private vegetationBuilt = false;
+  private vegetationBuildActive = false;
   private roadNetworkRef: RoadNetwork | null = null;
   private forestClearanceBuildings: BuildingTerrainSource[] = [];
   private forestClearanceBurgageParcelPolygons: Point2[][] = [];
@@ -289,7 +290,18 @@ export class SceneManager {
   async finishVegetation(): Promise<void> {
     if (this.vegetationBuilt) return;
     this.vegetationBuilt = true;
+    this.vegetationBuildActive = true;
 
+    try {
+      await this.buildVegetation();
+    } finally {
+      // SeedThree temporarily retargets the renderer while baking foliage
+      // atlases. Interleaving the normal screen pipeline corrupts both targets.
+      this.vegetationBuildActive = false;
+    }
+  }
+
+  private async buildVegetation(): Promise<void> {
     this.forestManager = await createForestProps(this.terrain, this.maxAnisotropy, {
       isBlockedAt: (x, z) => this.riverSystem.isBlockedAt(x, z) || this.quarrySystem.isBlockedAt(x, z),
       rendererBackend: this.rendererBackend,
@@ -417,6 +429,7 @@ export class SceneManager {
     firstPersonActive = false,
     firstPersonCrouching = false,
   ): void {
+    if (this.vegetationBuildActive) return;
     const elapsed = performance.now() * 0.001;
     const cameraDistance = orbitDistance ?? this.camera.position.distanceTo(this.cameraTarget);
     updateTerrainZoomBlend(this.terrain, cameraDistance, firstPersonActive);

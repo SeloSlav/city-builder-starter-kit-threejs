@@ -222,7 +222,9 @@ export function renderExpandedBuildingInspector(
   const logisticsRows = renderLogisticsRows(building, context);
   const supplementalPanelHtml = building.kind === 'monastery'
     ? renderMonasteryPolicyPanel(context)
-    : undefined;
+    : building.kind === 'threshing_barn'
+      ? renderFarmsteadFieldPanel()
+      : undefined;
   return {
     eyebrow: 'Settlement building',
     title: definition.label,
@@ -233,6 +235,17 @@ export function renderExpandedBuildingInspector(
     labor: buildingLaborView(building, context.populationStats),
     ...(supplementalPanelHtml ? { supplementalPanelHtml } : {}),
   };
+}
+
+function renderFarmsteadFieldPanel(): string {
+  return `
+    <div class="inspector-action-panel">
+      <p class="inspector-action-panel__hint">Lay out cultivated land for this farmstead. Its crew will exclusively plough, sow, tend, and harvest the linked fields.</p>
+      <div class="resource-action-row">
+        <button type="button" class="resource-action-button" data-land-parcel="field">Lay out farm field</button>
+      </div>
+    </div>
+  `;
 }
 
 function renderMonasteryPolicyPanel(context: InspectorRenderContext): string {

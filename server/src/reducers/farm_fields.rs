@@ -61,9 +61,14 @@ pub fn place_farm_field(
     }
 
     let center = centroid(&corners);
-    let distance = ((center.x - farmstead.x).powi(2) + (center.z - farmstead.z).powi(2)).sqrt();
-    if distance > farmstead.work_radius {
-        return Err("Field lies outside the farmstead's working range.".to_string());
+    if [corners.a, corners.b, corners.c, corners.d]
+        .iter()
+        .any(|point| {
+            ((point.x - farmstead.x).powi(2) + (point.z - farmstead.z).powi(2)).sqrt()
+                > farmstead.work_radius
+        })
+    {
+        return Err("The entire field must lie inside the farmstead's working range.".to_string());
     }
 
     let polygon = zone_corners_polygon(&corners);

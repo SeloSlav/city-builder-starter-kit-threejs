@@ -4,7 +4,11 @@ import { FirstPersonController } from '../camera/FirstPersonController.ts';
 import { BuildingMarkers } from '../buildings/BuildingMarkers.ts';
 import { BuildingTool } from '../buildings/BuildingTool.ts';
 import { FarmFieldMarkers } from '../farming/FarmFieldMarkers.ts';
-import { FarmFieldTool, type FarmFieldPlacementFailureReason } from '../farming/FarmFieldTool.ts';
+import {
+  FarmFieldTool,
+  type FarmFieldPlacementFailureReason,
+  type LandParcelMode,
+} from '../farming/FarmFieldTool.ts';
 import { PastureMarkers } from '../farming/PastureMarkers.ts';
 import { LivestockVisuals } from '../farming/LivestockVisuals.ts';
 import { BurgageTool } from '../residences/BurgageTool.ts';
@@ -480,6 +484,41 @@ export async function bootstrapAppSession(
     (x, z) => sceneManager.terrain.getHeightAt(x, z),
   );
 
+  const beginLinkedLandParcelPlacement = (mode: LandParcelMode, farmsteadId: string): void => {
+    if (!sessionGate.isReady()) {
+      toastManager?.show('SpacetimeDB is not connected.', { variant: 'error' });
+      return;
+    }
+    const farmstead = liveContext.gameState.buildings.get(farmsteadId);
+    const eligible = farmstead && (mode === 'field'
+      ? farmstead.kind === 'threshing_barn'
+      : farmstead.kind === 'pastoral_farmstead' || farmstead.kind === 'swineherd');
+    if (!farmstead || !eligible) {
+      toastManager?.show('That holding can no longer manage this type of land.', { variant: 'error' });
+      return;
+    }
+
+    const wasEnabled = farmFieldTool.isEnabled()
+      && farmFieldTool.getMode() === mode
+      && farmFieldTool.getFarmsteadId() === farmsteadId;
+    farmFieldTool.setMode(mode, farmsteadId);
+    if (!farmFieldTool.isEnabled()) return;
+
+    roadTool.setEnabled(false);
+    buildingTool.setMode('off');
+    burgageTool.setEnabled(false);
+    buildingMarkers.setBuildingExtentOverlay(farmstead);
+    if (!wasEnabled) {
+      toastManager?.show(
+        mode === 'field'
+          ? 'Lay out a field entirely inside this farmstead’s work extent. Press C to change the crop.'
+          : 'Fence a parcel entirely inside this holding’s work extent.',
+        { variant: 'info', durationMs: 6000 },
+      );
+    }
+    bridge.syncToolbar();
+  };
+
   toolbar = new BuildToolbar(uiRoot, {
     onOpenRoads: toggleRoadTool,
     onBuildRoad: () => {
@@ -523,48 +562,6 @@ export async function bootstrapAppSession(
           toastManager?.show(
             'Draw the rectangle along the road, then use the on-screen plot controls to choose how many homes fit.',
             { variant: 'info', durationMs: 6500 },
-          );
-        }
-      }
-      bridge.syncToolbar();
-    },
-    onSelectFarmFields: () => {
-      if (!sessionGate.isReady()) {
-        toastManager?.show('SpacetimeDB is not connected.', { variant: 'error' });
-        return;
-      }
-      const wasEnabled = farmFieldTool.isEnabled();
-      farmFieldTool.setMode('field');
-      if (farmFieldTool.isEnabled()) {
-        roadTool.setEnabled(false);
-        buildingTool.setMode('off');
-        burgageTool.setEnabled(false);
-        resourceInspector?.clearSelection();
-        if (!wasEnabled) {
-          toastManager?.show(
-            'Draw a baseline, set field depth, then choose rye, oats, or fallow with C.',
-            { variant: 'info', durationMs: 6000 },
-          );
-        }
-      }
-      bridge.syncToolbar();
-    },
-    onSelectPastures: () => {
-      if (!sessionGate.isReady()) {
-        toastManager?.show('SpacetimeDB is not connected.', { variant: 'error' });
-        return;
-      }
-      const wasEnabled = farmFieldTool.isEnabled() && farmFieldTool.getMode() === 'pasture';
-      farmFieldTool.setMode('pasture');
-      if (farmFieldTool.isEnabled()) {
-        roadTool.setEnabled(false);
-        buildingTool.setMode('off');
-        burgageTool.setEnabled(false);
-        resourceInspector?.clearSelection();
-        if (!wasEnabled) {
-          toastManager?.show(
-            'Draw fenced pasture inside a pastoral farmstead or woodland swineherd work extent.',
-            { variant: 'info', durationMs: 6000 },
           );
         }
       }
@@ -648,6 +645,8 @@ export async function bootstrapAppSession(
       spacetimeStore.snapshot.monasteryPolicy ?? DEFAULT_MONASTERY_POLICY,
     getMarketState: () => spacetimeStore.snapshot.marketState,
     ...inspectorActions,
+    onBeginFarmFieldPlacement: (farmsteadId) => beginLinkedLandParcelPlacement('field', farmsteadId),
+    onBeginPasturePlacement: (farmsteadId) => beginLinkedLandParcelPlacement('pasture', farmsteadId),
     onSelectionChange: (target) => {
       toolbar.setCityAdministrationOpen(target?.kind === 'building' && target.building.kind === 'town_hall');
       if (target?.kind === 'building') {

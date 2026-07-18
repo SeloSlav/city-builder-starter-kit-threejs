@@ -54,6 +54,13 @@ export function renderLivestockBuildingInspector(
         </div>
       </div>`
     : undefined;
+  const pastureLabel = building.kind === 'swineherd' ? 'Fence woodland pannage' : 'Fence pasture';
+  const pastureControls = `<div class="inspector-action-panel">
+      <p class="resource-inspector-note">Fence grazing land for this holding. Its area and terrain determine this herd’s capacity.</p>
+      <div class="resource-action-row">
+        <button type="button" class="resource-action-button" data-land-parcel="pasture">${pastureLabel}</button>
+      </div>
+    </div>`;
 
   const recentOutput = herd
     ? `${herd.lastFoodOutput.toFixed(2)} food · ${herd.lastPreservedOutput.toFixed(2)} preserved${herd.species === 'sheep' ? ` · ${herd.lastWoolGold.toFixed(2)} gold` : ''}`
@@ -97,6 +104,6 @@ export function renderLivestockBuildingInspector(
         : buildingDemolishHint(building.kind),
     },
     labor: buildingLaborView(building, context.populationStats),
-    ...(speciesControls ? { supplementalPanelHtml: speciesControls } : {}),
+    supplementalPanelHtml: `${pastureControls}${speciesControls ?? ''}`,
   };
 }
