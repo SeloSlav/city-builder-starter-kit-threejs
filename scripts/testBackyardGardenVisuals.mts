@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import * as THREE from 'three';
 import { createBackyardGardenMesh, disposeBackyardGardenMesh } from '../src/residences/backyardGardenMesh.ts';
 import type { BackyardGardenKind } from '../src/generated/gameBalance.ts';
@@ -66,6 +68,21 @@ assert.ok(
 assert.ok(
   Number(BACKYARD_PLANT_SPECIES.rose.params?.scale) < 1.5,
   'rose shrubs should remain below windowsill scale',
+);
+
+const backyardAssetSource = readFileSync(
+  join(process.cwd(), 'src/vegetation/seedthree/backyardPlantAssets.ts'),
+  'utf8',
+);
+assert.match(
+  backyardAssetSource,
+  /normalizeBackyardPlantFoliageWind\(group\)/,
+  'cultivated SeedThree prototypes must normalize r185 foliage wind before cloning',
+);
+assert.match(
+  backyardAssetSource,
+  /WIND_DIR\.x \* weight[\s\S]*WIND_DIR\.z \* weight/,
+  'backyard foliage wind must be stored in plant/object space without inverse leaf-scale amplification',
 );
 
 console.log('Backyard garden visual system passed.');
