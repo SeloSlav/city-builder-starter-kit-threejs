@@ -10,6 +10,7 @@ export type IndexedRoadEdge = {
   edgeId: string;
   path: THREE.Vector3[];
   useControlPoints: boolean;
+  halfWidth: number;
 };
 
 type BoundsXZ = {
@@ -19,16 +20,23 @@ type BoundsXZ = {
   maxZ: number;
 };
 
+type IndexedRoadNode = {
+  node: RoadNode;
+  surfaceRadius: number;
+};
+
 export class RoadSpatialIndex {
   private readonly edgeCells = new Map<number, IndexedRoadEdge[]>();
-  private readonly nodeCells = new Map<number, RoadNode[]>();
+  private readonly nodeCells = new Map<number, IndexedRoadNode[]>();
+  private readonly edgeHalfWidths = new Map<string, number>();
+  private maxSurfaceRadius = 0;
 
   constructor(nodes: Iterable<RoadNode>, edges: Iterable<RoadEdge>) {
-    for (const node of nodes) {
-      this.insertNode(node);
-    }
     for (const edge of edges) {
       this.insertEdge(edge);
+    }
+    for (const node of nodes) {
+      this.insertNode(node);
     }
   }
 
@@ -38,6 +46,26 @@ export class RoadSpatialIndex {
 
   isNearAnyRoad(x: number, z: number, margin: number): boolean {
     return this.nearestDistance(x, z, margin) <= margin;
+  }
+
+  isOnRoadSurface(x: number, z: number, margin: number): boolean {
+    const searchRadius = this.maxSurfaceRadius + margin;
+    for (const edge of this.queryEdges(x, z, searchRadius)) {
+      if (edge.path.length < 2) continue;
+      if (distancePointToPolylineXZ(x, z, edge.path) <= edge.halfWidth + margin) {
+        return true;
+      }
+    }
+    for (const indexed of this.queryIndexedNodes(x, z, searchRadius)) {
+      if (
+        indexed.surfaceRadius > 0
+        && Math.hypot(x - indexed.node.position.x, z - indexed.node.position.z)
+          <= indexed.surfaceRadius + margin
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   nearestDistance(x: number, z: number, maxDistance = Infinity): number {
@@ -113,14 +141,29 @@ export class RoadSpatialIndex {
   private queryNodes(x: number, z: number, radius: number): RoadNode[] {
     const results: RoadNode[] = [];
     const seen = new Set<RoadNode>();
+    for (const indexed of this.queryIndexedNodes(x, z, radius)) {
+      const node = indexed.node;
+      if (seen.has(node)) continue;
+      seen.add(node);
+      results.push(node);
+    }
+    return results;
+  }
+
+  private queryIndexedNodes(x: number, z: number, radius: number): IndexedRoadNode[] {
+    const results: IndexedRoadNode[] = [];
+    const seen = new Set<IndexedRoadNode>();
     for (const key of cellKeysInRadius(x, z, radius)) {
       const bucket = this.nodeCells.get(key);
       if (!bucket) continue;
-      for (const node of bucket) {
-        if (seen.has(node)) continue;
-        seen.add(node);
-        if (Math.hypot(x - node.position.x, z - node.position.z) <= radius + 1e-6) {
-          results.push(node);
+      for (const indexed of bucket) {
+        if (seen.has(indexed)) continue;
+        seen.add(indexed);
+        if (
+          Math.hypot(x - indexed.node.position.x, z - indexed.node.position.z)
+          <= radius + 1e-6
+        ) {
+          results.push(indexed);
         }
       }
     }
@@ -146,9 +189,15 @@ export class RoadSpatialIndex {
 
   private insertNode(node: RoadNode): void {
     const key = cellKey(node.position.x, node.position.z);
+    let surfaceRadius = 0;
+    for (const edgeId of node.edgeIds) {
+      surfaceRadius = Math.max(surfaceRadius, this.edgeHalfWidths.get(edgeId) ?? 0);
+    }
+    this.maxSurfaceRadius = Math.max(this.maxSurfaceRadius, surfaceRadius);
+    const indexed = { node, surfaceRadius };
     const bucket = this.nodeCells.get(key);
-    if (bucket) bucket.push(node);
-    else this.nodeCells.set(key, [node]);
+    if (bucket) bucket.push(indexed);
+    else this.nodeCells.set(key, [indexed]);
   }
 
   private insertEdge(edge: RoadEdge): void {
@@ -159,7 +208,10 @@ export class RoadSpatialIndex {
       edgeId: edge.id,
       path,
       useControlPoints: path === edge.controlPoints,
+      halfWidth: edge.width * 0.5,
     };
+    this.edgeHalfWidths.set(edge.id, indexed.halfWidth);
+    this.maxSurfaceRadius = Math.max(this.maxSurfaceRadius, indexed.halfWidth);
     const bounds = computePathBounds(path, 0);
     for (const key of cellKeysForBounds(bounds)) {
       const bucket = this.edgeCells.get(key);

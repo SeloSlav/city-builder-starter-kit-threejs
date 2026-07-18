@@ -72,6 +72,7 @@ export class BuildingTool {
   private readonly terrainPreviewMoveThreshold = 0.45;
   private readonly undoStack: BuildingPlacementUndoEntry[] = [];
   private readonly redoStack: BuildingPlacementRedoEntry[] = [];
+  private placementPending = false;
 
   constructor(options: BuildingToolOptions) {
     this.options = options;
@@ -96,7 +97,7 @@ export class BuildingTool {
   }
 
   setMode(mode: BuildingToolMode): void {
-    if (mode !== 'off' && this.options.isBlocked()) return;
+    if (mode !== 'off' && (this.options.isBlocked() || this.placementPending)) return;
     this.mode = mode;
     this.resetPreviewCache();
     if (mode === 'off') {
@@ -223,23 +224,29 @@ export class BuildingTool {
     event.preventDefault();
     event.stopPropagation();
 
-    void this.placeAt(this.mode, point.x, point.z);
+    const kind = this.mode;
+    this.placementPending = true;
+    this.setMode('off');
+    void this.placeAt(kind, point.x, point.z);
   };
 
   private async placeAt(kind: BuildingKind, x: number, z: number): Promise<void> {
     const beforeIds = new Set(this.options.getState().buildings.keys());
     try {
       await this.options.onPlaceBuilding(kind, x, z);
+      this.placementPending = false;
       const buildingId = await waitForPlacedBuilding(this.options.getState, beforeIds, kind, x, z);
       if (buildingId) {
         this.undoStack.push({ buildingId, kind, x, z });
         this.redoStack.length = 0;
       }
-      this.setMode('off');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Building placement failed.';
       console.error('Building placement failed:', error);
       this.options.onPlacementFailed?.(message);
+      this.placementPending = false;
+      if (!this.options.isBlocked()) this.setMode(kind);
+      return;
     }
   }
 

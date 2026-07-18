@@ -1,6 +1,4 @@
 import type { RoadNetwork } from './RoadNetwork.ts';
-import { getEdgePath } from './roadEndpoint.ts';
-import { distancePointToPolylineXZ } from '../utils/pathGeometry.ts';
 import type { BuildingState, ResidenceState } from '../resources/types.ts';
 import { BUILDING_ROAD_ACCESS_DISTANCE, BURGAGE_ROAD_FRONTAGE_DISTANCE } from '../generated/gameBalance.ts';
 
@@ -29,25 +27,7 @@ const ROAD_SURFACE_MARGIN = 0.15;
 
 /** True when a point lies on paved road surface (not merely near a road). */
 export function isOnRoadSurface(x: number, z: number, network: RoadNetwork): boolean {
-  for (const edge of network.edges.values()) {
-    const path = getEdgePath(edge);
-    if (path.length < 2) continue;
-    const distance = distancePointToPolylineXZ(x, z, path);
-    if (distance <= edge.width * 0.5 + ROAD_SURFACE_MARGIN) return true;
-  }
-
-  for (const node of network.nodes.values()) {
-    let maxHalfWidth = 0;
-    for (const edgeId of node.edgeIds) {
-      const edge = network.edges.get(edgeId);
-      if (edge) maxHalfWidth = Math.max(maxHalfWidth, edge.width * 0.5);
-    }
-    if (maxHalfWidth <= 0) continue;
-    const nodeDistance = Math.hypot(x - node.position.x, z - node.position.z);
-    if (nodeDistance <= maxHalfWidth + ROAD_SURFACE_MARGIN) return true;
-  }
-
-  return false;
+  return network.getSpatialIndex().isOnRoadSurface(x, z, ROAD_SURFACE_MARGIN);
 }
 
 export function areRoadConnected(

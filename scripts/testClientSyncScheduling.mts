@@ -7,10 +7,14 @@ import { syncWorldConfig } from '../src/data/spacetimeTableSync/syncWorldConfig.
 import { ForestManager } from '../src/props/ForestManager.ts';
 import { createStubForestInstances } from '../src/props/forestInstanceStub.ts';
 import type { GameState } from '../src/resources/types.ts';
-import type { RoadNetwork } from '../src/roads/RoadNetwork.ts';
+import { RoadNetwork } from '../src/roads/RoadNetwork.ts';
+import { isOnRoadSurface } from '../src/roads/roadConnectivity.ts';
+import { changedBuildingPadBounds } from '../src/terrain/TerrainBuildingPads.ts';
 
 await testTableCallbackCoalescing();
 testPlacementClearanceKeepsRoadWorkCached();
+testRoadSurfaceSpatialIndexRespectsRoadWidths();
+testTerrainPreviewOnlyResamplesChangedPads();
 testSettlementSyncSkipsUnchangedDomains();
 testTreeVisualSyncSkipsUnchangedSnapshots();
 testWorldGenerationReferenceStaysStableAcrossTicks();
@@ -164,6 +168,64 @@ function testPlacementClearanceKeepsRoadWorkCached(): void {
     roadPathReads,
     0,
     'building placement should reuse the existing road-clearance result',
+  );
+}
+
+function testRoadSurfaceSpatialIndexRespectsRoadWidths(): void {
+  const network = new RoadNetwork();
+  network.restore({
+    nextNodeId: 5,
+    nextEdgeId: 3,
+    nodes: [
+      { id: 'n1', position: [-10, 0, 0] },
+      { id: 'n2', position: [10, 0, 0] },
+      { id: 'n3', position: [-10, 0, 20] },
+      { id: 'n4', position: [10, 0, 20] },
+    ],
+    edges: [
+      {
+        id: 'e1',
+        startNodeId: 'n1',
+        endNodeId: 'n2',
+        width: 4,
+        controlPoints: [[-10, 0, 0], [10, 0, 0]],
+        sampledPath: [[-10, 0, 0], [10, 0, 0]],
+        length: 20,
+        revision: 1,
+      },
+      {
+        id: 'e2',
+        startNodeId: 'n3',
+        endNodeId: 'n4',
+        width: 10,
+        controlPoints: [[-10, 0, 20], [10, 0, 20]],
+        sampledPath: [[-10, 0, 20], [10, 0, 20]],
+        length: 20,
+        revision: 1,
+      },
+    ],
+  });
+
+  assert.equal(isOnRoadSurface(0, 2.1, network), true);
+  assert.equal(isOnRoadSurface(0, 2.3, network), false);
+  assert.equal(isOnRoadSurface(0, 25.1, network), true);
+  assert.equal(isOnRoadSurface(0, 25.3, network), false);
+}
+
+function testTerrainPreviewOnlyResamplesChangedPads(): void {
+  const existing = { minX: -4, maxX: 4, minZ: -4, maxZ: 4 };
+  const oldPreview = { minX: 10, maxX: 14, minZ: 10, maxZ: 14 };
+  const newPreview = { minX: 12, maxX: 16, minZ: 14, maxZ: 18 };
+
+  assert.deepEqual(
+    changedBuildingPadBounds([existing, oldPreview], [existing, newPreview]),
+    [oldPreview, newPreview],
+    'preview movement should resample only the footprint it leaves and enters',
+  );
+  assert.deepEqual(
+    changedBuildingPadBounds([existing], [existing]),
+    [],
+    'unchanged settlement pads should not be rebuilt',
   );
 }
 

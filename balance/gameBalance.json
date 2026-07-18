@@ -201,7 +201,7 @@
   },
   "construction": {
     "maxBuilders": 4,
-    "workPerWorkerPerSecond": 0.75,
+    "workPerWorkerPerSecond": 1,
     "haulPerWorker": 8,
     "deliverySpeedMps": 0.9,
     "deliveryUnloadSec": 6,

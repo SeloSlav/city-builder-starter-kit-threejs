@@ -9,7 +9,8 @@ use crate::economy::{
     chapel_coffer_gold, collect_chapel_coffer as sweep_chapel_coffer, credit_treasury_firewood,
     credit_treasury_food, credit_treasury_gold, credit_treasury_stone, credit_treasury_timber,
     credit_treasury_water, construction_treasury_reservation, total_stone, total_timber,
-    credit_treasury_commodity, CommodityKind,
+    available_building_labor, credit_treasury_commodity, initial_construction_labor,
+    CommodityKind,
 };
 use crate::lifecycle::ensure_player_resources;
 use crate::hydrology::{sample_hydrology_score, well_capacity_from_hydrology};
@@ -288,6 +289,8 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
     }
     let (treasury_timber, treasury_stone) =
         construction_treasury_reservation(ctx, owner, timber_cost, cost.stone);
+    let assigned_builders =
+        initial_construction_labor(available_building_labor(ctx, owner));
 
     let config = ctx
         .db
@@ -339,7 +342,7 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
         honey: 0.0,
         wine: 0.0,
         water_capacity,
-        assigned_labor: 0,
+        assigned_labor: assigned_builders,
         construction_complete: false,
         construction_progress: 0.0,
         construction_required_timber: timber_cost,

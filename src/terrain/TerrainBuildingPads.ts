@@ -10,10 +10,10 @@ export function updateTerrainBuildingPads(terrain: Terrain, layout: BuildingTerr
   const positions = geometry.getAttribute('position') as THREE.BufferAttribute;
   const normals = geometry.getAttribute('normal') as THREE.BufferAttribute | undefined;
   const currentBounds = layout?.getAffectedBounds() ?? [];
-  const boundsToUpdate = mergeBounds(lastAppliedBounds, currentBounds);
+  const boundsToUpdate = changedBuildingPadBounds(lastAppliedBounds, currentBounds);
 
   if (boundsToUpdate.length === 0) {
-    lastAppliedBounds = [];
+    lastAppliedBounds = currentBounds;
     return;
   }
 
@@ -104,14 +104,28 @@ function updateHeightfieldNormalsInRegion(
   normals.needsUpdate = true;
 }
 
-function mergeBounds(previous: TerrainBounds[], current: TerrainBounds[]): TerrainBounds[] {
-  const merged = [...previous];
+/**
+ * Only the symmetric difference needs resampling. Unchanged pads already have
+ * their final vertex heights; during preview movement this limits work to the
+ * old and new preview footprints instead of rebuilding the whole settlement.
+ */
+export function changedBuildingPadBounds(
+  previous: TerrainBounds[],
+  current: TerrainBounds[],
+): TerrainBounds[] {
+  const changed = previous.filter(
+    (bounds) => !current.some((entry) => boundsEqual(entry, bounds)),
+  );
   for (const bounds of current) {
-    if (!merged.some((entry) => boundsEqual(entry, bounds))) {
-      merged.push(bounds);
+    if (
+      previous.some((entry) => boundsEqual(entry, bounds))
+      || changed.some((entry) => boundsEqual(entry, bounds))
+    ) {
+      continue;
     }
+    changed.push(bounds);
   }
-  return merged;
+  return changed;
 }
 
 function boundsEqual(a: TerrainBounds, b: TerrainBounds): boolean {

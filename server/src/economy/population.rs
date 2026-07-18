@@ -50,6 +50,17 @@ fn total_assigned_labor(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u
         .sum()
 }
 
+pub fn available_building_labor(
+    ctx: &ReducerContext,
+    owner: spacetimedb::Identity,
+) -> u32 {
+    total_population(ctx, owner).saturating_sub(total_assigned_labor(ctx, owner))
+}
+
+pub fn initial_construction_labor(available_labor: u32) -> u32 {
+    available_labor.min(CONSTRUCTION_MAX_BUILDERS)
+}
+
 pub fn assign_building_labor(
     ctx: &ReducerContext,
     owner: spacetimedb::Identity,
@@ -99,4 +110,20 @@ pub fn assign_building_labor(
 
 pub fn building_accepts_labor(kind: &str) -> bool {
     building_def(kind).is_some_and(|def| def.accepts_labor)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::initial_construction_labor;
+    use crate::balance_generated::CONSTRUCTION_MAX_BUILDERS;
+
+    #[test]
+    fn new_sites_take_available_builders_up_to_the_construction_cap() {
+        assert_eq!(initial_construction_labor(0), 0);
+        assert_eq!(initial_construction_labor(2), 2);
+        assert_eq!(
+            initial_construction_labor(CONSTRUCTION_MAX_BUILDERS + 3),
+            CONSTRUCTION_MAX_BUILDERS,
+        );
+    }
 }

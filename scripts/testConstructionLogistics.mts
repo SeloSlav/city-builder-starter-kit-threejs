@@ -8,6 +8,8 @@ import {
   CONSTRUCTION_TREASURY_TRANSFER_PER_SEC,
   CONSTRUCTION_WORK_PER_WORKER_PER_SEC,
 } from '../src/generated/gameBalance.ts';
+import { getBuildingDefinition } from '../src/resources/buildings.ts';
+import { getBuildingCost } from '../src/resources/buildingEconomy.ts';
 import {
   constructionVisualSignature,
   createConstructionSiteMesh,
@@ -21,6 +23,17 @@ assert.ok(CONSTRUCTION_HAUL_PER_WORKER > 0);
 assert.ok(CONSTRUCTION_DELIVERY_SPEED_MPS > 0);
 assert.ok(CONSTRUCTION_TREASURY_TRANSFER_PER_SEC > 0);
 assert.ok(CONSTRUCTION_WORK_PER_WORKER_PER_SEC > 0);
+
+for (const kind of ['lumber_mill', 'stone_quarry'] as const) {
+  const definition = getBuildingDefinition(kind);
+  const cost = getBuildingCost(kind);
+  const maxCrewSeconds = (cost.timber + cost.stone)
+    / (CONSTRUCTION_WORK_PER_WORKER_PER_SEC * CONSTRUCTION_MAX_BUILDERS);
+  assert.ok(
+    maxCrewSeconds <= 17,
+    `${definition.label} should finish builder work in at most 17 seconds with a full crew`,
+  );
+}
 
 assert.notEqual(
   constructionVisualSignature(0.1, 0.2, 0.2),
@@ -45,6 +58,15 @@ assert.match(constructionServer, /complete_site/);
 const placementServer = read('server/src/reducers/buildings.rs');
 assert.match(placementServer, /construction_complete: false/);
 assert.match(placementServer, /construction_treasury_reservation/);
+assert.match(placementServer, /initial_construction_labor/);
+assert.doesNotMatch(
+  placementServer.slice(
+    placementServer.indexOf('pub fn place_building'),
+    placementServer.indexOf('pub fn assign_building_labor'),
+  ),
+  /assigned_labor:\s*0/,
+  'new construction sites must not silently start with zero builders when labor is available',
+);
 assert.doesNotMatch(
   placementServer.slice(
     placementServer.indexOf('pub fn place_building'),
