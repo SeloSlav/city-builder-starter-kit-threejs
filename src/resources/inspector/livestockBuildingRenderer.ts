@@ -55,8 +55,11 @@ export function renderLivestockBuildingInspector(
       </div>`
     : undefined;
   const pastureLabel = building.kind === 'swineherd' ? 'Fence woodland pannage' : 'Fence pasture';
+  const pastureHint = building.kind === 'swineherd'
+    ? 'Fence woodland for this holding. Parcel area and live mature trees determine the pigs’ capacity.'
+    : 'Fence grazing land for this holding. Parcel area and terrain determine this herd’s capacity.';
   const pastureControls = `<div class="inspector-action-panel">
-      <p class="resource-inspector-note">Fence grazing land for this holding. Its area and terrain determine this herd’s capacity.</p>
+      <p class="resource-inspector-note">${pastureHint}</p>
       <div class="resource-action-row">
         <button type="button" class="resource-action-button" data-land-parcel="pasture">${pastureLabel}</button>
       </div>

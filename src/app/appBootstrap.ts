@@ -423,18 +423,19 @@ export async function bootstrapAppSession(
   });
   burgageTool.attachTo(sceneManager.previewGroup);
 
-  const fieldFailureMessage = (reason: FarmFieldPlacementFailureReason): string => {
+  const fieldFailureMessage = (mode: LandParcelMode, reason: FarmFieldPlacementFailureReason): string => {
+    const parcel = mode === 'pasture' ? 'pasture' : 'field';
     switch (reason) {
-      case 'too_small': return 'Draw a larger field.';
-      case 'edge_too_short': return 'Each field edge must be at least 6 metres.';
-      case 'too_steep': return 'This ground is too steep to cultivate.';
-      case 'no_farmstead': return "Place a farmstead first, then draw inside its work extent.";
-      case 'water': return 'Fields cannot cover open water.';
-      case 'quarry': return 'Fields cannot cover a quarry pit.';
-      case 'building': return 'Field overlaps a building.';
-      case 'residence': return 'Field overlaps a residence plot.';
-      case 'field': return 'Field overlaps existing farmland.';
-      case 'pasture': return 'This parcel overlaps an existing pasture.';
+      case 'too_small': return `Draw a larger ${parcel}.`;
+      case 'edge_too_short': return `Each ${parcel} edge must be longer.`;
+      case 'too_steep': return `This ground is too steep for the ${parcel}.`;
+      case 'no_farmstead': return `Keep the entire ${parcel} inside the selected holding’s work extent.`;
+      case 'water': return `${parcel === 'field' ? 'Fields' : 'Pastures'} cannot cover open water.`;
+      case 'quarry': return `${parcel === 'field' ? 'Fields' : 'Pastures'} cannot cover a quarry pit.`;
+      case 'building': return `${parcel === 'field' ? 'Field' : 'Pasture'} overlaps a building.`;
+      case 'residence': return `${parcel === 'field' ? 'Field' : 'Pasture'} overlaps a residence plot.`;
+      case 'field': return `${parcel === 'field' ? 'Field' : 'Pasture'} overlaps existing farmland.`;
+      case 'pasture': return `This ${parcel} overlaps an existing pasture.`;
     }
   };
 
@@ -455,7 +456,10 @@ export async function bootstrapAppSession(
       await spacetimeStore.placePasture(input);
     },
     onModeChanged: () => bridge.syncToolbar(),
-    onPlacementRejected: (reason) => toastManager?.show(fieldFailureMessage(reason), { variant: 'error' }),
+    onPlacementRejected: (reason) => toastManager?.show(
+      fieldFailureMessage(farmFieldTool.getMode(), reason),
+      { variant: 'error' },
+    ),
     onPlacementFailed: (message) => toastManager?.show(message, { variant: 'error' }),
     onCropChanged: (crop, recommendation) => toastManager?.show(
       `${crop[0].toUpperCase()}${crop.slice(1)} selected · ${recommendation}.`,
