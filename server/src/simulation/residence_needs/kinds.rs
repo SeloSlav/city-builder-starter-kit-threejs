@@ -18,9 +18,9 @@ impl ResidenceNeedKind {
 
     pub fn is_active_for_tier(self, tier: u8) -> bool {
         match self {
-            Self::Firewood | Self::Water | Self::Food => true,
-            Self::PreservedFood => tier >= 2,
-            Self::Ale => tier >= 3,
+            Self::Food => true,
+            Self::Firewood | Self::Water => tier >= 2,
+            Self::PreservedFood | Self::Ale => tier >= 3,
         }
     }
 
@@ -43,5 +43,27 @@ impl ResidenceNeedKind {
             7 => Some(Self::PreservedFood),
             _ => None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ResidenceNeedKind;
+
+    #[test]
+    fn needs_form_a_three_step_progression() {
+        let active_count = |tier| {
+            ResidenceNeedKind::ALL
+                .into_iter()
+                .filter(|kind| kind.is_active_for_tier(tier))
+                .count()
+        };
+
+        assert_eq!(active_count(1), 1);
+        assert_eq!(active_count(2), 3);
+        assert_eq!(active_count(3), 5);
+        assert!(ResidenceNeedKind::Food.is_active_for_tier(1));
+        assert!(!ResidenceNeedKind::Firewood.is_active_for_tier(1));
+        assert!(!ResidenceNeedKind::PreservedFood.is_active_for_tier(2));
     }
 }

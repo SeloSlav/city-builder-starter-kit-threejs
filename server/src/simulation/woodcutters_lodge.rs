@@ -106,6 +106,7 @@ fn collect_delivery_targets(
         .residence()
         .owner()
         .filter(&lodge.owner)
+        .filter(|residence| ResidenceNeedKind::Firewood.is_active_for_tier(residence.tier))
         .collect();
     let claims = claim_residences_for_lodges(network, &lodges, &residences);
 

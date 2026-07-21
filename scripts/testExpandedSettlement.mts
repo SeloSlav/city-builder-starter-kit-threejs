@@ -8,7 +8,10 @@ import {
   RESIDENCE_TIER2_CAPACITY,
   RESIDENCE_TIER3_CAPACITY,
 } from '../src/generated/gameBalance.ts';
-import { createDefaultNeeds } from '../src/residences/residenceNeedState.ts';
+import {
+  activeResidenceNeedKinds,
+  createDefaultNeeds,
+} from '../src/residences/residenceNeedState.ts';
 import { evaluateResidenceNeedRecovery } from '../src/residences/residenceNeeds.ts';
 import type { ResidenceState } from '../src/resources/types.ts';
 import * as THREE from 'three';
@@ -95,8 +98,11 @@ const residence = (tier: 1 | 2 | 3): ResidenceState => ({
   tier, settlementTicks: 0, needs: createDefaultNeeds(), abandoned: false, householdWealth: 0,
 });
 const supply = { servingLodgeId: 'lodge', servingWellId: 'well', servingFoodSupplierId: 'food' };
-assert.equal(evaluateResidenceNeedRecovery(residence(1), supply).length, 3);
-assert.equal(evaluateResidenceNeedRecovery(residence(2), supply).length, 4);
+assert.deepEqual(activeResidenceNeedKinds(1), ['food']);
+assert.deepEqual(activeResidenceNeedKinds(2), ['firewood', 'water', 'food']);
+assert.deepEqual(activeResidenceNeedKinds(3), ['firewood', 'water', 'food', 'preservedFood', 'ale']);
+assert.equal(evaluateResidenceNeedRecovery(residence(1), supply).length, 1);
+assert.equal(evaluateResidenceNeedRecovery(residence(2), supply).length, 3);
 assert.equal(evaluateResidenceNeedRecovery(residence(3), supply).length, 5);
 
 for (const kind of expanded) {

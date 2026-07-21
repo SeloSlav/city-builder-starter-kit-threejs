@@ -13,6 +13,9 @@ pub mod marketplace_trade_policy;
 #[path = "../../src/economy/population_policy.rs"]
 pub mod population_policy;
 
+#[path = "../../src/simulation/residence_needs/kinds.rs"]
+pub mod residence_need_kinds;
+
 #[path = "../../src/hydrology/mod.rs"]
 pub mod hydrology;
 

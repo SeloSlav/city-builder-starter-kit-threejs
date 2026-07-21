@@ -162,6 +162,9 @@ export type GameBalance = {
     residenceAleCapacity: number;
     residenceAlePerPersonPerSec: number;
     abandonAfterDeficitTicks: number;
+    residenceTier1AbandonmentGraceMultiplier: number;
+    residenceTier2AbandonmentGraceMultiplier: number;
+    residenceTier3AbandonmentGraceMultiplier: number;
     residenceRecoveryFirewoodMin: number;
     residenceRecoveryWaterMin: number;
     residenceRecoveryFoodMin: number;
@@ -409,6 +412,9 @@ function generateRust(): string {
     `pub const RESIDENCE_ALE_CAPACITY: f64 = ${rustF64(b.population.residenceAleCapacity)};`,
     `pub const RESIDENCE_ALE_PER_PERSON_PER_SEC: f64 = ${rustF64(b.population.residenceAlePerPersonPerSec)};`,
     `pub const ABANDON_AFTER_DEFICIT_TICKS: u32 = ${b.population.abandonAfterDeficitTicks};`,
+    `pub const RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER: f64 = ${rustF64(b.population.residenceTier1AbandonmentGraceMultiplier)};`,
+    `pub const RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER: f64 = ${rustF64(b.population.residenceTier2AbandonmentGraceMultiplier)};`,
+    `pub const RESIDENCE_TIER3_ABANDONMENT_GRACE_MULTIPLIER: f64 = ${rustF64(b.population.residenceTier3AbandonmentGraceMultiplier)};`,
     `pub const RESIDENCE_RECOVERY_FIREWOOD_MIN: f64 = ${rustF64(b.population.residenceRecoveryFirewoodMin)};`,
     `pub const RESIDENCE_RECOVERY_WATER_MIN: f64 = ${rustF64(b.population.residenceRecoveryWaterMin)};`,
     `pub const RESIDENCE_RECOVERY_FOOD_MIN: f64 = ${rustF64(b.population.residenceRecoveryFoodMin)};`,
@@ -828,6 +834,9 @@ function generateTypeScript(): string {
     `export const RESIDENCE_ALE_CAPACITY = ${b.population.residenceAleCapacity};`,
     `export const RESIDENCE_ALE_PER_PERSON_PER_SEC = ${b.population.residenceAlePerPersonPerSec};`,
     `export const ABANDON_AFTER_DEFICIT_TICKS = ${b.population.abandonAfterDeficitTicks};`,
+    `export const RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER = ${b.population.residenceTier1AbandonmentGraceMultiplier};`,
+    `export const RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER = ${b.population.residenceTier2AbandonmentGraceMultiplier};`,
+    `export const RESIDENCE_TIER3_ABANDONMENT_GRACE_MULTIPLIER = ${b.population.residenceTier3AbandonmentGraceMultiplier};`,
     `export const RESIDENCE_RECOVERY_FIREWOOD_MIN = ${b.population.residenceRecoveryFirewoodMin};`,
     `export const RESIDENCE_RECOVERY_WATER_MIN = ${b.population.residenceRecoveryWaterMin};`,
     `export const RESIDENCE_RECOVERY_FOOD_MIN = ${b.population.residenceRecoveryFoodMin};`,

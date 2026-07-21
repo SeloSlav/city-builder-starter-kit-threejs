@@ -1,10 +1,10 @@
 pub mod firewood;
-mod kinds;
 pub mod food;
+mod kinds;
+pub mod provisions;
 pub mod state;
 mod supply;
 pub mod water;
-pub mod provisions;
 
 pub use kinds::ResidenceNeedKind;
 pub use state::{load_needs, need_stock};
@@ -14,11 +14,12 @@ use crate::simulation::labor_schedule::is_consumption_paused;
 use spacetimedb::ReducerContext;
 
 use crate::db::*;
+use crate::economy::reconcile_building_labor;
 use crate::simulation::chapel_community::{
     effective_abandon_after_deficit_ticks, recovery_needs_required, recovery_stock_min,
 };
 use crate::simulation::residence_needs::state::{
-    delete_needs, find_need_mut, init_needs, max_deficit_ticks, persist_needs, NeedState,
+    delete_needs, find_need_mut, init_needs, persist_needs, NeedState,
 };
 use crate::simulation::tick_context::SimTickContext;
 use crate::tables::Residence;
@@ -43,6 +44,9 @@ pub fn step_residence_needs(
 
     for kind in ResidenceNeedKind::ALL {
         if !kind.is_active_for_tier(residence.tier) {
+            if let Some(need) = find_need_mut(&mut needs, kind) {
+                need.deficit_ticks = 0;
+            }
             continue;
         }
         let Some(need) = find_need_mut(&mut needs, kind) else {
@@ -66,15 +70,28 @@ pub fn step_residence_needs(
         return;
     }
 
-    let abandon_threshold =
-        effective_abandon_after_deficit_ticks(has_chapel_access, has_monastery_coverage);
-    let abandoned = max_deficit_ticks(&needs) >= abandon_threshold;
+    let abandon_threshold = effective_abandon_after_deficit_ticks(
+        residence.tier,
+        has_chapel_access,
+        has_monastery_coverage,
+    );
+    let active_max_deficit = needs
+        .iter()
+        .filter(|need| need.kind.is_active_for_tier(residence.tier))
+        .map(|need| need.deficit_ticks)
+        .max()
+        .unwrap_or(0);
+    let abandoned = active_max_deficit >= abandon_threshold;
+    let owner = residence.owner;
     persist_needs(ctx, residence.id, &needs);
     ctx.db.residence().id().update(Residence {
         abandoned,
         population: if abandoned { 0 } else { residence.population },
         ..residence
     });
+    if abandoned {
+        reconcile_building_labor(ctx, owner);
+    }
 }
 
 pub fn step_residence_recovery(
@@ -149,7 +166,13 @@ fn recovery_ready(
             let Some(need) = state::find_need(needs, *kind) else {
                 return false;
             };
-            evaluate_recovery(*kind, need, supply, has_chapel_access, has_monastery_coverage)
+            evaluate_recovery(
+                *kind,
+                need,
+                supply,
+                has_chapel_access,
+                has_monastery_coverage,
+            )
         })
         .count();
 
@@ -165,33 +188,31 @@ enum ConsumeResult {
     Unmet,
 }
 
-fn consume_need(
-    kind: ResidenceNeedKind,
-    residence: &Residence,
-    need: &NeedState,
-) -> ConsumeResult {
-        match kind {
-            ResidenceNeedKind::Firewood => match firewood::consume(residence, need) {
-                firewood::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
-                firewood::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
-            },
-            ResidenceNeedKind::Water => match water::consume(residence, need) {
-                water::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
-                water::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
-            },
-            ResidenceNeedKind::Food => match food::consume(residence, need) {
-                food::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
-                food::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
-            },
-            ResidenceNeedKind::Ale => match provisions::consume_ale(residence, need) {
+fn consume_need(kind: ResidenceNeedKind, residence: &Residence, need: &NeedState) -> ConsumeResult {
+    match kind {
+        ResidenceNeedKind::Firewood => match firewood::consume(residence, need) {
+            firewood::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
+            firewood::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
+        },
+        ResidenceNeedKind::Water => match water::consume(residence, need) {
+            water::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
+            water::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
+        },
+        ResidenceNeedKind::Food => match food::consume(residence, need) {
+            food::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
+            food::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
+        },
+        ResidenceNeedKind::Ale => match provisions::consume_ale(residence, need) {
+            provisions::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
+            provisions::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
+        },
+        ResidenceNeedKind::PreservedFood => {
+            match provisions::consume_preserved_food(residence, need) {
                 provisions::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
                 provisions::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
-            },
-            ResidenceNeedKind::PreservedFood => match provisions::consume_preserved_food(residence, need) {
-                provisions::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
-                provisions::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
-            },
+            }
         }
+    }
 }
 
 fn on_unmet_need(kind: ResidenceNeedKind, need: &NeedState) -> NeedState {
@@ -221,11 +242,7 @@ fn evaluate_recovery(
     }
 }
 
-fn apply_delivery_for_kind(
-    kind: ResidenceNeedKind,
-    need: &NeedState,
-    delivered: f64,
-) -> NeedState {
+fn apply_delivery_for_kind(kind: ResidenceNeedKind, need: &NeedState, delivered: f64) -> NeedState {
     match kind {
         ResidenceNeedKind::Firewood => firewood::apply_delivery(need, delivered),
         ResidenceNeedKind::Water => water::apply_delivery(need, delivered),

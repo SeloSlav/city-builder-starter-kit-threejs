@@ -84,7 +84,8 @@ pub fn step_household_market_orders(
                 residence_water_runway_seconds(&residence, water_stock) / CALENDAR_SECONDS_PER_DAY;
 
             let food_critical = food_runway_days <= HOUSEHOLD_AUTO_BUY_RUNWAY_DAYS;
-            let water_critical = water_runway_days <= HOUSEHOLD_AUTO_BUY_RUNWAY_DAYS;
+            let water_critical = ResidenceNeedKind::Water.is_active_for_tier(residence.tier)
+                && water_runway_days <= HOUSEHOLD_AUTO_BUY_RUNWAY_DAYS;
             if !food_critical && !water_critical {
                 continue;
             }

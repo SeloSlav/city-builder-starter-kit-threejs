@@ -23,6 +23,9 @@ import {
   MONASTERY_ATTENDANCE_BONUS,
   MONASTERY_SETTLEMENT_TICKS_MULTIPLIER,
   RESIDENCE_SETTLE_TICKS,
+  RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER,
+  RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER,
+  RESIDENCE_TIER3_ABANDONMENT_GRACE_MULTIPLIER,
   SIM_TICK_SECONDS,
 } from '../src/generated/gameBalance.ts';
 import { SECONDS_PER_DAY } from '../src/economy/gardenMarketActivity.ts';
@@ -50,12 +53,19 @@ export function expectedEffectiveSettleTicks(
 export function expectedEffectiveAbandonAfterDeficitTicks(
   hasChapelAccess: boolean,
   hasMonasteryCoverage = false,
+  residenceTier: 1 | 2 | 3 = 3,
 ): number {
+  const tierGrace = residenceTier === 1
+    ? RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER
+    : residenceTier === 2
+      ? RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER
+      : RESIDENCE_TIER3_ABANDONMENT_GRACE_MULTIPLIER;
+  const baseTicks = ABANDON_AFTER_DEFICIT_TICKS * tierGrace;
   if (!hasChapelAccess) {
-    return ABANDON_AFTER_DEFICIT_TICKS;
+    return Math.ceil(baseTicks);
   }
 
-  let ticks = ABANDON_AFTER_DEFICIT_TICKS / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER;
+  let ticks = baseTicks / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER;
   if (hasMonasteryCoverage) {
     ticks /= MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER;
   }

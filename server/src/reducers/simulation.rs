@@ -12,7 +12,7 @@ use crate::simulation::{
     step_village_storehouse,
     SimTickContext,
 };
-use crate::economy::step_regional_markets;
+use crate::economy::{reconcile_all_building_labor, step_regional_markets};
 use crate::tables::WorldConfig;
 use crate::tables::{Building, Residence};
 
@@ -39,6 +39,8 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
         .map(|config| config.sim_tick)
         .unwrap_or(0);
     let clock = crate::simulation::game_clock(sim_tick);
+
+    reconcile_all_building_labor(ctx);
 
     let tick = SimTickContext::new(ctx);
     step_delivery_trips(ctx, &tick, &clock);

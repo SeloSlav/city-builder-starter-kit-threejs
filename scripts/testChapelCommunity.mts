@@ -5,6 +5,8 @@ import {
   CHAPEL_RECOVERY_STOCK_MULTIPLIER,
   RESIDENCE_RECOVERY_FIREWOOD_MIN,
   RESIDENCE_SETTLE_TICKS,
+  RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER,
+  RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER,
 } from '../src/generated/gameBalance.ts';
 import {
   expectedChapelAttendanceChance,
@@ -32,6 +34,14 @@ assert.equal(effectiveResidenceSettleTicks(true), 175);
 assert.equal(effectiveResidenceSettleTicks(true, false, true), expectedEffectiveSettleTicks(true, false, true));
 assert.equal(effectiveResidenceSettleTicks(true, false, true), 149);
 
+assert.equal(
+  effectiveAbandonAfterDeficitTicks(false, false, 1),
+  ABANDON_AFTER_DEFICIT_TICKS * RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER,
+);
+assert.equal(
+  effectiveAbandonAfterDeficitTicks(false, false, 2),
+  ABANDON_AFTER_DEFICIT_TICKS * RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER,
+);
 assert.equal(effectiveAbandonAfterDeficitTicks(false), ABANDON_AFTER_DEFICIT_TICKS);
 assert.equal(effectiveAbandonAfterDeficitTicks(true), expectedEffectiveAbandonAfterDeficitTicks(true));
 assert.equal(effectiveAbandonAfterDeficitTicks(true), 5143);
@@ -43,6 +53,8 @@ assert.equal(formatChapelAbandonmentGracePercent(), '43%');
 
 assert.equal(recoveryNeedsRequired(false), RESIDENCE_NEED_KINDS.length);
 assert.equal(recoveryNeedsRequired(true), CHAPEL_RECOVERY_NEEDS_REQUIRED);
+assert.equal(recoveryNeedsRequired(false, 1), 1);
+assert.equal(recoveryNeedsRequired(true, 1), 1);
 
 assert.equal(
   recoveryStockMin('firewood', true),

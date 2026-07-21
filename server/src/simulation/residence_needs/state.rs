@@ -104,14 +104,6 @@ pub fn find_need_mut<'a>(
     needs.iter_mut().find(|need| need.kind == kind)
 }
 
-pub fn max_deficit_ticks(needs: &[NeedState]) -> u32 {
-    needs
-        .iter()
-        .map(|need| need.deficit_ticks)
-        .max()
-        .unwrap_or(0)
-}
-
 fn find_row(
     ctx: &ReducerContext,
     residence_id: u64,

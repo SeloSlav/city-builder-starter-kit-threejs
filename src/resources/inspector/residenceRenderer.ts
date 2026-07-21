@@ -41,6 +41,7 @@ import {
 } from '../../economy/economyInspectorViews.ts';
 import {
   RESIDENCE_FIREWOOD_CAPACITY,
+  activeResidenceNeedKinds,
   residenceNeedsStatus,
   getNeedStock,
 } from '../../residences/residenceNeeds.ts';
@@ -59,10 +60,14 @@ export function renderResidenceInspector(
   const plotRefund = residenceZoneSalvageRefund(residenceCount);
   const nearestRoad = context.worldQueries.getNearestRoadNodeDistance(residence.x, residence.z);
   const roadAccess = context.worldQueries.getRoadAccessLabel(residence.x, residence.z);
-  const servingLodge = context.worldQueries.getServingLodgeForResidence(residence);
-  const servingWell = context.worldQueries.getServingWellForResidence(residence);
+  const servingLodge = residence.tier >= 2
+    ? context.worldQueries.getServingLodgeForResidence(residence)
+    : null;
+  const servingWell = residence.tier >= 2
+    ? context.worldQueries.getServingWellForResidence(residence)
+    : null;
   const servingFoodSupplier = context.worldQueries.getServingFoodSupplierForResidence(residence);
-  const servingPreservedFoodSupplier = residence.tier >= 2
+  const servingPreservedFoodSupplier = residence.tier >= 3
     ? context.worldQueries.getServingPreservedFoodSupplierForResidence(residence)
     : null;
   const servingAleSupplier = residence.tier >= 3
@@ -87,11 +92,11 @@ export function renderResidenceInspector(
     servingWellId: servingWell?.id ?? null,
     servingFoodSupplierId: servingFoodSupplier?.id ?? null,
   }, community);
-  const runwayDays = residenceFirewoodRunwayDays(residence);
+  const runwayDays = residence.tier >= 2 ? residenceFirewoodRunwayDays(residence) : null;
   const firewoodRunwayLabel = runwayDays == null
     ? '—'
     : formatFirewoodRunwayDays(runwayDays);
-  const waterRunwayDays = residenceWaterRunwayDays(residence);
+  const waterRunwayDays = residence.tier >= 2 ? residenceWaterRunwayDays(residence) : null;
   const waterRunwayLabel = waterRunwayDays == null
     ? '—'
     : formatWaterRunwayDays(waterRunwayDays);
@@ -99,7 +104,7 @@ export function renderResidenceInspector(
   const foodRunwayLabel = foodRunwayDays == null
     ? '—'
     : formatFoodRunwayDays(foodRunwayDays);
-  const preservedFoodRunwayDays = residence.tier >= 2 ? residencePreservedFoodRunwayDays(residence) : null;
+  const preservedFoodRunwayDays = residence.tier >= 3 ? residencePreservedFoodRunwayDays(residence) : null;
   const preservedFoodRunwayLabel = preservedFoodRunwayDays == null
     ? '—'
     : formatSpecialtyRunwayDays(preservedFoodRunwayDays);
@@ -135,13 +140,14 @@ export function renderResidenceInspector(
         Math.round((settleTicks - residence.settlementTicks) * SIM_TICK_SECONDS),
       )
     : null;
+  const activeNeedsLabel = activeResidenceNeedKinds(residence.tier)
+    .map((kind) => kind === 'preservedFood' ? 'preserved food' : kind)
+    .join(', ');
 
   return {
     eyebrow: 'Residence',
     title: residence.abandoned
-      ? getNeedStock(residence.needs, 'firewood') > 0
-        ? 'Abandoned residence — restocking'
-        : 'Abandoned residence'
+      ? 'Abandoned residence'
       : residenceCount === 1
         ? 'Residence'
         : `Residence plot (${residenceCount} residences)`,
@@ -153,6 +159,7 @@ export function renderResidenceInspector(
       <li><span>Parcel</span><span>#${residence.parcelIndex + 1}</span></li>
       <li><span>Population</span><span>${residence.abandoned ? 0 : residence.population} / ${capacity}</span></li>
       <li><span>House tier</span><span>${residence.tier} / 3</span></li>
+      <li><span>Active needs</span><span>${activeNeedsLabel}</span></li>
       <li><span>Household wealth</span><span>${formatHouseholdWealth(residence.householdWealth)}</span></li>
       ${parishEconomy.hasChapelAccess
         ? `<li><span>Parish tithe</span><span>~${parishEconomy.tithePerDay.toFixed(1)} gold / day when attending (${parishEconomy.attendancePercent}% chance${parishEconomy.wealthLimited ? ', wealth-limited' : ''}) → chapel coffer</span></li>`
@@ -160,20 +167,20 @@ export function renderResidenceInspector(
       ${settleEtaSeconds != null && !residence.abandoned
         ? `<li><span>Settlers</span><span>${settlersRemaining} pending — next in ~${formatSettleEta(settleEtaSeconds)}</span></li>`
         : ''}
-      <li><span>Firewood stock</span><span>${Math.round(getNeedStock(residence.needs, 'firewood'))} / ${RESIDENCE_FIREWOOD_CAPACITY}</span></li>
-      <li><span>Firewood runway</span><span>${firewoodRunwayLabel}</span></li>
-      <li><span>Water stock</span><span>${Math.round(getNeedStock(residence.needs, 'water'))} / ${RESIDENCE_WATER_CAPACITY}</span></li>
-      <li><span>Water runway</span><span>${waterRunwayLabel}</span></li>
       <li><span>Food stock</span><span>${Math.round(getNeedStock(residence.needs, 'food'))} / ${RESIDENCE_FOOD_CAPACITY}</span></li>
       <li><span>Food runway</span><span>${foodRunwayLabel}</span></li>
-      ${residence.tier >= 2 ? `<li><span>Preserved food</span><span>${Math.round(getNeedStock(residence.needs, 'preservedFood'))} / ${RESIDENCE_PRESERVED_FOOD_CAPACITY}</span></li>` : ''}
-      ${residence.tier >= 2 ? `<li><span>Preserved food runway</span><span>${preservedFoodRunwayLabel}</span></li>` : ''}
+      ${residence.tier >= 2 ? `<li><span>Firewood stock</span><span>${Math.round(getNeedStock(residence.needs, 'firewood'))} / ${RESIDENCE_FIREWOOD_CAPACITY}</span></li>` : ''}
+      ${residence.tier >= 2 ? `<li><span>Firewood runway</span><span>${firewoodRunwayLabel}</span></li>` : ''}
+      ${residence.tier >= 2 ? `<li><span>Water stock</span><span>${Math.round(getNeedStock(residence.needs, 'water'))} / ${RESIDENCE_WATER_CAPACITY}</span></li>` : ''}
+      ${residence.tier >= 2 ? `<li><span>Water runway</span><span>${waterRunwayLabel}</span></li>` : ''}
+      ${residence.tier >= 3 ? `<li><span>Preserved food</span><span>${Math.round(getNeedStock(residence.needs, 'preservedFood'))} / ${RESIDENCE_PRESERVED_FOOD_CAPACITY}</span></li>` : ''}
+      ${residence.tier >= 3 ? `<li><span>Preserved food runway</span><span>${preservedFoodRunwayLabel}</span></li>` : ''}
       ${residence.tier >= 3 ? `<li><span>Ale</span><span>${Math.round(getNeedStock(residence.needs, 'ale'))} / ${RESIDENCE_ALE_CAPACITY}</span></li>` : ''}
       ${residence.tier >= 3 ? `<li><span>Ale runway</span><span>${aleRunwayLabel}</span></li>` : ''}
-      <li><span>Serving lodge</span><span>${lodgeLabel}</span></li>
-      <li><span>Serving well</span><span>${wellLabel}</span></li>
       <li><span>Serving food supplier</span><span>${foodSupplierLabel}</span></li>
-      ${residence.tier >= 2 ? `<li><span>Preserved food supplier</span><span>${preservedFoodSupplierLabel}</span></li>` : ''}
+      ${residence.tier >= 2 ? `<li><span>Serving lodge</span><span>${lodgeLabel}</span></li>` : ''}
+      ${residence.tier >= 2 ? `<li><span>Serving well</span><span>${wellLabel}</span></li>` : ''}
+      ${residence.tier >= 3 ? `<li><span>Preserved food supplier</span><span>${preservedFoodSupplierLabel}</span></li>` : ''}
       ${residence.tier >= 3 ? `<li><span>Ale supplier</span><span>${aleSupplierLabel}</span></li>` : ''}
       <li><span>Chapel link</span><span>${community.hasChapelAccess ? 'Staffed parish on the road' : 'None on branch'}</span></li>
       <li><span>Monastery coverage</span><span>${community.hasMonasteryCoverage ? 'Linked Pauline house within parish radius' : 'None'}</span></li>
@@ -202,7 +209,9 @@ function residenceUpgradePanel(tier: 1 | 2 | 3): string {
   const costs = tier === 1
     ? [RESIDENCE_TIER2_TIMBER_COST, RESIDENCE_TIER2_STONE_COST, RESIDENCE_TIER2_GOLD_COST]
     : [RESIDENCE_TIER3_TIMBER_COST, RESIDENCE_TIER3_STONE_COST, RESIDENCE_TIER3_GOLD_COST];
-  const requirement = tier === 1 ? 'Requires preserved-food access.' : 'Requires ale access.';
+  const requirement = tier === 1
+    ? "Adds firewood and water needs. Requires a road-linked woodcutter's lodge and well."
+    : 'Adds preserved food and ale needs. Requires both road-linked suppliers; a monastery can serve both.';
   return `<button type="button" class="resource-action-button" data-action="upgrade-residence">Upgrade to tier ${next}</button><p class="resource-inspector-note">${costs[0]} timber · ${costs[1]} stone · ${costs[2]} gold. ${requirement}</p>`;
 }
 

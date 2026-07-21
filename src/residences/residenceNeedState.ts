@@ -2,6 +2,14 @@ export type ResidenceNeedKind = 'firewood' | 'water' | 'food' | 'ale' | 'preserv
 
 export const RESIDENCE_NEED_KINDS: readonly ResidenceNeedKind[] = ['firewood', 'water', 'food', 'preservedFood', 'ale'];
 
+export function activeResidenceNeedKinds(tier: 1 | 2 | 3): ResidenceNeedKind[] {
+  return RESIDENCE_NEED_KINDS.filter((kind) => {
+    if (kind === 'food') return true;
+    if (kind === 'firewood' || kind === 'water') return tier >= 2;
+    return tier >= 3;
+  });
+}
+
 export const RESIDENCE_NEED_KIND_IDS: Record<ResidenceNeedKind, number> = {
   firewood: 0,
   water: 1,
@@ -93,6 +101,16 @@ export function getNeedDeficitTicks(needs: ResidenceNeedsState, kind: ResidenceN
 
 export function maxNeedDeficitTicks(needs: ResidenceNeedsState): number {
   return RESIDENCE_NEED_KINDS.reduce(
+    (max, kind) => Math.max(max, needs[kind].deficitTicks),
+    0,
+  );
+}
+
+export function maxActiveNeedDeficitTicks(
+  needs: ResidenceNeedsState,
+  tier: 1 | 2 | 3,
+): number {
+  return activeResidenceNeedKinds(tier).reduce(
     (max, kind) => Math.max(max, needs[kind].deficitTicks),
     0,
   );

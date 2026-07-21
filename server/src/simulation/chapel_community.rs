@@ -1,5 +1,5 @@
 use crate::balance_generated::{
-    ABANDON_AFTER_DEFICIT_TICKS, CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER,
+    ABANDON_AFTER_DEFICIT_TICKS, CALENDAR_SECONDS_PER_DAY, CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER,
     CHAPEL_BASE_ATTENDANCE_CHANCE, CHAPEL_COMMUNITY_ATTENDANCE_BONUS,
     CHAPEL_PRIEST_ATTENDANCE_BONUS, CHAPEL_RECOVERY_NEEDS_REQUIRED,
     CHAPEL_RECOVERY_STOCK_MULTIPLIER, CHAPEL_SABBATH_OBSERVANCE_ATTENDANCE_BONUS,
@@ -8,7 +8,8 @@ use crate::balance_generated::{
     MONASTERY_ATTENDANCE_BONUS, MONASTERY_RECOVERY_STOCK_MULTIPLIER,
     MONASTERY_SETTLEMENT_TICKS_MULTIPLIER, RESIDENCE_RECOVERY_FIREWOOD_MIN,
     RESIDENCE_RECOVERY_FOOD_MIN, RESIDENCE_RECOVERY_WATER_MIN, RESIDENCE_SETTLE_TICKS,
-    TICK_DT, CALENDAR_SECONDS_PER_DAY,
+    RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER, RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER,
+    RESIDENCE_TIER3_ABANDONMENT_GRACE_MULTIPLIER, TICK_DT,
 };
 use crate::simulation::residence_needs::ResidenceNeedKind;
 
@@ -37,13 +38,20 @@ pub fn effective_settle_ticks(
 }
 
 pub fn effective_abandon_after_deficit_ticks(
+    residence_tier: u8,
     has_chapel_access: bool,
     has_monastery_coverage: bool,
 ) -> u32 {
+    let tier_grace = match residence_tier {
+        1 => RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER,
+        2 => RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER,
+        _ => RESIDENCE_TIER3_ABANDONMENT_GRACE_MULTIPLIER,
+    };
+    let base_ticks = ABANDON_AFTER_DEFICIT_TICKS as f64 * tier_grace;
     let mut ticks = if !has_chapel_access {
-        ABANDON_AFTER_DEFICIT_TICKS as f64
+        base_ticks
     } else {
-        ABANDON_AFTER_DEFICIT_TICKS as f64 / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER
+        base_ticks / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER
     };
 
     if has_chapel_access && has_monastery_coverage {
@@ -119,21 +127,24 @@ pub fn chapel_tithe_gold_per_tick(population: u32) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        chapel_attendance_chance, chapel_tithe_gold_per_tick, effective_abandon_after_deficit_ticks,
-        effective_settle_ticks, recovery_needs_required,
+        chapel_attendance_chance, chapel_tithe_gold_per_tick,
+        effective_abandon_after_deficit_ticks, effective_settle_ticks, recovery_needs_required,
     };
     use crate::balance_generated::{
         ABANDON_AFTER_DEFICIT_TICKS, CHAPEL_BASE_ATTENDANCE_CHANCE,
         CHAPEL_COMMUNITY_ATTENDANCE_BONUS, CHAPEL_PRIEST_ATTENDANCE_BONUS,
         CHAPEL_RECOVERY_NEEDS_REQUIRED, CHAPEL_SETTLEMENT_TICKS_MULTIPLIER,
         CHAPEL_TITHE_GOLD_PER_PERSON_PER_DAY, MONASTERY_SETTLEMENT_TICKS_MULTIPLIER,
-        RESIDENCE_SETTLE_TICKS, TICK_DT,
+        RESIDENCE_SETTLE_TICKS, RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER, TICK_DT,
     };
     use crate::simulation::residence_needs::ResidenceNeedKind;
 
     #[test]
     fn effective_settle_ticks_matches_balance() {
-        assert_eq!(effective_settle_ticks(false, false, false), RESIDENCE_SETTLE_TICKS);
+        assert_eq!(
+            effective_settle_ticks(false, false, false),
+            RESIDENCE_SETTLE_TICKS
+        );
         assert_eq!(
             effective_settle_ticks(true, false, false),
             (RESIDENCE_SETTLE_TICKS as f64 * CHAPEL_SETTLEMENT_TICKS_MULTIPLIER).ceil() as u32,
@@ -150,10 +161,13 @@ mod tests {
     #[test]
     fn effective_abandon_ticks_matches_balance() {
         assert_eq!(
-            effective_abandon_after_deficit_ticks(false, false),
-            ABANDON_AFTER_DEFICIT_TICKS,
+            effective_abandon_after_deficit_ticks(1, false, false),
+            (ABANDON_AFTER_DEFICIT_TICKS as f64 * RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER)
+                as u32,
         );
-        assert_eq!(effective_abandon_after_deficit_ticks(true, false), 5143);
+        assert_eq!(effective_abandon_after_deficit_ticks(2, false, false), 5400);
+        assert_eq!(effective_abandon_after_deficit_ticks(3, false, false), 3600);
+        assert_eq!(effective_abandon_after_deficit_ticks(3, true, false), 5143);
     }
 
     #[test]
@@ -162,7 +176,10 @@ mod tests {
             recovery_needs_required(false),
             ResidenceNeedKind::ALL.len() as u32,
         );
-        assert_eq!(recovery_needs_required(true), CHAPEL_RECOVERY_NEEDS_REQUIRED);
+        assert_eq!(
+            recovery_needs_required(true),
+            CHAPEL_RECOVERY_NEEDS_REQUIRED
+        );
     }
 
     #[test]

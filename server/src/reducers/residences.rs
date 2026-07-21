@@ -1,17 +1,20 @@
 use spacetimedb::{reducer, ReducerContext, Table};
 
+use crate::balance_generated::{
+    RESIDENCE_TIER2_CAPACITY, RESIDENCE_TIER2_GOLD_COST, RESIDENCE_TIER2_STONE_COST,
+    RESIDENCE_TIER2_TIMBER_COST, RESIDENCE_TIER3_CAPACITY, RESIDENCE_TIER3_GOLD_COST,
+    RESIDENCE_TIER3_STONE_COST, RESIDENCE_TIER3_TIMBER_COST,
+};
 use crate::burgage::{
-    compute_burgage_layout, convex_zones_overlap, max_zone_depth, measure_zone_depth, min_zone_depth,
-    zone_corners_polygon, ZoneCorners,
+    compute_burgage_layout, convex_zones_overlap, max_zone_depth, measure_zone_depth,
+    min_zone_depth, zone_corners_polygon, ZoneCorners,
 };
 use crate::db::*;
 use crate::economy::{
-    credit_treasury_stone, credit_treasury_timber,
-    residence_population_for_parcel,
-    residence_zone_cost,
-    spend_aggregate_stone, spend_aggregate_timber, total_stone, total_timber,
-    TIMBER_SALVAGE_FRACTION, STONE_SALVAGE_FRACTION, ResourceAmount,
-    spend_treasury_gold,
+    credit_treasury_stone, credit_treasury_timber, reconcile_building_labor,
+    residence_population_for_parcel, residence_zone_cost, spend_aggregate_stone,
+    spend_aggregate_timber, spend_treasury_gold, total_stone, total_timber, ResourceAmount,
+    STONE_SALVAGE_FRACTION, TIMBER_SALVAGE_FRACTION,
 };
 use crate::lifecycle::ensure_player_resources;
 use crate::placement_validation::{
@@ -23,11 +26,6 @@ use crate::simulation::{
     ensure_residence_needs,
 };
 use crate::tables::{farm_field, BurgageZone, Residence};
-use crate::balance_generated::{
-    RESIDENCE_TIER2_CAPACITY, RESIDENCE_TIER2_GOLD_COST,
-    RESIDENCE_TIER2_STONE_COST, RESIDENCE_TIER2_TIMBER_COST, RESIDENCE_TIER3_CAPACITY,
-    RESIDENCE_TIER3_GOLD_COST, RESIDENCE_TIER3_STONE_COST, RESIDENCE_TIER3_TIMBER_COST,
-};
 
 #[reducer]
 pub fn place_burgage_zone(
@@ -110,10 +108,22 @@ pub fn place_burgage_zone(
 
     for field in ctx.db.farm_field().iter() {
         let field_polygon = [
-            crate::burgage::Point2 { x: field.corner_ax, z: field.corner_az },
-            crate::burgage::Point2 { x: field.corner_bx, z: field.corner_bz },
-            crate::burgage::Point2 { x: field.corner_cx, z: field.corner_cz },
-            crate::burgage::Point2 { x: field.corner_dx, z: field.corner_dz },
+            crate::burgage::Point2 {
+                x: field.corner_ax,
+                z: field.corner_az,
+            },
+            crate::burgage::Point2 {
+                x: field.corner_bx,
+                z: field.corner_bz,
+            },
+            crate::burgage::Point2 {
+                x: field.corner_cx,
+                z: field.corner_cz,
+            },
+            crate::burgage::Point2 {
+                x: field.corner_dx,
+                z: field.corner_dz,
+            },
         ];
         if convex_zones_overlap(&candidate_polygon, &field_polygon) {
             return Err("Residence plot overlaps cultivated farmland.".to_string());
@@ -212,30 +222,38 @@ pub fn upgrade_residence(ctx: &ReducerContext, residence_id: u64) -> Result<(), 
     }
 
     let next_tier = residence.tier.saturating_add(1);
-    let (timber, stone, gold, capacity, required_supplier_kinds): (f64, f64, f64, u32, &[&str]) =
-        match next_tier {
-            2 => (
-                RESIDENCE_TIER2_TIMBER_COST,
-                RESIDENCE_TIER2_STONE_COST,
-                RESIDENCE_TIER2_GOLD_COST,
-                RESIDENCE_TIER2_CAPACITY,
+    let (timber, stone, gold, capacity, required_supplier_groups): (
+        f64,
+        f64,
+        f64,
+        u32,
+        &[&[&str]],
+    ) = match next_tier {
+        2 => (
+            RESIDENCE_TIER2_TIMBER_COST,
+            RESIDENCE_TIER2_STONE_COST,
+            RESIDENCE_TIER2_GOLD_COST,
+            RESIDENCE_TIER2_CAPACITY,
+            &[&["woodcutters_lodge"], &["well"]],
+        ),
+        3 => (
+            RESIDENCE_TIER3_TIMBER_COST,
+            RESIDENCE_TIER3_STONE_COST,
+            RESIDENCE_TIER3_GOLD_COST,
+            RESIDENCE_TIER3_CAPACITY,
+            &[
                 &["smokehouse", "granary", "monastery"],
-            ),
-            3 => (
-                RESIDENCE_TIER3_TIMBER_COST,
-                RESIDENCE_TIER3_STONE_COST,
-                RESIDENCE_TIER3_GOLD_COST,
-                RESIDENCE_TIER3_CAPACITY,
                 &["brewery", "monastery"],
-            ),
-            _ => return Err("This residence is already at tier 3.".to_string()),
-        };
+            ],
+        ),
+        _ => return Err("This residence is already at tier 3.".to_string()),
+    };
 
-    if !has_connected_supplier(ctx, &residence, required_supplier_kinds) {
+    if !has_connected_suppliers(ctx, &residence, required_supplier_groups) {
         return Err(if next_tier == 2 {
-            "Tier 2 requires a road-linked smokehouse, granary, or monastery.".to_string()
+            "Tier 2 requires a road-linked woodcutter's lodge and well.".to_string()
         } else {
-            "Tier 3 requires a road-linked brewery or monastery.".to_string()
+            "Tier 3 requires road-linked preserved-food and ale suppliers (a monastery can serve both).".to_string()
         });
     }
     if total_timber(ctx, owner) + 1e-6 < timber || total_stone(ctx, owner) + 1e-6 < stone {
@@ -259,20 +277,31 @@ pub fn upgrade_residence(ctx: &ReducerContext, residence_id: u64) -> Result<(), 
     Ok(())
 }
 
-fn has_connected_supplier(
+fn has_connected_suppliers(
     ctx: &ReducerContext,
     residence: &Residence,
-    kinds: &[&str],
+    required_groups: &[&[&str]],
 ) -> bool {
     let Some(network) = crate::roads::load_owner_road_network(ctx, residence.owner) else {
         return false;
     };
-    ctx.db.building().owner().filter(&residence.owner).any(|building| {
-        building.construction_complete
-            && kinds.contains(&building.kind.as_str())
-            && network
-                .road_path_distance(building.x, building.z, residence.x, residence.z)
-                .is_some()
+    let connected_buildings: Vec<_> = ctx
+        .db
+        .building()
+        .owner()
+        .filter(&residence.owner)
+        .filter(|building| {
+            building.construction_complete
+                && network
+                    .road_path_distance(building.x, building.z, residence.x, residence.z)
+                    .is_some()
+        })
+        .collect();
+
+    required_groups.iter().all(|kinds| {
+        connected_buildings
+            .iter()
+            .any(|building| kinds.contains(&building.kind.as_str()))
     })
 }
 
@@ -303,6 +332,7 @@ pub fn demolish_residence(ctx: &ReducerContext, residence_id: u64) -> Result<(),
     clear_backyard_garden_for_residence(ctx, residence_id);
     cancel_trips_for_residence(ctx, residence_id);
     ctx.db.residence().id().delete(residence_id);
+    reconcile_building_labor(ctx, owner);
 
     let remaining = ctx.db.residence().zone_id().filter(&zone_id).count();
     if remaining == 0 {
@@ -326,12 +356,7 @@ pub fn demolish_burgage_zone(ctx: &ReducerContext, zone_id: u64) -> Result<(), S
         return Err("You do not own this residence zone.".to_string());
     }
 
-    let residence_count = ctx
-        .db
-        .residence()
-        .zone_id()
-        .filter(&zone_id)
-        .count() as u32;
+    let residence_count = ctx.db.residence().zone_id().filter(&zone_id).count() as u32;
     let refund = residence_zone_cost(residence_count);
     let salvage = ResourceAmount {
         timber: (refund.timber * TIMBER_SALVAGE_FRACTION).round(),
@@ -347,5 +372,6 @@ pub fn demolish_burgage_zone(ctx: &ReducerContext, zone_id: u64) -> Result<(), S
         ctx.db.residence().id().delete(residence.id);
     }
     ctx.db.burgage_zone().id().delete(zone_id);
+    reconcile_building_labor(ctx, owner);
     Ok(())
 }

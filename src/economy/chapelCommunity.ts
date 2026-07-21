@@ -12,6 +12,9 @@ import {
   RESIDENCE_RECOVERY_FOOD_MIN,
   RESIDENCE_RECOVERY_WATER_MIN,
   RESIDENCE_SETTLE_TICKS,
+  RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER,
+  RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER,
+  RESIDENCE_TIER3_ABANDONMENT_GRACE_MULTIPLIER,
 } from '../generated/gameBalance.ts';
 import type { ResidenceNeedKind } from '../residences/residenceNeedState.ts';
 import { RESIDENCE_NEED_KINDS } from '../residences/residenceNeedState.ts';
@@ -44,12 +47,19 @@ export function effectiveResidenceSettleTicks(
 export function effectiveAbandonAfterDeficitTicks(
   hasChapelAccess: boolean,
   hasMonasteryCoverage = false,
+  residenceTier: 1 | 2 | 3 = 3,
 ): number {
+  const tierGrace = residenceTier === 1
+    ? RESIDENCE_TIER1_ABANDONMENT_GRACE_MULTIPLIER
+    : residenceTier === 2
+      ? RESIDENCE_TIER2_ABANDONMENT_GRACE_MULTIPLIER
+      : RESIDENCE_TIER3_ABANDONMENT_GRACE_MULTIPLIER;
+  const baseTicks = ABANDON_AFTER_DEFICIT_TICKS * tierGrace;
   if (!hasChapelAccess) {
-    return ABANDON_AFTER_DEFICIT_TICKS;
+    return Math.ceil(baseTicks);
   }
 
-  let ticks = ABANDON_AFTER_DEFICIT_TICKS / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER;
+  let ticks = baseTicks / CHAPEL_ABANDONMENT_DEFICIT_MULTIPLIER;
   if (hasMonasteryCoverage) {
     ticks /= MONASTERY_ABANDONMENT_DEFICIT_MULTIPLIER;
   }
@@ -72,8 +82,14 @@ export function recoveryStockMin(
   return threshold;
 }
 
-export function recoveryNeedsRequired(hasChapelAccess: boolean): number {
-  return hasChapelAccess ? CHAPEL_RECOVERY_NEEDS_REQUIRED : RESIDENCE_NEED_KINDS.length;
+export function recoveryNeedsRequired(
+  hasChapelAccess: boolean,
+  activeNeedCount = RESIDENCE_NEED_KINDS.length,
+): number {
+  const policyRequired = hasChapelAccess
+    ? CHAPEL_RECOVERY_NEEDS_REQUIRED
+    : RESIDENCE_NEED_KINDS.length;
+  return Math.min(policyRequired, activeNeedCount);
 }
 
 export function formatChapelTithePerDay(linkedPopulation: number, assignedLabor: number): string {

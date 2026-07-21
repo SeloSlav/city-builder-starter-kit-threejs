@@ -22,14 +22,14 @@ import {
 import type { ResidenceState } from '../resources/types.ts';
 import {
   getNeed,
-  maxNeedDeficitTicks,
+  activeResidenceNeedKinds,
+  maxActiveNeedDeficitTicks,
   type ResidenceNeedKind,
   type ResidenceNeedRecoveryStatus,
   type ResidenceNeedSupplyContext,
   type ResidenceCommunityContext,
   type ResidenceNeedsStatus,
   DEFAULT_RESIDENCE_COMMUNITY_CONTEXT,
-  RESIDENCE_NEED_KINDS,
 } from './residenceNeedState.ts';
 
 export type {
@@ -44,6 +44,7 @@ export {
   getNeed,
   getNeedStock,
   RESIDENCE_NEED_KINDS,
+  activeResidenceNeedKinds,
 } from './residenceNeedState.ts';
 
 export function evaluateResidenceNeedRecovery(
@@ -58,7 +59,7 @@ export function residenceRecoveryReady(
   statuses: readonly ResidenceNeedRecoveryStatus[],
   community: ResidenceCommunityContext = DEFAULT_RESIDENCE_COMMUNITY_CONTEXT,
 ): boolean {
-  const required = recoveryNeedsRequired(community.hasChapelAccess);
+  const required = recoveryNeedsRequired(community.hasChapelAccess, statuses.length);
   return statuses.filter((status) => status.ready).length >= required;
 }
 
@@ -199,7 +200,7 @@ function describeDeficitWarning(
   residence: ResidenceState,
   community: ResidenceCommunityContext,
 ): ResidenceNeedsStatus | null {
-  const deficitTicks = maxNeedDeficitTicks(residence.needs);
+  const deficitTicks = maxActiveNeedDeficitTicks(residence.needs, residence.tier);
   if (deficitTicks <= 0) return null;
 
   const unmetNeeds = activeNeedKinds(residence)
@@ -209,6 +210,7 @@ function describeDeficitWarning(
   const abandonThreshold = effectiveAbandonAfterDeficitTicks(
     community.hasChapelAccess,
     community.hasMonasteryCoverage,
+    residence.tier,
   );
   const remainingTicks = Math.max(0, abandonThreshold - deficitTicks);
   const remainingSeconds = remainingTicks * SIM_TICK_SECONDS;
@@ -358,9 +360,7 @@ function formatShortDuration(seconds: number): string {
 }
 
 function activeNeedKinds(residence: ResidenceState): ResidenceNeedKind[] {
-  return RESIDENCE_NEED_KINDS.filter((kind) =>
-    kind === 'preservedFood' ? residence.tier >= 2 : kind === 'ale' ? residence.tier >= 3 : true,
-  );
+  return activeResidenceNeedKinds(residence.tier);
 }
 
 function residenceFoodRunwayDays(residence: ResidenceState): number | null {

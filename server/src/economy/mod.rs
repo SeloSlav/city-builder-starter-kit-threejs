@@ -2,18 +2,18 @@
 
 mod aggregate_spend;
 mod chapel_coffer;
+mod commodities;
+mod garden_market_activity;
+mod household_wealth;
 mod marketplace_orders;
 mod marketplace_trade;
 mod marketplace_trade_policy;
-mod regional_market;
-mod garden_market_activity;
-mod household_wealth;
+mod parish_accounting;
 mod population;
 mod population_policy;
+mod regional_market;
 mod storage;
-mod parish_accounting;
 mod village_economy;
-mod commodities;
 
 pub use commodities::{
     building_commodity_cap, building_commodity_room, building_commodity_stock,
@@ -21,14 +21,6 @@ pub use commodities::{
     CommodityKind,
 };
 
-pub use marketplace_trade::execute_marketplace_trade;
-pub use marketplace_orders::{
-    best_affordable_food_commodity, best_affordable_water_commodity,
-    nearest_marketplace_for_residence, order_food_commodity, order_water_commodity, MarketGoldPayer,
-};
-pub use regional_market::{
-    ensure_market_state, scaled_gold_cost, step_regional_markets,
-};
 pub use aggregate_spend::{
     spend_aggregate_firewood, spend_aggregate_food, spend_aggregate_stone, spend_aggregate_timber,
 };
@@ -36,30 +28,39 @@ pub use chapel_coffer::{
     chapel_coffer_gold, collect_chapel_coffer, deposit_chapel_coffer, deposit_coffer_in_place,
     withdraw_coffer_in_place,
 };
-pub use parish_accounting::{clamp_chapel_coffer_reserve_gold, record_parish_ledger, ParishLedgerKind};
 pub use garden_market_activity::garden_market_activity;
 pub use household_wealth::{credit_residence_wealth, debit_residence_wealth};
+pub use marketplace_orders::{
+    best_affordable_food_commodity, best_affordable_water_commodity,
+    nearest_marketplace_for_residence, order_food_commodity, order_water_commodity,
+    MarketGoldPayer,
+};
+pub use marketplace_trade::execute_marketplace_trade;
+pub use parish_accounting::{
+    clamp_chapel_coffer_reserve_gold, record_parish_ledger, ParishLedgerKind,
+};
 pub use population::{
     assign_building_labor, available_building_labor, initial_construction_labor,
-    residence_population_for_parcel,
+    reconcile_all_building_labor, reconcile_building_labor, residence_population_for_parcel,
 };
-pub use storage::{
-    building_food_storage_cap, building_storage_caps, building_water_storage_cap, credit_treasury_firewood,
-    credit_treasury_food, credit_treasury_gold, credit_treasury_stone, credit_treasury_timber, credit_treasury_water,
-    construction_treasury_reservation,
-    deposit_building, deposit_building_food, deposit_building_water, residence_firewood_capacity, residence_food_capacity,
-    residence_water_capacity, spend_treasury_gold, total_stone, total_timber,
-    withdraw_building, withdraw_building_food, withdraw_building_water,
-};
+pub use regional_market::{ensure_market_state, scaled_gold_cost, step_regional_markets};
 pub(crate) use storage::available_unreserved_building_timber;
+pub use storage::{
+    building_food_storage_cap, building_storage_caps, building_water_storage_cap,
+    construction_treasury_reservation, credit_treasury_firewood, credit_treasury_food,
+    credit_treasury_gold, credit_treasury_stone, credit_treasury_timber, credit_treasury_water,
+    deposit_building, deposit_building_food, deposit_building_water, residence_firewood_capacity,
+    residence_food_capacity, residence_water_capacity, spend_treasury_gold, total_stone,
+    total_timber, withdraw_building, withdraw_building_food, withdraw_building_water,
+};
 pub use village_economy::{
     clamp_economic_activity_tax_rate, player_economic_activity_tax_rate, taxed_economic_activity,
     town_hall_tax_collection_multiplier,
 };
 
 pub use crate::balance_generated::{
-    RESIDENCE_STONE_COST, RESIDENCE_TIMBER_COST, STARTING_GOLD, STARTING_STONE,
-    STARTING_TIMBER, STONE_SALVAGE_FRACTION, TIMBER_SALVAGE_FRACTION,
+    RESIDENCE_STONE_COST, RESIDENCE_TIMBER_COST, STARTING_GOLD, STARTING_STONE, STARTING_TIMBER,
+    STONE_SALVAGE_FRACTION, TIMBER_SALVAGE_FRACTION,
 };
 
 pub struct ResourceAmount {
@@ -91,7 +92,9 @@ pub fn backyard_garden_cost(kind: crate::balance_generated::BackyardGardenKind) 
     }
 }
 
-pub fn backyard_garden_salvage_refund(kind: crate::balance_generated::BackyardGardenKind) -> ResourceAmount {
+pub fn backyard_garden_salvage_refund(
+    kind: crate::balance_generated::BackyardGardenKind,
+) -> ResourceAmount {
     let cost = backyard_garden_cost(kind);
     ResourceAmount {
         timber: (cost.timber * TIMBER_SALVAGE_FRACTION).round(),

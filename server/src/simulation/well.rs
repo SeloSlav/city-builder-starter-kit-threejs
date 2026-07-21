@@ -130,7 +130,7 @@ fn collect_delivery_targets(
         .residence()
         .owner()
         .filter(&well.owner)
-        .filter(|residence| !residence.abandoned && residence.population > 0)
+        .filter(|residence| ResidenceNeedKind::Water.is_active_for_tier(residence.tier))
         .collect();
     let claims = claim_residences_for_wells(network, &wells, &residences);
 

@@ -1,15 +1,17 @@
 use spacetimedb::ReducerContext;
 
+use crate::balance_generated::CONSTRUCTION_MAX_BUILDERS;
 use crate::building_defs::building_def;
 use crate::constants::{
     NARROW_PARCEL_FRONTAGE_MAX, POPULATION_PER_RESIDENCE, RESIDENCE_POPULATION_NARROW,
     RESIDENCE_POPULATION_WIDE, STARTING_POPULATION, WIDE_PARCEL_FRONTAGE_MIN,
 };
-use crate::balance_generated::CONSTRUCTION_MAX_BUILDERS;
 use crate::db::*;
 use crate::tables::Building;
 
-use super::population_policy::population_limit_blocks_labor_request;
+use super::population_policy::{
+    labor_reconciliation_updates, population_limit_blocks_labor_request, LaborAssignment,
+};
 
 pub fn residence_population_for_parcel(parcel_frontage: f64) -> u32 {
     if parcel_frontage >= WIDE_PARCEL_FRONTAGE_MIN {
@@ -22,13 +24,7 @@ pub fn residence_population_for_parcel(parcel_frontage: f64) -> u32 {
 }
 
 pub fn building_max_labor(kind: &str) -> u32 {
-    building_def(kind).map_or(0, |def| {
-        if def.accepts_labor {
-            def.max_labor
-        } else {
-            0
-        }
-    })
+    building_def(kind).map_or(0, |def| if def.accepts_labor { def.max_labor } else { 0 })
 }
 
 fn total_population(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u32 {
@@ -52,15 +48,53 @@ fn total_assigned_labor(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u
         .sum()
 }
 
-pub fn available_building_labor(
-    ctx: &ReducerContext,
-    owner: spacetimedb::Identity,
-) -> u32 {
+pub fn available_building_labor(ctx: &ReducerContext, owner: spacetimedb::Identity) -> u32 {
     total_population(ctx, owner).saturating_sub(total_assigned_labor(ctx, owner))
 }
 
 pub fn initial_construction_labor(available_labor: u32) -> u32 {
     available_labor.min(CONSTRUCTION_MAX_BUILDERS)
+}
+
+/// Clamp building assignments immediately after residence population is lost.
+pub fn reconcile_building_labor(ctx: &ReducerContext, owner: spacetimedb::Identity) {
+    let assignments = ctx
+        .db
+        .building()
+        .owner()
+        .filter(&owner)
+        .map(|building| LaborAssignment {
+            building_id: building.id,
+            assigned_labor: building.assigned_labor,
+            construction_complete: building.construction_complete,
+        })
+        .collect();
+
+    for (building_id, assigned_labor) in
+        labor_reconciliation_updates(assignments, total_population(ctx, owner))
+    {
+        let Some(building) = ctx.db.building().id().find(&building_id) else {
+            continue;
+        };
+        ctx.db.building().id().update(Building {
+            assigned_labor,
+            ..building
+        });
+    }
+}
+
+/// Enforce the population/labor invariant for every settlement, including saves that were
+/// already over-assigned before reconciliation was introduced.
+pub fn reconcile_all_building_labor(ctx: &ReducerContext) {
+    let owners: Vec<_> = ctx
+        .db
+        .player_resources()
+        .iter()
+        .map(|resources| resources.owner)
+        .collect();
+    for owner in owners {
+        reconcile_building_labor(ctx, owner);
+    }
 }
 
 pub fn assign_building_labor(

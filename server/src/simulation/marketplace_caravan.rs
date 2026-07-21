@@ -60,6 +60,9 @@ pub fn try_dispatch_marketplace_caravan(
         .owner()
         .filter(&building.owner)
         .filter(|residence| {
+            if !need_kind.is_active_for_tier(residence.tier) {
+                return false;
+            }
             if dispatch.include_abandoned {
                 return true;
             }
