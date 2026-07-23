@@ -16,11 +16,12 @@ export type WorldBootstrapQuarry = {
   x: number;
   z: number;
   maxYield: number;
+  isRich: boolean;
 };
 
 export type WorldBootstrapForagingNode = {
   nodeId: string;
-  nodeKind: 'game' | 'berries';
+  nodeKind: 'game' | 'berries' | 'fish';
   x: number;
   z: number;
   maxYield: number;
@@ -67,13 +68,14 @@ export function computeWorldBootstrapDataFromLayout(worldLayout: WorldLayout): W
       x: definition.x,
       z: definition.z,
       maxYield: definition.maxYield,
+      isRich: definition.isRich === true,
     }));
 
   const foragingNodes: WorldBootstrapForagingNode[] = registry.definitionList
-    .filter((definition) => definition.kind === 'game' || definition.kind === 'berries')
+    .filter((definition) => definition.kind === 'game' || definition.kind === 'berries' || definition.kind === 'fish')
     .map((definition) => ({
       nodeId: definition.id,
-      nodeKind: definition.kind as 'game' | 'berries',
+      nodeKind: definition.kind as 'game' | 'berries' | 'fish',
       x: definition.x,
       z: definition.z,
       maxYield: definition.maxYield,

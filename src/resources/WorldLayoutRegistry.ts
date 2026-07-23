@@ -2,7 +2,12 @@ import type { ForagingSite } from '../foraging/ForagingLayout.ts';
 import type { QuarrySite } from '../quarries/QuarryLayout.ts';
 import type { BuildingKind, ResourceNodeDefinition } from './types.ts';
 import { foragingPickRadius } from '../foraging/foragingYields.ts';
-import { BERRY_PATCH_MAX_YIELD, GAME_PATCH_MAX_YIELD } from '../foraging/foragingYields.ts';
+import {
+  BERRY_PATCH_MAX_YIELD,
+  FISH_SHOAL_MAX_YIELD,
+  GAME_PATCH_MAX_YIELD,
+  RICH_FISH_SHOAL_MAX_YIELD,
+} from '../foraging/foragingYields.ts';
 import { quarryMaxYield, quarryPickRadius } from './yields.ts';
 import type { WorldLayout } from './WorldLayout.ts';
 import { getBuildingDefinition } from './buildings.ts';
@@ -37,18 +42,23 @@ export class WorldLayoutRegistry {
         resource: 'stone',
         x: site.x,
         z: site.z,
-        label: site.kind === 'large' ? 'Large quarry' : 'Small quarry',
+        label: site.kind === 'large' ? 'Rich stone deposit' : 'Stone deposit',
         maxYield: quarryMaxYield(site.kind),
         pickRadius: quarryPickRadius(site.radiusX, site.radiusZ),
         quarryKind: site.kind,
+        isRich: site.kind === 'large',
       });
     }
 
     let berryIndex = 0;
+    let fishIndex = 0;
     for (const site of layout.foragingLayout.sites) {
       if (site.kind === 'berries') {
         definitions.push(foragingDefinition(site, berryIndex));
         berryIndex++;
+      } else if (site.kind === 'fish') {
+        definitions.push(foragingDefinition(site, fishIndex));
+        fishIndex++;
       } else {
         definitions.push(foragingDefinition(site));
       }
@@ -68,7 +78,7 @@ export class WorldLayoutRegistry {
   findNearestForagingNode(
     x: number,
     z: number,
-    nodeKind: 'game' | 'berries',
+    nodeKind: 'game' | 'berries' | 'fish',
   ): ResourceNodeDefinition | null {
     let best: ResourceNodeDefinition | null = null;
     let bestScore = Infinity;
@@ -150,15 +160,28 @@ export function buildingKindLabel(kind: BuildingKind): string {
 
 function foragingDefinition(site: ForagingSite, berryIndex = 0): ResourceNodeDefinition {
   const isGame = site.kind === 'game';
+  const isFish = site.kind === 'fish';
+  const isRichFish = isFish && site.isRich === true;
   return {
-    id: isGame ? 'foraging-game-0' : `foraging-berries-${berryIndex}`,
+    id: isGame
+      ? 'foraging-game-0'
+      : isFish
+        ? `foraging-fish-${isRichFish ? 'rich' : 'small'}-${berryIndex}`
+        : `foraging-berries-${berryIndex}`,
     kind: site.kind,
-    resource: isGame ? 'game' : 'berries',
+    resource: isGame ? 'game' : isFish ? 'fish' : 'berries',
     x: site.x,
     z: site.z,
-    label: isGame ? 'Game trail' : 'Berry patch',
-    maxYield: isGame ? GAME_PATCH_MAX_YIELD : BERRY_PATCH_MAX_YIELD,
+    label: isGame ? 'Game trail' : isFish ? (isRichFish ? 'Rich fishing shoal' : 'Fishing shoal') : 'Berry patch',
+    maxYield: isGame
+      ? GAME_PATCH_MAX_YIELD
+      : isRichFish
+        ? RICH_FISH_SHOAL_MAX_YIELD
+        : isFish
+          ? FISH_SHOAL_MAX_YIELD
+          : BERRY_PATCH_MAX_YIELD,
     pickRadius: foragingPickRadius(site.kind),
+    isRich: isRichFish,
   };
 }
 

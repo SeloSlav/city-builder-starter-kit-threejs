@@ -993,7 +993,7 @@ export class VillagerRenderer {
     if (agent.role !== 'worker' || !agent.workplaceId) return null;
     const kind = this.buildings.get(agent.workplaceId)?.kind;
     if (kind === 'lumber_mill') return 'hatchet';
-    if (kind === 'stone_quarry') return 'pickaxe';
+    if (kind === 'stone_quarry' || kind === 'large_quarry') return 'pickaxe';
     return null;
   }
 }

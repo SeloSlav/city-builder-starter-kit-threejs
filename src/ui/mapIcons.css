@@ -85,6 +85,10 @@
   border-color: rgba(176, 92, 118, 0.58);
 }
 
+.foraging-map-icon--fish {
+  border-color: rgba(91, 153, 176, 0.72);
+}
+
 .foraging-map-icon:hover,
 .foraging-map-icon:focus-visible {
   transform: scale(1.08);
@@ -99,6 +103,11 @@
 }
 
 .foraging-map-icon-glyph--berries {
+  width: 23px;
+  height: 23px;
+}
+
+.foraging-map-icon-glyph--fish {
   width: 23px;
   height: 23px;
 }

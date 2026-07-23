@@ -71,7 +71,7 @@ export class QuarryMapIcons {
     button.type = 'button';
     button.className = 'quarry-map-icon';
     button.dataset.quarryId = marker.id;
-    button.title = marker.label;
+    button.dataset.tooltip = marker.label;
     button.setAttribute('aria-label', marker.label);
     button.hidden = true;
 

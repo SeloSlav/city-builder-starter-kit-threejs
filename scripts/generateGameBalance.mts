@@ -44,6 +44,7 @@ type BuildingBalance = {
   requiresQuarryStone: boolean;
   requiresGame: boolean;
   requiresBerries: boolean;
+  requiresFish?: boolean;
   requiresWaterShore?: boolean;
   requiresHillside?: boolean;
 };
@@ -229,6 +230,8 @@ export type GameBalance = {
     stonePerHarvest: number;
     gamePerHarvest: number;
     berriesPerHarvest: number;
+    fishPerHarvest: number;
+    richFishYieldMultiplier: number;
     foodPerDelivery: number;
     gameRespawnSec: number;
     berriesRespawnSec: number;
@@ -326,10 +329,12 @@ const simKindByKind: Record<string, string | null> = {
   lumber_mill: 'LumberMill',
   reforester: 'Reforester',
   stone_quarry: 'StoneQuarry',
+  large_quarry: 'LargeQuarry',
   woodcutters_lodge: 'WoodcuttersLodge',
   well: 'Well',
   hunters_hall: 'HuntersHall',
   foragers_shed: 'ForagersShed',
+  fishing_camp: 'FishingCamp',
   chapel: null,
   marketplace: null,
   town_hall: null,
@@ -479,6 +484,8 @@ function generateRust(): string {
     `pub const STONE_PER_HARVEST: f64 = ${rustF64(b.production.stonePerHarvest)};`,
     `pub const GAME_PER_HARVEST: f64 = ${rustF64(b.production.gamePerHarvest)};`,
     `pub const BERRIES_PER_HARVEST: f64 = ${rustF64(b.production.berriesPerHarvest)};`,
+    `pub const FISH_PER_HARVEST: f64 = ${rustF64(b.production.fishPerHarvest)};`,
+    `pub const RICH_FISH_YIELD_MULTIPLIER: f64 = ${rustF64(b.production.richFishYieldMultiplier)};`,
     `pub const FOOD_PER_DELIVERY: f64 = ${rustF64(b.production.foodPerDelivery)};`,
     `pub const GAME_RESPAWN_SEC: f64 = ${rustF64(b.production.gameRespawnSec)};`,
     `pub const BERRIES_RESPAWN_SEC: f64 = ${rustF64(b.production.berriesRespawnSec)};`,
@@ -596,10 +603,12 @@ function generateRust(): string {
   lines.push('    LumberMill,');
   lines.push('    Reforester,');
   lines.push('    StoneQuarry,');
+  lines.push('    LargeQuarry,');
   lines.push('    WoodcuttersLodge,');
   lines.push('    Well,');
   lines.push('    HuntersHall,');
   lines.push('    ForagersShed,');
+  lines.push('    FishingCamp,');
   lines.push('    ThreshingBarn,');
   lines.push('    Monastery,');
   lines.push('    Brewery,');
@@ -641,6 +650,7 @@ function generateRust(): string {
   lines.push('    pub requires_quarry_stone: bool,');
   lines.push('    pub requires_game: bool,');
   lines.push('    pub requires_berries: bool,');
+  lines.push('    pub requires_fish: bool,');
   lines.push('    pub requires_water_shore: bool,');
   lines.push('    pub requires_hillside: bool,');
   lines.push('    pub sim_kind: Option<BuildingSimKind>,');
@@ -675,6 +685,7 @@ function generateRust(): string {
     lines.push(`    requires_quarry_stone: ${def.requiresQuarryStone},`);
     lines.push(`    requires_game: ${def.requiresGame},`);
     lines.push(`    requires_berries: ${def.requiresBerries},`);
+    lines.push(`    requires_fish: ${def.requiresFish ?? false},`);
     lines.push(`    requires_water_shore: ${def.requiresWaterShore ?? false},`);
     lines.push(`    requires_hillside: ${def.requiresHillside ?? false},`);
     lines.push(`    sim_kind: ${simKind ? `Some(BuildingSimKind::${simKind})` : 'None'},`);
@@ -904,6 +915,8 @@ function generateTypeScript(): string {
     `export const STONE_PER_HARVEST = ${b.production.stonePerHarvest};`,
     `export const GAME_PER_HARVEST = ${b.production.gamePerHarvest};`,
     `export const BERRIES_PER_HARVEST = ${b.production.berriesPerHarvest};`,
+    `export const FISH_PER_HARVEST = ${b.production.fishPerHarvest};`,
+    `export const RICH_FISH_YIELD_MULTIPLIER = ${b.production.richFishYieldMultiplier};`,
     `export const FOOD_PER_DELIVERY = ${b.production.foodPerDelivery};`,
     `export const WELL_BASE_REFILL_PER_SEC = ${b.production.wellBaseRefillPerSec};`,
     `export const WELL_SURGE_CHANCE_PER_TICK = ${b.production.wellSurgeChancePerTick};`,
@@ -1044,6 +1057,7 @@ function generateTypeScript(): string {
     '  requiresQuarryStone: boolean;',
     '  requiresGame: boolean;',
     '  requiresBerries: boolean;',
+    '  requiresFish: boolean;',
     '  requiresWaterShore: boolean;',
     '  requiresHillside: boolean;',
     '};',
@@ -1067,6 +1081,7 @@ function generateTypeScript(): string {
     lines.push(`    requiresQuarryStone: ${def.requiresQuarryStone},`);
     lines.push(`    requiresGame: ${def.requiresGame},`);
     lines.push(`    requiresBerries: ${def.requiresBerries},`);
+    lines.push(`    requiresFish: ${def.requiresFish ?? false},`);
     lines.push(`    requiresWaterShore: ${def.requiresWaterShore ?? false},`);
     lines.push(`    requiresHillside: ${def.requiresHillside ?? false},`);
     lines.push('  },');

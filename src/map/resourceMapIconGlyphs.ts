@@ -4,6 +4,7 @@
  * - Stone pile by Delapouite
  * - Deer head by Caro Asercion
  * - Berry bush by Delapouite
+ * - Fish silhouette drawn in-project
  *
  * The original black square backgrounds were removed, the quarry and berry
  * artwork was redrawn as low-detail silhouettes, and every glyph now inherits
@@ -32,5 +33,12 @@ export const BERRY_ICON_SVG = `
     <circle cx="14.1" cy="11.1" r="2.5" fill="currentColor"/>
     <circle cx="10.8" cy="16.6" r="2.55" fill="currentColor"/>
     <circle cx="16.5" cy="16.2" r="2.35" fill="currentColor"/>
+  </svg>
+`.trim();
+
+export const FISH_ICON_SVG = `
+  <svg class="map-resource-icon-glyph foraging-map-icon-glyph foraging-map-icon-glyph--fish" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="currentColor" d="M3.2 6.4c2.4.6 4 1.6 5 3 2.4-2.1 5.1-3.2 8-3.2 2.1 0 3.7.9 4.8 2.7-1.1 1.8-2.7 2.7-4.8 2.7-2.9 0-5.6-1.1-8-3.2-1 1.4-2.6 2.4-5 3 .7-1.8.7-3.2 0-5Z" transform="translate(0 2.5)"/>
+    <circle cx="17.2" cy="11.4" r="1" fill="var(--panel, #171915)"/>
   </svg>
 `.trim();

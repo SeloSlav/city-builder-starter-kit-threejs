@@ -8,7 +8,7 @@ import {
   createMapIconRoot,
   placeProjectedMapButton,
 } from './mapIconProjection.ts';
-import { BERRY_ICON_SVG, GAME_ICON_SVG } from './resourceMapIconGlyphs.ts';
+import { BERRY_ICON_SVG, FISH_ICON_SVG, GAME_ICON_SVG } from './resourceMapIconGlyphs.ts';
 
 type ForagingMapIconsOptions = {
   uiRoot: HTMLElement;
@@ -81,16 +81,19 @@ export class ForagingMapIcons {
     button.type = 'button';
     button.className = 'foraging-map-icon';
     button.dataset.foragingId = marker.id;
-    button.title = marker.label;
+    button.dataset.tooltip = marker.label;
     button.setAttribute('aria-label', marker.label);
     button.hidden = true;
 
     if (marker.kind === 'game') {
       button.classList.add('foraging-map-icon--game');
       button.innerHTML = GAME_ICON_SVG;
-    } else {
+    } else if (marker.kind === 'berries') {
       button.classList.add('foraging-map-icon--berries');
       button.innerHTML = BERRY_ICON_SVG;
+    } else {
+      button.classList.add('foraging-map-icon--fish');
+      button.innerHTML = FISH_ICON_SVG;
     }
 
     button.addEventListener('mousedown', (event) => {

@@ -326,6 +326,7 @@ export async function bootstrapWorld(
         x: definition.x,
         z: definition.z,
         maxYield: definition.maxYield,
+        isRich: definition.isRich === true,
       }));
   const nodes = bootstrap.foragingNodes.length > 0
     ? bootstrap.foragingNodes.map((node) => ({

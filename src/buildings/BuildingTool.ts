@@ -4,7 +4,7 @@ import type { BuildingKind, GameState } from '../resources/types.ts';
 import { computeResourceTotals } from '../resources/resourceTotals.ts';
 import { getBuildingDefinition } from '../resources/buildings.ts';
 import type { BuildingPlacementFailureReason, BuildingPlacementResult } from './BuildingPlacementValidation.ts';
-import { validateBuildingPlacement } from './BuildingPlacementValidation.ts';
+import { resolveBuildingPlacementPoint, validateBuildingPlacement } from './BuildingPlacementValidation.ts';
 import type { BuildingMarkers } from './BuildingMarkers.ts';
 import type { BuildingTerrainSource } from './BuildingTerrainLayout.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
@@ -189,13 +189,14 @@ export class BuildingTool {
       return;
     }
 
-    const dx = point.x - this.lastPreviewX;
-    const dz = point.z - this.lastPreviewZ;
+    const resolved = this.resolvePoint(this.mode as BuildingKind, point.x, point.z);
+    const dx = resolved.x - this.lastPreviewX;
+    const dz = resolved.z - this.lastPreviewZ;
     if (Number.isFinite(this.lastPreviewX) && Math.hypot(dx, dz) < this.previewMoveThreshold) {
       return;
     }
 
-    this.refreshPreviewAt(point);
+    this.refreshPreviewAt(new THREE.Vector3(resolved.x, point.y, resolved.z));
   }
 
   private readonly onPointerDown = (event: MouseEvent): void => {
@@ -213,7 +214,8 @@ export class BuildingTool {
     const point = this.options.terrainProjector.pick(event.clientX, event.clientY);
     if (!point) return;
 
-    const validation = this.validate(this.mode, point.x, point.z);
+    const resolved = this.resolvePoint(this.mode, point.x, point.z);
+    const validation = this.validate(this.mode, resolved.x, resolved.z);
     if (!validation.ok) {
       event.preventDefault();
       event.stopPropagation();
@@ -227,7 +229,7 @@ export class BuildingTool {
     const kind = this.mode;
     this.placementPending = true;
     this.setMode('off');
-    void this.placeAt(kind, point.x, point.z);
+    void this.placeAt(kind, resolved.x, resolved.z);
   };
 
   private async placeAt(kind: BuildingKind, x: number, z: number): Promise<void> {
@@ -315,7 +317,8 @@ export class BuildingTool {
       return;
     }
 
-    this.refreshPreviewAt(point);
+    const resolved = this.resolvePoint(this.mode, point.x, point.z);
+    this.refreshPreviewAt(new THREE.Vector3(resolved.x, point.y, resolved.z));
   }
 
   private refreshPreviewAt(point: THREE.Vector3): void {
@@ -388,6 +391,15 @@ export class BuildingTool {
       countMatureTreesInRadius: this.options.countMatureTreesInRadius,
       roadNetwork: this.options.getRoadNetwork?.(),
     });
+  }
+
+  private resolvePoint(kind: BuildingKind, x: number, z: number): { x: number; z: number } {
+    return resolveBuildingPlacementPoint(
+      kind,
+      x,
+      z,
+      this.options.getState().quarries.values(),
+    );
   }
 
   private clearPreview(): void {

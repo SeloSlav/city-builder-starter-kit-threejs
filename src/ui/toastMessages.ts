@@ -19,8 +19,10 @@ export const TOAST_MESSAGES = {
   'building.placement.within_pasture': 'Cannot build inside a fenced pasture',
   'building.placement.on_quarry_pit': 'Cannot build on a quarry pit',
   'building.placement.no_quarry_in_range': 'No quarry stone within work range',
+  'building.placement.requires_rich_deposit': 'Large Quarries must be placed directly over a rich stone deposit',
   'building.placement.no_game_in_range': 'No game within work range',
   'building.placement.no_berries_in_range': 'No berries within work range',
+  'building.placement.no_fish_in_range': 'No fish shoal within work range',
   'building.placement.no_trees_in_range': 'No mature trees within work range',
   'building.placement.on_road': 'Cannot build on a road',
   'building.placement.insufficient_resources': 'Not enough timber or stone',
@@ -122,10 +124,14 @@ export function buildingPlacementReasonToToastId(reason: BuildingPlacementFailur
       return 'building.placement.on_quarry_pit';
     case 'no_quarry_in_range':
       return 'building.placement.no_quarry_in_range';
+    case 'requires_rich_deposit':
+      return 'building.placement.requires_rich_deposit';
     case 'no_game_in_range':
       return 'building.placement.no_game_in_range';
     case 'no_berries_in_range':
       return 'building.placement.no_berries_in_range';
+    case 'no_fish_in_range':
+      return 'building.placement.no_fish_in_range';
     case 'no_trees_in_range':
       return 'building.placement.no_trees_in_range';
     case 'on_road':

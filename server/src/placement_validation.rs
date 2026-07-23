@@ -174,7 +174,7 @@ pub fn burgage_zone_overlaps_buildings(ctx: &ReducerContext, corners: &ZoneCorne
 
 pub fn is_on_quarry_pit(ctx: &ReducerContext, x: f64, z: f64) -> bool {
     for quarry in ctx.db.quarry().iter() {
-        let radius = if quarry.quarry_id.contains("large") {
+        let radius = if quarry.is_rich {
             LARGE_QUARRY_PIT_RADIUS
         } else {
             SMALL_QUARRY_PIT_RADIUS
@@ -214,6 +214,32 @@ pub fn building_overlaps_road_surface(network: &RoadNetwork, kind: &str, x: f64,
     false
 }
 
+pub fn building_overlaps_open_water(kind: &str, x: f64, z: f64) -> bool {
+    let pad = building_pad_params(kind);
+    let yaw = building_placement_yaw(x, z);
+    let cos = yaw.cos();
+    let sin = yaw.sin();
+
+    for &fraction in &FOOTPRINT_SAMPLE_FRACTIONS {
+        for sx in [-1, 0, 1] {
+            for sz in [-1, 0, 1] {
+                if fraction == 0.0 && (sx != 0 || sz != 0) {
+                    continue;
+                }
+                let local_x = sx as f64 * pad.radius_x * pad.inner_fade * fraction;
+                let local_z = sz as f64 * pad.radius_z * pad.inner_fade * fraction;
+                let sample_x = x + local_x * cos - local_z * sin;
+                let sample_z = z + local_x * sin + local_z * cos;
+                if is_open_water(sample_x, sample_z) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
 fn building_pad_params(kind: &str) -> BuildingPadParams {
     match kind {
         "lumber_mill" => BuildingPadParams {
@@ -240,6 +266,12 @@ fn building_pad_params(kind: &str) -> BuildingPadParams {
             inner_fade: 0.82,
             outer_fade: 1.42,
         },
+        "large_quarry" => BuildingPadParams {
+            radius_x: 13.0,
+            radius_z: 12.0,
+            inner_fade: 0.84,
+            outer_fade: 1.24,
+        },
         "well" => BuildingPadParams {
             radius_x: 2.2,
             radius_z: 2.2,
@@ -255,6 +287,12 @@ fn building_pad_params(kind: &str) -> BuildingPadParams {
         "foragers_shed" => BuildingPadParams {
             radius_x: 4.2,
             radius_z: 3.8,
+            inner_fade: 0.88,
+            outer_fade: 1.3,
+        },
+        "fishing_camp" => BuildingPadParams {
+            radius_x: 5.4,
+            radius_z: 4.5,
             inner_fade: 0.88,
             outer_fade: 1.3,
         },

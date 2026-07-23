@@ -240,7 +240,7 @@ fn source_priority(source: &Building) -> u8 {
     let kind_priority = match source.kind.as_str() {
         "village_storehouse" => 0,
         "carpenter" => 1,
-        "lumber_mill" | "stone_quarry" => 2,
+        "lumber_mill" | "stone_quarry" | "large_quarry" => 2,
         _ => 3,
     };
     if source.assigned_labor > 0 {

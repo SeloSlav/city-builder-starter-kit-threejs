@@ -14,8 +14,8 @@ use crate::economy::{
 use crate::hydrology::{sample_hydrology_score, well_capacity_from_hydrology};
 use crate::lifecycle::ensure_player_resources;
 use crate::placement_validation::{
-    building_overlaps_residence_zone, building_overlaps_road_surface, building_site_contains_point,
-    is_near_open_water, is_on_quarry_pit, is_open_water,
+    building_overlaps_open_water, building_overlaps_residence_zone, building_overlaps_road_surface,
+    building_site_contains_point, is_near_open_water, is_on_quarry_pit, is_open_water,
 };
 use crate::roads::load_owner_road_network;
 use crate::simulation::drain_trips_for_building;
@@ -146,6 +146,16 @@ fn has_quarry_stone_in_radius(ctx: &ReducerContext, x: f64, z: f64, radius: f64)
     false
 }
 
+fn has_rich_quarry_at_center(ctx: &ReducerContext, x: f64, z: f64) -> bool {
+    const CENTER_TOLERANCE: f64 = 2.5;
+    let tolerance_sq = CENTER_TOLERANCE * CENTER_TOLERANCE;
+    ctx.db.quarry().iter().any(|quarry| {
+        quarry.is_rich
+            && (quarry.x - x) * (quarry.x - x) + (quarry.z - z) * (quarry.z - z)
+                <= tolerance_sq
+    })
+}
+
 fn has_foraging_in_radius(
     ctx: &ReducerContext,
     x: f64,
@@ -173,18 +183,21 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
     let owner = ctx.sender();
     ensure_player_resources(ctx, owner);
 
-    if !def.requires_quarry_stone && is_on_quarry_pit(ctx, x, z) {
+    if kind != "large_quarry" && is_on_quarry_pit(ctx, x, z) {
         return Err("Cannot build on a quarry pit.".to_string());
     }
 
     // Quarry generation now guarantees a dry padded pit. Do not let the coarse,
     // static server hydrology grid falsely reject a visually dry stonecutter site.
-    if kind != "stone_quarry" && is_open_water(x, z) {
+    if kind != "large_quarry" && is_open_water(x, z) {
         return Err(if kind == "well" {
             "Cannot build a well on open water.".to_string()
         } else {
             "Cannot build on water.".to_string()
         });
+    }
+    if kind == "fishing_camp" && building_overlaps_open_water(&kind, x, z) {
+        return Err("The entire fishing camp must stand on dry land.".to_string());
     }
 
     if def.requires_water_shore && !is_near_open_water(x, z, 24.0) {
@@ -301,12 +314,20 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
         return Err("No quarry stone within work range.".to_string());
     }
 
+    if kind == "large_quarry" && !has_rich_quarry_at_center(ctx, x, z) {
+        return Err("Large Quarries must be placed directly over a rich stone deposit.".to_string());
+    }
+
     if def.requires_game && !has_foraging_in_radius(ctx, x, z, def.work_radius, "game") {
         return Err("No game within work range.".to_string());
     }
 
     if def.requires_berries && !has_foraging_in_radius(ctx, x, z, def.work_radius, "berries") {
         return Err("No berries within work range.".to_string());
+    }
+
+    if def.requires_fish && !has_foraging_in_radius(ctx, x, z, def.work_radius, "fish") {
+        return Err("No fish shoal within work range.".to_string());
     }
 
     if is_too_close_to_buildings(ctx, &kind, x, z) {

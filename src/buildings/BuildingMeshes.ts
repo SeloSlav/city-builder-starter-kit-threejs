@@ -9,10 +9,12 @@ import {
 import { createMarketplaceMesh } from './meshes/marketplaceMesh.ts';
 import {
   createForagersShedMesh,
+  createFishingCampMesh,
   createHuntersHallMesh,
   createWellMesh,
 } from './meshes/serviceBuildingMeshes.ts';
 import { createStoneQuarryMesh } from './meshes/stoneQuarryMesh.ts';
+import { createLargeQuarryMesh } from './meshes/largeQuarryMesh.ts';
 import {
   createApiaryMesh,
   createBreweryMesh,
@@ -41,12 +43,16 @@ export function createBuildingMesh(kind: BuildingKind): THREE.Group {
       return createWoodcuttersLodgeMesh();
     case 'stone_quarry':
       return createStoneQuarryMesh();
+    case 'large_quarry':
+      return createLargeQuarryMesh();
     case 'well':
       return createWellMesh();
     case 'hunters_hall':
       return createHuntersHallMesh();
     case 'foragers_shed':
       return createForagersShedMesh();
+    case 'fishing_camp':
+      return createFishingCampMesh();
     case 'chapel':
       return createChapelMesh();
     case 'marketplace':

@@ -231,6 +231,7 @@ export const Quarry = __t.object("Quarry", {
   z: __t.f64(),
   maxYield: __t.f64(),
   remaining: __t.f64(),
+  isRich: __t.bool(),
 });
 export type Quarry = __Infer<typeof Quarry>;
 
@@ -239,6 +240,7 @@ export const QuarryBootstrap = __t.object("QuarryBootstrap", {
   x: __t.f64(),
   z: __t.f64(),
   maxYield: __t.f64(),
+  isRich: __t.bool(),
 });
 export type QuarryBootstrap = __Infer<typeof QuarryBootstrap>;
 
@@ -313,4 +315,3 @@ export const WorldConfig = __t.object("WorldConfig", {
   configured: __t.bool(),
 });
 export type WorldConfig = __Infer<typeof WorldConfig>;
-

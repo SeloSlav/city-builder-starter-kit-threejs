@@ -3,9 +3,9 @@ use spacetimedb::ReducerContext;
 use crate::db::*;
 use crate::simulation::{
     step_backyard_gardens,
-    step_chapels, step_chapel_parish, step_construction_sites, step_delivery_trips, step_foragers_shed, step_foraging_respawn,
+    step_chapels, step_chapel_parish, step_construction_sites, step_delivery_trips, step_fishing_camp, step_foragers_shed, step_foraging_respawn,
     step_household_market_orders, step_hunters_hall, step_lumber_mill, step_marketplace_caravans,
-    step_reforester, step_residence, step_stone_quarry, step_well, step_woodcutters_lodge,
+    step_large_quarry, step_reforester, step_residence, step_stone_quarry, step_well, step_woodcutters_lodge,
     step_apiary, step_brewery, step_carpenter, step_ferry_landing,
     step_granary, step_monastery, step_smokehouse, step_threshing_barn, step_vineyard,
     step_watermill, step_pastoral_farmstead, step_swineherd,
@@ -52,10 +52,12 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
     let mut lumber_mill_ids: Vec<u64> = Vec::new();
     let mut reforester_ids: Vec<u64> = Vec::new();
     let mut stone_quarry_ids: Vec<u64> = Vec::new();
+    let mut large_quarry_ids: Vec<u64> = Vec::new();
     let mut woodcutters_lodge_ids: Vec<u64> = Vec::new();
     let mut well_ids: Vec<u64> = Vec::new();
     let mut hunters_hall_ids: Vec<u64> = Vec::new();
     let mut foragers_shed_ids: Vec<u64> = Vec::new();
+    let mut fishing_camp_ids: Vec<u64> = Vec::new();
     let mut expanded_ids: Vec<(crate::building_defs::BuildingSimKind, u64)> = Vec::new();
 
     for building in ctx.db.building().iter() {
@@ -71,6 +73,7 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
             crate::building_defs::BuildingSimKind::LumberMill => lumber_mill_ids.push(building.id),
             crate::building_defs::BuildingSimKind::Reforester => reforester_ids.push(building.id),
             crate::building_defs::BuildingSimKind::StoneQuarry => stone_quarry_ids.push(building.id),
+            crate::building_defs::BuildingSimKind::LargeQuarry => large_quarry_ids.push(building.id),
             crate::building_defs::BuildingSimKind::WoodcuttersLodge => {
                 woodcutters_lodge_ids.push(building.id)
             }
@@ -78,6 +81,9 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
             crate::building_defs::BuildingSimKind::HuntersHall => hunters_hall_ids.push(building.id),
             crate::building_defs::BuildingSimKind::ForagersShed => {
                 foragers_shed_ids.push(building.id)
+            }
+            crate::building_defs::BuildingSimKind::FishingCamp => {
+                fishing_camp_ids.push(building.id)
             }
             crate::building_defs::BuildingSimKind::ThreshingBarn
             | crate::building_defs::BuildingSimKind::Monastery
@@ -118,6 +124,13 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
         step_stone_quarry(ctx, &clock, building);
     }
 
+    for building_id in large_quarry_ids {
+        let Some(building) = ctx.db.building().id().find(&building_id) else {
+            continue;
+        };
+        step_large_quarry(ctx, &clock, building);
+    }
+
     for building_id in hunters_hall_ids {
         let Some(building) = ctx.db.building().id().find(&building_id) else {
             continue;
@@ -130,6 +143,13 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
             continue;
         };
         step_foragers_shed(ctx, &tick, &clock, building);
+    }
+
+    for building_id in fishing_camp_ids {
+        let Some(building) = ctx.db.building().id().find(&building_id) else {
+            continue;
+        };
+        step_fishing_camp(ctx, &tick, &clock, building);
     }
 
     for building_id in woodcutters_lodge_ids {

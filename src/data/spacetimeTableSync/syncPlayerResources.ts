@@ -22,6 +22,7 @@ export function syncPlayerResources(rows: Iterable<PlayerResources>, state: Game
       gold: row.gold ?? 0,
       game: 0,
       berries: 0,
+      fish: 0,
       food: row.food ?? 0,
       grain: row.grain ?? 0,
       flour: row.flour ?? 0,

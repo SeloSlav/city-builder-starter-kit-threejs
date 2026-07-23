@@ -113,7 +113,10 @@ export class WellDeliveryClaimQueries extends DeliveryClaimQueries {
 export class FoodDeliveryClaimQueries extends DeliveryClaimQueries {
   constructor(network: RoadNetwork, buildings: BuildingState[], residences: ResidenceState[]) {
     const suppliers = buildings.filter(
-      (building) => building.kind === 'hunters_hall' || building.kind === 'foragers_shed',
+      (building) =>
+        building.kind === 'hunters_hall'
+        || building.kind === 'foragers_shed'
+        || building.kind === 'fishing_camp',
     );
     super(network, suppliers, residences, claimResidencesForFoodSuppliers);
   }

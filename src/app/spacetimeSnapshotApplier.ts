@@ -42,6 +42,7 @@ export class SpacetimeSnapshotApplier {
     const residencesChanged = !previous || state.residences !== previous.residences;
     const burgageZonesChanged = !previous || state.burgageZones !== previous.burgageZones;
     const farmFieldsChanged = !previous || state.farmFields !== previous.farmFields;
+    const quarriesChanged = !previous || state.quarries !== previous.quarries;
     const residenceCollidersChanged = !previous || !mapEntriesMatch(
       state.residences,
       previous.residences,
@@ -75,6 +76,9 @@ export class SpacetimeSnapshotApplier {
         && current.kind === prior.kind,
     );
     let buildingCollidersChanged = false;
+    const quarryCollidersChanged = quarriesChanged
+      ? (deps.sceneManager?.syncQuarryNodes(state.quarries.values()) ?? false)
+      : false;
     const treesChanged = !previous || !mapEntriesShareValues(state.trees, previous.trees);
     if (treesChanged) {
       const changedTreeIds: string[] = [];
@@ -163,6 +167,7 @@ export class SpacetimeSnapshotApplier {
       || burgageFenceCollidersChanged
       || pastureFenceCollidersChanged
       || backyardCollidersChanged
+      || quarryCollidersChanged
     ) {
       deps.onFirstPersonCollisionChanged?.();
     }

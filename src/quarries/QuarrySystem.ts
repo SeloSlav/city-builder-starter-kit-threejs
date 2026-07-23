@@ -3,6 +3,8 @@ import type { MossyRockTextureSet } from '../utils/propTextureLoad.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
 import { createRockShadowGeometry } from '../props/ForestProps.ts';
 import { TREE_SHADOW_CAST_LAYER } from '../scene/SceneLayers.ts';
+import type { ResourceNodeState } from '../resources/types.ts';
+import { surfaceRockCountForRemaining } from './quarryDepletion.ts';
 import type { QuarryLayout, QuarrySite } from './QuarryLayout.ts';
 import {
   setRockObstacleCollisionBounds,
@@ -11,10 +13,27 @@ import {
 
 const TAU = Math.PI * 2;
 
+type QuarryRockPlacement = RockObstacle & {
+  quarryId: string;
+};
+
+type QuarryRockBucket = {
+  placements: QuarryRockPlacement[];
+  rocks: THREE.InstancedMesh;
+  shadows: THREE.InstancedMesh;
+};
+
+type QuarrySiteVisual = {
+  quarryId: string;
+  buckets: QuarryRockBucket[];
+};
+
 export type QuarrySystem = {
   layout: QuarryLayout;
   group: THREE.Group;
+  /** Mutable-in-place so collision consumers retain one stable array reference. */
   rockPlacements: ReadonlyArray<RockObstacle>;
+  syncNodes: (nodes: Iterable<ResourceNodeState>) => boolean;
   isBlockedAt: (x: number, z: number) => boolean;
   isGrassBlockedAt: (x: number, z: number) => boolean;
   dispose: () => void;
@@ -26,14 +45,52 @@ export function createQuarrySystem(
   rockTextures: MossyRockTextureSet,
 ): QuarrySystem {
   const group = new THREE.Group();
-  group.name = 'Rock quarries';
+  group.name = 'Stone deposits';
 
   const rockMaterial = createQuarryRockMaterial(rockTextures);
   const shadowMaterials = createPropShadowMaterials();
   const rng = mulberry32(0x71a2e0d ^ 0x5151);
   const placements = createQuarryRockPlacements(layout, rng);
-  const rocksGroup = createQuarryRockMeshes(terrain, placements, rockMaterial, shadowMaterials, rng);
+  const { group: rocksGroup, sites } = createQuarryRockMeshes(
+    terrain,
+    placements,
+    rockMaterial,
+    shadowMaterials,
+    rng,
+  );
   group.add(rocksGroup);
+
+  const activePlacements: RockObstacle[] = [...placements];
+  const syncNodes = (nodes: Iterable<ResourceNodeState>): boolean => {
+    const byId = new Map(Array.from(nodes, (node) => [node.nodeId, node]));
+    const nextActive: RockObstacle[] = [];
+    let changed = false;
+
+    for (const site of sites) {
+      const node = byId.get(site.quarryId);
+      for (const bucket of site.buckets) {
+        const visibleCount = node
+          ? surfaceRockCountForRemaining(
+              bucket.placements.length,
+              node.remaining,
+              node.maxYield,
+            )
+          : bucket.placements.length;
+        if (bucket.rocks.count !== visibleCount || bucket.shadows.count !== visibleCount) {
+          bucket.rocks.count = visibleCount;
+          bucket.shadows.count = visibleCount;
+          changed = true;
+        }
+        nextActive.push(...bucket.placements.slice(0, visibleCount));
+      }
+    }
+
+    if (changed || activePlacements.length !== nextActive.length) {
+      activePlacements.splice(0, activePlacements.length, ...nextActive);
+      return true;
+    }
+    return false;
+  };
 
   const dispose = () => {
     rockMaterial.dispose();
@@ -47,24 +104,33 @@ export function createQuarrySystem(
   return {
     layout,
     group,
-    rockPlacements: placements,
+    rockPlacements: activePlacements,
+    syncNodes,
     isBlockedAt: (x, z) => layout.isBlockedForProps(x, z),
     isGrassBlockedAt: (x, z) => layout.isBlockedForGrass(x, z),
     dispose,
   };
 }
 
-type StonePlacement = RockObstacle;
-
-function createQuarryRockPlacements(layout: QuarryLayout, rng: () => number): StonePlacement[] {
-  const placements: StonePlacement[] = [];
+function createQuarryRockPlacements(layout: QuarryLayout, rng: () => number): QuarryRockPlacement[] {
+  const placements: QuarryRockPlacement[] = [];
+  let largeIndex = 0;
+  let smallIndex = 0;
   for (const site of layout.sites) {
-    createSiteRockPlacements(site, placements, rng);
+    const quarryId = site.kind === 'large'
+      ? `quarry-large-${largeIndex++}`
+      : `quarry-small-${smallIndex++}`;
+    createSiteRockPlacements(site, quarryId, placements, rng);
   }
   return placements;
 }
 
-function createSiteRockPlacements(site: QuarrySite, placements: StonePlacement[], rng: () => number): void {
+function createSiteRockPlacements(
+  site: QuarrySite,
+  quarryId: string,
+  placements: QuarryRockPlacement[],
+  rng: () => number,
+): void {
   const targetCount =
     site.kind === 'large'
       ? 88 + Math.floor(rng() * 32)
@@ -93,65 +159,83 @@ function createSiteRockPlacements(site: QuarrySite, placements: StonePlacement[]
         : THREE.MathUtils.lerp(0.55, 2.6, Math.pow(rng(), 1.35));
     if (!hasMinimumRockDistance(placements, x, z, 1.8 + scale * 0.95)) continue;
 
-    placements.push({ x, z, scale });
+    placements.push({ quarryId, x, z, scale });
   }
 }
 
 function createQuarryRockMeshes(
   terrain: Terrain,
-  placements: StonePlacement[],
+  placements: QuarryRockPlacement[],
   material: THREE.Material,
   shadowMaterials: { shadowCast: THREE.MeshStandardMaterial; shadowDepth: THREE.MeshDepthMaterial },
   rng: () => number,
-): THREE.Group {
+): { group: THREE.Group; sites: QuarrySiteVisual[] } {
   const group = new THREE.Group();
-  group.name = 'Quarry boulder piles';
-  if (placements.length === 0) return group;
+  group.name = 'Finite surface stone';
+  if (placements.length === 0) return { group, sites: [] };
 
   const variants = [createBoulderGeometry(2.1), createBoulderGeometry(8.4), createBoulderGeometry(15.7)];
   const shadowGeometry = createRockShadowGeometry();
-  const buckets = variants.map(() => [] as StonePlacement[]);
-  placements.forEach((placement, index) => buckets[index % buckets.length].push(placement));
+  const sitePlacements = new Map<string, QuarryRockPlacement[]>();
+  for (const placement of placements) {
+    const bucket = sitePlacements.get(placement.quarryId);
+    if (bucket) bucket.push(placement);
+    else sitePlacements.set(placement.quarryId, [placement]);
+  }
 
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
   const scaleVector = new THREE.Vector3();
+  const sites: QuarrySiteVisual[] = [];
 
-  buckets.forEach((bucket, variantIndex) => {
-    if (bucket.length === 0) return;
-    const mesh = new THREE.InstancedMesh(variants[variantIndex], material, bucket.length);
-    mesh.name = `Quarry boulders ${variantIndex + 1}`;
-    mesh.castShadow = false;
-    mesh.receiveShadow = true;
-    const shadowMesh = new THREE.InstancedMesh(shadowGeometry, shadowMaterials.shadowCast, bucket.length);
-    shadowMesh.name = `Quarry boulder shadows ${variantIndex + 1}`;
-    shadowMesh.layers.set(TREE_SHADOW_CAST_LAYER);
-    shadowMesh.castShadow = true;
-    shadowMesh.receiveShadow = false;
-    shadowMesh.customDepthMaterial = shadowMaterials.shadowDepth;
-
-    bucket.forEach((rock, rockIndex) => {
-      const y = terrain.getHeightAt(rock.x, rock.z);
-      position.set(rock.x, y + rock.scale * 0.16, rock.z);
-      quaternion.setFromEuler(new THREE.Euler((rng() - 0.5) * 0.24, rng() * TAU, (rng() - 0.5) * 0.24));
-      scaleVector.set(
-        rock.scale * (0.96 + rng() * 0.62),
-        rock.scale * (0.42 + rng() * 0.28),
-        rock.scale * (0.86 + rng() * 0.52),
-      );
-      matrix.compose(position, quaternion, scaleVector);
-      setRockObstacleCollisionBounds(rock, variants[variantIndex], matrix);
-      mesh.setMatrixAt(rockIndex, matrix);
-      shadowMesh.setMatrixAt(rockIndex, matrix);
+  for (const [quarryId, quarryPlacements] of sitePlacements) {
+    const siteGroup = new THREE.Group();
+    siteGroup.name = `${quarryId} surface rocks`;
+    const variantBuckets = variants.map(() => [] as QuarryRockPlacement[]);
+    quarryPlacements.forEach((placement, index) => {
+      variantBuckets[index % variantBuckets.length].push(placement);
     });
 
-    mesh.instanceMatrix.needsUpdate = true;
-    shadowMesh.instanceMatrix.needsUpdate = true;
-    group.add(mesh, shadowMesh);
-  });
+    const buckets: QuarryRockBucket[] = [];
+    variantBuckets.forEach((bucket, variantIndex) => {
+      if (bucket.length === 0) return;
+      const rocks = new THREE.InstancedMesh(variants[variantIndex], material, bucket.length);
+      rocks.name = `${quarryId} boulders ${variantIndex + 1}`;
+      rocks.castShadow = false;
+      rocks.receiveShadow = true;
+      const shadows = new THREE.InstancedMesh(shadowGeometry, shadowMaterials.shadowCast, bucket.length);
+      shadows.name = `${quarryId} boulder shadows ${variantIndex + 1}`;
+      shadows.layers.set(TREE_SHADOW_CAST_LAYER);
+      shadows.castShadow = true;
+      shadows.receiveShadow = false;
+      shadows.customDepthMaterial = shadowMaterials.shadowDepth;
 
-  return group;
+      bucket.forEach((rock, rockIndex) => {
+        const y = terrain.getHeightAt(rock.x, rock.z);
+        position.set(rock.x, y + rock.scale * 0.16, rock.z);
+        quaternion.setFromEuler(new THREE.Euler((rng() - 0.5) * 0.24, rng() * TAU, (rng() - 0.5) * 0.24));
+        scaleVector.set(
+          rock.scale * (0.96 + rng() * 0.62),
+          rock.scale * (0.42 + rng() * 0.28),
+          rock.scale * (0.86 + rng() * 0.52),
+        );
+        matrix.compose(position, quaternion, scaleVector);
+        setRockObstacleCollisionBounds(rock, variants[variantIndex], matrix);
+        rocks.setMatrixAt(rockIndex, matrix);
+        shadows.setMatrixAt(rockIndex, matrix);
+      });
+
+      rocks.instanceMatrix.needsUpdate = true;
+      shadows.instanceMatrix.needsUpdate = true;
+      siteGroup.add(rocks, shadows);
+      buckets.push({ placements: bucket, rocks, shadows });
+    });
+    group.add(siteGroup);
+    sites.push({ quarryId, buckets });
+  }
+
+  return { group, sites };
 }
 
 function createQuarryRockMaterial(rockTextures: MossyRockTextureSet): THREE.MeshStandardMaterial {
@@ -210,7 +294,7 @@ function createBoulderGeometry(seed: number): THREE.BufferGeometry {
 }
 
 function hasMinimumRockDistance(
-  placements: StonePlacement[],
+  placements: QuarryRockPlacement[],
   x: number,
   z: number,
   minDistance: number,

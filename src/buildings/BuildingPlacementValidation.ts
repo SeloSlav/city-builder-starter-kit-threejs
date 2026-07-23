@@ -24,8 +24,10 @@ export type BuildingPlacementFailureReason =
   | 'within_pasture'
   | 'on_quarry_pit'
   | 'no_quarry_in_range'
+  | 'requires_rich_deposit'
   | 'no_game_in_range'
   | 'no_berries_in_range'
+  | 'no_fish_in_range'
   | 'no_trees_in_range'
   | 'on_road'
   | 'insufficient_resources'
@@ -60,7 +62,9 @@ export function validateBuildingPlacement(
   z: number,
   context: BuildingPlacementContext,
 ): BuildingPlacementResult {
-  if (context.isWaterAt(x, z)) {
+  const fishingFootprintTouchesWater = kind === 'fishing_camp'
+    && sampleBuildingFootprintPoints(kind, x, z).some((point) => context.isWaterAt(point.x, point.z));
+  if (kind !== 'large_quarry' && (context.isWaterAt(x, z) || fishingFootprintTouchesWater)) {
     return { ok: false, reason: 'water' };
   }
 
@@ -76,7 +80,7 @@ export function validateBuildingPlacement(
     if (slope > MAX_FOOTPRINT_HEIGHT_DELTA) {
       return { ok: false, reason: 'too_steep' };
     }
-  } else if (isFootprintTooUneven(kind, x, z, context.getNaturalHeightAt)) {
+  } else if (kind !== 'large_quarry' && isFootprintTooUneven(kind, x, z, context.getNaturalHeightAt)) {
     return { ok: false, reason: 'too_steep' };
   }
 
@@ -84,7 +88,7 @@ export function validateBuildingPlacement(
     return { ok: false, reason: 'on_road' };
   }
 
-  if (kind !== 'stone_quarry' && context.isQuarryPitAt?.(x, z)) {
+  if (kind !== 'large_quarry' && context.isQuarryPitAt?.(x, z)) {
     return { ok: false, reason: 'on_quarry_pit' };
   }
 
@@ -112,12 +116,20 @@ export function validateBuildingPlacement(
     return { ok: false, reason: 'no_quarry_in_range' };
   }
 
+  if (kind === 'large_quarry' && !hasRichQuarryAtCenter(x, z, context.quarries)) {
+    return { ok: false, reason: 'requires_rich_deposit' };
+  }
+
   if (kind === 'hunters_hall' && !hasForagingInRadius(x, z, getBuildingDefinition(kind).workRadius, 'game', context.foragingNodes)) {
     return { ok: false, reason: 'no_game_in_range' };
   }
 
   if (kind === 'foragers_shed' && !hasForagingInRadius(x, z, getBuildingDefinition(kind).workRadius, 'berries', context.foragingNodes)) {
     return { ok: false, reason: 'no_berries_in_range' };
+  }
+
+  if (kind === 'fishing_camp' && !hasForagingInRadius(x, z, getBuildingDefinition(kind).workRadius, 'fish', context.foragingNodes)) {
+    return { ok: false, reason: 'no_fish_in_range' };
   }
 
   if (kind === 'lumber_mill') {
@@ -153,6 +165,42 @@ export function validateBuildingPlacement(
   }
 
   return { ok: true };
+}
+
+const RICH_QUARRY_SNAP_RADIUS = 58;
+const RICH_QUARRY_CENTER_TOLERANCE = 2.5;
+
+export function resolveBuildingPlacementPoint(
+  kind: BuildingKind,
+  x: number,
+  z: number,
+  quarries: Iterable<ResourceNodeState>,
+): { x: number; z: number } {
+  if (kind !== 'large_quarry') return { x, z };
+  let nearest: ResourceNodeState | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const quarry of quarries) {
+    if (!quarry.isRich) continue;
+    const distance = Math.hypot(quarry.x - x, quarry.z - z);
+    if (distance > RICH_QUARRY_SNAP_RADIUS || distance >= nearestDistance) continue;
+    nearest = quarry;
+    nearestDistance = distance;
+  }
+  return nearest ? { x: nearest.x, z: nearest.z } : { x, z };
+}
+
+function hasRichQuarryAtCenter(
+  x: number,
+  z: number,
+  quarries: Iterable<ResourceNodeState>,
+): boolean {
+  for (const quarry of quarries) {
+    if (!quarry.isRich) continue;
+    if (Math.hypot(quarry.x - x, quarry.z - z) <= RICH_QUARRY_CENTER_TOLERANCE) {
+      return true;
+    }
+  }
+  return false;
 }
 
 const SHORE_RADIAL_SAMPLE_STEP = 2;
@@ -249,7 +297,7 @@ function hasForagingInRadius(
   x: number,
   z: number,
   radius: number,
-  nodeKind: 'game' | 'berries',
+  nodeKind: 'game' | 'berries' | 'fish',
   nodes: Iterable<ForagingNodeState>,
 ): boolean {
   for (const node of nodes) {

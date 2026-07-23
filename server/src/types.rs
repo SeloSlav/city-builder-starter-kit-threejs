@@ -4,6 +4,7 @@ pub struct QuarryBootstrap {
     pub x: f64,
     pub z: f64,
     pub max_yield: f64,
+    pub is_rich: bool,
 }
 
 #[derive(spacetimedb::SpacetimeType, Clone, Debug)]

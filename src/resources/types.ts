@@ -1,7 +1,7 @@
-export const RESOURCE_KINDS = ['timber', 'stone', 'firewood', 'water', 'game', 'berries', 'food', 'grain', 'flour', 'ale', 'preservedFood', 'honey', 'wine'] as const;
+export const RESOURCE_KINDS = ['timber', 'stone', 'firewood', 'water', 'game', 'berries', 'fish', 'food', 'grain', 'flour', 'ale', 'preservedFood', 'honey', 'wine'] as const;
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];
 
-export const RESOURCE_NODE_KINDS = ['quarry', 'game', 'berries'] as const;
+export const RESOURCE_NODE_KINDS = ['quarry', 'game', 'berries', 'fish'] as const;
 export type ResourceNodeKind = (typeof RESOURCE_NODE_KINDS)[number];
 
 export const TREE_PHASES = ['stump', 'growing', 'mature'] as const;
@@ -24,6 +24,7 @@ export type ResourceNodeDefinition = {
   maxYield: number;
   pickRadius: number;
   quarryKind?: 'large' | 'small';
+  isRich?: boolean;
 };
 
 export type ResourceNodeState = {
@@ -34,6 +35,7 @@ export type ResourceNodeState = {
   maxYield: number;
   x: number;
   z: number;
+  isRich?: boolean;
 };
 
 export type ForagingNodeState = ResourceNodeState;
@@ -252,7 +254,7 @@ export type InspectableTarget =
     };
 
 export function createEmptyStockpile(): ResourceStockpile {
-  return { timber: 0, stone: 0, firewood: 0, water: 0, game: 0, berries: 0, food: 0, grain: 0, flour: 0, ale: 0, preservedFood: 0, honey: 0, wine: 0, gold: 0 };
+  return { timber: 0, stone: 0, firewood: 0, water: 0, game: 0, berries: 0, fish: 0, food: 0, grain: 0, flour: 0, ale: 0, preservedFood: 0, honey: 0, wine: 0, gold: 0 };
 }
 
 export function isResourceKind(value: string): value is ResourceKind {

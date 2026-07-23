@@ -23,7 +23,7 @@ export function buildLayoutWorldMapMarkers(registry: WorldLayoutRegistry): World
       if (definition.kind === 'quarry') {
         return definition.resource === 'stone';
       }
-      return definition.kind === 'game' || definition.kind === 'berries';
+      return definition.kind === 'game' || definition.kind === 'berries' || definition.kind === 'fish';
     })
     .map((definition) => ({
       id: definition.id,
@@ -49,7 +49,7 @@ export function isWorldMapForagingMarkerVisible(
   marker: WorldMapMarker,
   foragingNodes: Map<string, ForagingNodeState>,
 ): boolean {
-  if (marker.kind !== 'game' && marker.kind !== 'berries') return true;
+  if (marker.kind !== 'game' && marker.kind !== 'berries' && marker.kind !== 'fish') return true;
   const state = foragingNodes.get(marker.id);
   return Boolean(state && state.remaining > 0);
 }
@@ -62,5 +62,7 @@ export function filterWorldMapMarkersByKind<K extends WorldMapMarkerKind>(
 }
 
 export function filterWorldMapForagingMarkers(markers: readonly WorldMapMarker[]): WorldMapMarker[] {
-  return markers.filter((marker) => marker.kind === 'game' || marker.kind === 'berries');
+  return markers.filter(
+    (marker) => marker.kind === 'game' || marker.kind === 'berries' || marker.kind === 'fish',
+  );
 }

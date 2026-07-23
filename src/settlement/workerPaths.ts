@@ -20,8 +20,10 @@ export const PRODUCTION_WORKPLACE_KINDS = [
   'reforester',
   'woodcutters_lodge',
   'stone_quarry',
+  'large_quarry',
   'hunters_hall',
   'foragers_shed',
+  'fishing_camp',
   'threshing_barn',
   'pastoral_farmstead',
   'swineherd',
@@ -57,6 +59,7 @@ export type WorkerTargetKind =
   | 'quarry'
   | 'game'
   | 'berries'
+  | 'fish'
   | 'field'
   | 'pasture'
   | 'construction';
@@ -201,6 +204,18 @@ export function collectWorkerTargets(
       pushNodeInsideExtent(building, radius, node, 'quarry', targets);
     }
   }
+  if (building.kind === 'large_quarry') {
+    const workRadius = Math.max(4.2, definition.pickRadius * 0.42);
+    for (let index = 0; index < Math.max(4, definition.maxLabor); index++) {
+      const angle = index / Math.max(4, definition.maxLabor) * Math.PI * 2;
+      targets.push({
+        id: `${building.id}:shaft:${index}`,
+        kind: 'quarry',
+        x: building.x + Math.sin(angle) * workRadius,
+        z: building.z + Math.cos(angle) * workRadius,
+      });
+    }
+  }
   if (definition.requiresGame) {
     for (const node of inputs.foragingNodes) {
       if (node.kind !== 'game' || node.remaining <= 0) continue;
@@ -211,6 +226,12 @@ export function collectWorkerTargets(
     for (const node of inputs.foragingNodes) {
       if (node.kind !== 'berries' || node.remaining <= 0) continue;
       pushNodeInsideExtent(building, radius, node, 'berries', targets);
+    }
+  }
+  if (definition.requiresFish) {
+    for (const node of inputs.foragingNodes) {
+      if (node.kind !== 'fish' || node.remaining <= 0) continue;
+      pushNodeInsideExtent(building, radius, node, 'fish', targets);
     }
   }
 
@@ -352,6 +373,7 @@ function workerActivityFor(
 ): WorkerActivityKind | null {
   if (building.kind === 'lumber_mill' && target.kind === 'tree') return 'chop';
   if (building.kind === 'stone_quarry' && target.kind === 'quarry') return 'mine';
+  if (building.kind === 'large_quarry' && target.kind === 'quarry') return 'mine';
   return null;
 }
 
@@ -359,7 +381,7 @@ function pushNodeInsideExtent(
   building: BuildingState,
   radius: number,
   node: ResourceNodeState,
-  kind: Extract<WorkerTargetKind, 'quarry' | 'game' | 'berries'>,
+  kind: Extract<WorkerTargetKind, 'quarry' | 'game' | 'berries' | 'fish'>,
   targets: WorkerTarget[],
 ): void {
   if (radius <= 0 || distanceSq(building, node) > radius * radius) return;

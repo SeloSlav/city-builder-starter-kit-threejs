@@ -1,0 +1,187 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { sampleBuildingFootprintPoints } from '../src/buildings/BuildingTerrainLayout.ts';
+import { validateBuildingPlacement } from '../src/buildings/BuildingPlacementValidation.ts';
+import {
+  BUILDING_DEFINITIONS,
+  BUILDING_STORAGE_CAPS,
+  FISH_PER_HARVEST,
+  RICH_FISH_YIELD_MULTIPLIER,
+} from '../src/generated/gameBalance.ts';
+import { claimResidencesForFoodSuppliers } from '../src/logistics/roadLogistics.ts';
+import { FISH_ICON_SVG } from '../src/map/resourceMapIconGlyphs.ts';
+import { createWorldLayout } from '../src/resources/WorldLayout.ts';
+import { WorldLayoutRegistry } from '../src/resources/WorldLayoutRegistry.ts';
+import {
+  RESOURCE_KINDS,
+  createEmptyStockpile,
+  type BuildingState,
+  type ForagingNodeState,
+  type ResidenceState,
+} from '../src/resources/types.ts';
+import type { RoadNetwork } from '../src/roads/RoadNetwork.ts';
+
+const layout = createWorldLayout();
+const registry = WorldLayoutRegistry.fromWorldLayout(layout);
+const fish = registry.definitionList.filter((node) => node.kind === 'fish');
+
+assert.equal(fish.length, 2, 'world generation should create one small and one rich fish shoal');
+assert.equal(fish.filter((node) => node.isRich === true).length, 1);
+assert.equal(fish.filter((node) => node.isRich !== true).length, 1);
+assert.ok(fish.every((node) => node.resource === 'fish'));
+assert.ok(fish.every((node) => layout.riverLayout.isWaterAt(node.x, node.z)));
+assert.ok(fish.every((node) => node.maxYield > 0));
+assert.ok(
+  fish.find((node) => node.isRich)!.maxYield
+    > fish.find((node) => !node.isRich)!.maxYield,
+  'rich shoal should advertise the larger yield class',
+);
+
+assert.ok(RESOURCE_KINDS.includes('fish'));
+assert.equal(createEmptyStockpile().fish, 0);
+assert.equal(BUILDING_DEFINITIONS.fishing_camp.requiresFish, true);
+assert.equal(BUILDING_DEFINITIONS.fishing_camp.workRadius, 64);
+assert.equal(BUILDING_STORAGE_CAPS.fishing_camp.food, 120);
+assert.ok(FISH_PER_HARVEST > 0);
+assert.ok(RICH_FISH_YIELD_MULTIPLIER > 1);
+
+for (const mapSize of ['small', 'medium', 'large'] as const) {
+  for (const hydrology of [0, 50, 100]) {
+    const variantLayout = createWorldLayout({
+      seed: 0x71a2e0d ^ hydrology ^ mapSize.length,
+      mapSize,
+      topography: 50,
+      hydrology,
+      forestDensity: 50,
+    });
+    const variantFish = WorldLayoutRegistry.fromWorldLayout(variantLayout)
+      .definitionList
+      .filter((node) => node.kind === 'fish');
+    assert.equal(variantFish.length, 2);
+    for (const shoal of variantFish) {
+      assert.ok(variantLayout.riverLayout.isWaterAt(shoal.x, shoal.z));
+      assert.ok(
+        findDryCampSite(shoal.x, shoal.z, variantLayout.riverLayout),
+        `${mapSize}/${hydrology} ${shoal.id} should have a reachable dry shoreline`,
+      );
+    }
+  }
+}
+
+const fishStates: ForagingNodeState[] = fish.map((node) => ({
+  nodeId: node.id,
+  kind: 'fish',
+  resource: 'fish',
+  remaining: node.maxYield,
+  maxYield: node.maxYield,
+  x: node.x,
+  z: node.z,
+  isRich: node.isRich,
+}));
+
+const basePlacementContext = {
+  buildings: [] as BuildingState[],
+  residences: [] as ResidenceState[],
+  burgageZones: [],
+  farmFields: [],
+  pastures: [],
+  quarries: [],
+  foragingNodes: fishStates,
+  stockpile: { timber: 10_000, stone: 10_000 },
+  isWaterAt: (x: number, z: number) => layout.riverLayout.isWaterAt(x, z),
+  getNaturalHeightAt: () => 0,
+};
+
+for (const shoal of fishStates) {
+  const campSite = findDryCampSite(shoal.x, shoal.z, layout.riverLayout);
+  assert.ok(campSite, `${shoal.nodeId} should have a dry camp site inside the 64 m work radius`);
+  assert.deepEqual(
+    validateBuildingPlacement('fishing_camp', campSite.x, campSite.z, basePlacementContext),
+    { ok: true },
+  );
+}
+
+assert.deepEqual(
+  validateBuildingPlacement('fishing_camp', 0, 0, {
+    ...basePlacementContext,
+    foragingNodes: [],
+    isWaterAt: () => false,
+  }),
+  { ok: false, reason: 'no_fish_in_range' },
+);
+
+assert.deepEqual(
+  validateBuildingPlacement('fishing_camp', 0, 0, {
+    ...basePlacementContext,
+    foragingNodes: [{
+      nodeId: 'test-fish',
+      kind: 'fish',
+      resource: 'fish',
+      remaining: 120,
+      maxYield: 120,
+      x: 20,
+      z: 0,
+    }],
+    isWaterAt: (x: number) => x > 4,
+  }),
+  { ok: false, reason: 'water' },
+  'the full fishing-camp footprint—not just its center—must remain on land',
+);
+
+const camp = { id: 'camp-1', kind: 'fishing_camp', x: 0, z: 0 } as BuildingState;
+const residence = { id: 'home-1', x: 20, z: 0 } as ResidenceState;
+const connectedNetwork = {
+  getPathfinder: () => ({
+    roadPathDistance: () => 20,
+  }),
+} as RoadNetwork;
+assert.equal(
+  claimResidencesForFoodSuppliers(connectedNetwork, [camp], [residence]).get(residence.id),
+  camp.id,
+  'fishing camps should participate in normal residence food claims',
+);
+
+assert.ok(FISH_ICON_SVG.includes('currentColor'));
+assert.ok(!FISH_ICON_SVG.includes('<image'), 'resource marker should use the same inline glyph treatment as other resources');
+
+const projectRoot = fileURLToPath(new URL('../', import.meta.url));
+assert.ok(
+  existsSync(`${projectRoot}public/assets/ui/build-menu/fishing-camp.png`),
+  'fishing camp build card should exist',
+);
+
+const serverFoodSupplier = readFileSync(
+  `${projectRoot}server/src/simulation/food_supplier.rs`,
+  'utf8',
+);
+assert.match(
+  serverFoodSupplier,
+  /step_food_supplier\(ctx,\s*tick,\s*clock,\s*building,\s*"fish",\s*FISH_PER_HARVEST,\s*false\)/s,
+  'the authoritative fishing step must use the non-depleting harvest branch',
+);
+
+console.log('fishing system tests passed');
+
+function findDryCampSite(
+  shoalX: number,
+  shoalZ: number,
+  river: { isWaterAt: (x: number, z: number) => boolean },
+): { x: number; z: number } | null {
+  const workRadius = BUILDING_DEFINITIONS.fishing_camp.workRadius;
+  for (let radius = 8; radius <= workRadius; radius += 2) {
+    const samples = Math.max(48, Math.ceil(Math.PI * 2 * radius / 2));
+    for (let index = 0; index < samples; index++) {
+      const angle = index * Math.PI * 2 / samples;
+      const x = shoalX + Math.cos(angle) * radius;
+      const z = shoalZ + Math.sin(angle) * radius;
+      if (
+        sampleBuildingFootprintPoints('fishing_camp', x, z)
+          .every((point) => !river.isWaterAt(point.x, point.z))
+      ) {
+        return { x, z };
+      }
+    }
+  }
+  return null;
+}

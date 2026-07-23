@@ -12,6 +12,7 @@ export function syncQuarries(rows: Iterable<Quarry>): Map<string, ResourceNodeSt
       maxYield: row.maxYield,
       x: row.x,
       z: row.z,
+      isRich: row.isRich,
     });
   }
   return quarries;

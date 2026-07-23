@@ -3,8 +3,8 @@ import { formatBuildingCost, getBuildingCost, residenceZoneCost } from '../resou
 import { MENU_ACTION_TO_BUILDING_KIND } from './buildMenuMapping.ts';
 
 export type PlacementBuildMenuAction =
-  | 'lumber-mill' | 'stone-quarry' | 'reforester' | 'woodcutters-lodge'
-  | 'well' | 'hunters-hall' | 'foragers-shed' | 'chapel' | 'marketplace'
+  | 'lumber-mill' | 'stone-quarry' | 'large-quarry' | 'reforester' | 'woodcutters-lodge'
+  | 'well' | 'hunters-hall' | 'foragers-shed' | 'fishing-camp' | 'chapel' | 'marketplace'
   | 'threshing-barn' | 'monastery' | 'brewery' | 'smokehouse'
   | 'granary' | 'apiary' | 'watermill' | 'carpenter' | 'ferry-landing' | 'vineyard'
   | 'pastoral-farmstead' | 'swineherd'
@@ -18,8 +18,10 @@ export type BuildMenuEntry = { kind: 'placement'; action: PlacementBuildMenuActi
 const BUILD_CARD_ART: Record<PlacementArtKey, string> = {
   lumber_mill: '/assets/ui/build-menu/lumber-mill.png', reforester: '/assets/ui/build-menu/reforester.png',
   woodcutters_lodge: '/assets/ui/build-menu/woodcutters-lodge.png', stone_quarry: '/assets/ui/build-menu/stonecutters-camp.png',
+  large_quarry: '/assets/ui/build-menu/large-quarry.png',
   well: '/assets/ui/build-menu/water-well.png', hunters_hall: '/assets/ui/build-menu/hunter-hall.png',
   foragers_shed: '/assets/ui/build-menu/foragers-hut.png', chapel: '/assets/ui/build-menu/chapel.png',
+  fishing_camp: '/assets/ui/build-menu/fishing-camp.png',
   marketplace: '/assets/ui/build-menu/market.png', residences: '/assets/ui/build-menu/residence.png',
   town_hall: '/assets/ui/build-menu/town-hall.png', village_storehouse: '/assets/ui/build-menu/village-storehouse.png',
   threshing_barn: '/assets/ui/build-menu/threshing-barn.png',
@@ -43,10 +45,12 @@ const DETAILS: Record<PlacementArtKey, [title: string, hotkey: string, descripti
   ferry_landing: ['Ferry landing', 'J', 'A staffed river crossing and modest source of trade income. Must touch open water.'],
   lumber_mill: ['Lumber mill', 'L', 'Fells mature trees and stockpiles construction timber.'],
   stone_quarry: ["Stonecutter's camp", 'S', 'Cuts stone from rock outcrops inside its working range.'],
+  large_quarry: ['Large Quarry', 'G', 'Builds directly over a rich deposit and raises underground stone indefinitely.'],
   reforester: ['Reforester', 'F', 'Restores harvested woodland with native saplings.'],
   woodcutters_lodge: ["Woodcutter's lodge", 'W', 'Splits timber into firewood and supplies connected homes.'],
   hunters_hall: ["Hunter's hall", 'K', 'Hunts game and delivers fresh food along the road network.'],
   foragers_shed: ["Forager's shed", 'Y', 'Gathers berries and provisions homes from forest edges.'],
+  fishing_camp: ['Fishing camp', 'Z', 'Catches fish from an inexhaustible river shoal inside its work extent and delivers fresh food to homes.'],
   threshing_barn: ['Farmstead', 'T', 'Road-linked labor hub that ploughs, sows, tends, harvests, and stores grain from surrounding fields.'],
   watermill: ['Grain watermill', 'M', 'Uses a river wheel to grind grain into flour. Must touch open water.'],
   granary: ['Village granary', 'N', 'Stores grain and flour, bakes staple food, and buffers shortages.'],
@@ -82,8 +86,8 @@ export const AGRICULTURE_BUILD_MENU_ENTRIES: readonly BuildMenuEntry[] = [
 
 /** Forestry, hunting, foraging, extraction, and rural craft. */
 export const RURAL_INDUSTRY_BUILD_MENU_ENTRIES: readonly BuildMenuEntry[] = [
-  entry('hunters_hall'), entry('foragers_shed'), entry('woodcutters_lodge'), entry('lumber_mill'), entry('reforester'),
-  entry('stone_quarry'), entry('carpenter'),
+  entry('hunters_hall'), entry('foragers_shed'), entry('fishing_camp'), entry('woodcutters_lodge'), entry('lumber_mill'), entry('reforester'),
+  entry('stone_quarry'), entry('large_quarry'), entry('carpenter'),
 ];
 
 export const BUILD_MENU_ENTRIES: readonly BuildMenuEntry[] = [

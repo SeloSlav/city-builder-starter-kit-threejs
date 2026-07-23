@@ -4,19 +4,22 @@
       "quarryId": "quarry-large-0",
       "x": 274.43263704627753,
       "z": 240.23998832553625,
-      "maxYield": 10000
+      "maxYield": 10000,
+      "isRich": true
     },
     {
       "quarryId": "quarry-small-0",
       "x": -286.79271238762885,
       "z": 341.03622449338434,
-      "maxYield": 4000
+      "maxYield": 4000,
+      "isRich": false
     },
     {
       "quarryId": "quarry-small-1",
       "x": 305.5985452823341,
       "z": 27.232413323782385,
-      "maxYield": 4000
+      "maxYield": 4000,
+      "isRich": false
     }
   ]
 }

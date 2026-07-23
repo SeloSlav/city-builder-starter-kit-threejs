@@ -23,6 +23,7 @@ export function isBuilderHudMode(mode: ToolbarStats['mode']): boolean {
 }
 
 const PLACEMENT_STATUS_HINTS: Partial<Record<BuildingKind, string>> = {
+  fishing_camp: ' - keep the camp on land with a fish shoal inside its work extent',
   town_hall: ' — requires 24 people, a chapel, a marketplace, and road access',
   village_storehouse: ' — road-linked haulers collect producer overflow',
   well: ' — use the water map for best spots',

@@ -203,7 +203,9 @@ function constructionSourcePriority(source: BuildingState): number {
     ? 0
     : source.kind === 'carpenter'
       ? 1
-      : source.kind === 'lumber_mill' || source.kind === 'stone_quarry'
+      : source.kind === 'lumber_mill'
+        || source.kind === 'stone_quarry'
+        || source.kind === 'large_quarry'
         ? 2
         : 3;
   return source.assignedLabor > 0 ? kindPriority : kindPriority + 4;

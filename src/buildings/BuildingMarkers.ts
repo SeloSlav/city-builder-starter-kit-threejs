@@ -270,9 +270,11 @@ const BUILDING_EXTENT_COLORS: Partial<Record<BuildingKind, number>> = {
   lumber_mill: 0xd7b463,
   reforester: 0x00cc66,
   stone_quarry: 0xa8a29e,
+  large_quarry: 0xd5b866,
   well: 0x4f9fd4,
   hunters_hall: 0x8a6d45,
   foragers_shed: 0xb05c76,
+  fishing_camp: 0x5b99b0,
   threshing_barn: 0xb8894c,
   monastery: 0xe4dfd2,
 };

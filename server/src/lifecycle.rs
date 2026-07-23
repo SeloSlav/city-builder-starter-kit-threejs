@@ -37,6 +37,7 @@ pub fn seed_world_entities(ctx: &ReducerContext) {
                 z: quarry.z,
                 max_yield: quarry.max_yield,
                 remaining: quarry.max_yield,
+                is_rich: quarry.is_rich,
             });
         }
     }

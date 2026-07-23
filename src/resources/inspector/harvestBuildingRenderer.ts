@@ -25,11 +25,11 @@ import {
 } from '../../logistics/foodLogistics.ts';
 import { formatCooldown } from './woodcuttersLodgeStatus.ts';
 
-type HarvestBuildingKind = Extract<BuildingKind, 'foragers_shed' | 'hunters_hall'>;
+type HarvestBuildingKind = Extract<BuildingKind, 'foragers_shed' | 'hunters_hall' | 'fishing_camp'>;
 
 const HARVEST_BUILDING_COPY: Record<
   HarvestBuildingKind,
-  { foragingKind: 'berries' | 'game'; idleLabel: string; activeUnit: string; patchLabel: string }
+  { foragingKind: 'berries' | 'game' | 'fish'; idleLabel: string; activeUnit: string; patchLabel: string; inexhaustible?: boolean }
 > = {
   foragers_shed: {
     foragingKind: 'berries',
@@ -42,6 +42,13 @@ const HARVEST_BUILDING_COPY: Record<
     idleLabel: 'Idle — assign labor to hunt game',
     activeUnit: 'game',
     patchLabel: 'trail',
+  },
+  fishing_camp: {
+    foragingKind: 'fish',
+    idleLabel: 'Idle - assign labor to fish the shoal',
+    activeUnit: 'fish',
+    patchLabel: 'shoal',
+    inexhaustible: true,
   },
 };
 
@@ -100,9 +107,15 @@ export function renderHarvestBuildingInspector(
   } else if (canDeliver) {
     statusText = `Delivering food — ${claimedResidences.length} road-linked home${claimedResidences.length === 1 ? '' : 's'}`;
     statusState = 'active';
+  } else if (harvesting && copy.inexhaustible) {
+    statusText = `Working - fishing an ${nearestNode.isRich ? 'inexhaustible rich' : 'inexhaustible'} ${copy.patchLabel}`;
+    statusState = 'active';
   } else if (harvesting) {
     statusText = `Working — ${Math.round(nearestNode.remaining)} ${copy.activeUnit} left at ${copy.patchLabel}`;
     statusState = 'active';
+  } else if (nearestNode && copy.inexhaustible) {
+    statusText = `Idle - ${nearestNode.isRich ? 'rich ' : ''}inexhaustible ${copy.patchLabel} in range`;
+    statusState = 'idle';
   } else if (nearestNode) {
     statusText = `Idle — ${Math.round(nearestNode.remaining)} ${copy.activeUnit} in range`;
     statusState = 'idle';

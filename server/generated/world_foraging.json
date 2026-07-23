@@ -26,6 +26,24 @@
       "maxYield": 60,
       "anchorX": 327.1112253328785,
       "anchorZ": 111.66617432907223
+    },
+    {
+      "nodeId": "foraging-fish-small-0",
+      "nodeKind": "fish",
+      "x": 385.05966683880496,
+      "z": -286.89034268050096,
+      "maxYield": 120,
+      "anchorX": 385.05966683880496,
+      "anchorZ": -286.89034268050096
+    },
+    {
+      "nodeId": "foraging-fish-rich-1",
+      "nodeKind": "fish",
+      "x": 20.547768106642984,
+      "z": 54.02610099312055,
+      "maxYield": 240,
+      "anchorX": 20.547768106642984,
+      "anchorZ": 54.02610099312055
     }
   ],
   "gameRespawnCandidates": [

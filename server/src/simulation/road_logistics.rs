@@ -240,7 +240,11 @@ pub fn owner_food_suppliers(ctx: &spacetimedb::ReducerContext, owner: Identity) 
         .building()
         .owner()
         .filter(&owner)
-        .filter(|row| row.kind == "hunters_hall" || row.kind == "foragers_shed")
+        .filter(|row| {
+            row.kind == "hunters_hall"
+                || row.kind == "foragers_shed"
+                || row.kind == "fishing_camp"
+        })
         .collect()
 }
 
@@ -255,7 +259,10 @@ pub fn claim_residences_for_food_suppliers(
         let mut best_supplier: Option<&Building> = None;
         let mut best_distance = f64::INFINITY;
         for supplier in suppliers {
-            if supplier.kind != "hunters_hall" && supplier.kind != "foragers_shed" {
+            if supplier.kind != "hunters_hall"
+                && supplier.kind != "foragers_shed"
+                && supplier.kind != "fishing_camp"
+            {
                 continue;
             }
             let Some(distance) =

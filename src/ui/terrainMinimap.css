@@ -103,6 +103,10 @@
   background: #b45c74;
 }
 
+.terrain-minimap__marker--fish {
+  background: #5b99b0;
+}
+
 .terrain-minimap__marker--building {
   background: var(--accent);
 }

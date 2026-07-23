@@ -24,6 +24,7 @@ export function createInitialGameState(registry: WorldLayoutRegistry, seed: numb
       maxYield: definition.maxYield,
       x: definition.x,
       z: definition.z,
+      isRich: definition.isRich ?? false,
     };
     if (definition.kind === 'quarry') {
       quarries.set(definition.id, nodeState);

@@ -34,6 +34,8 @@ const tests = [
   'test:civic-logistics',
   'test:construction-logistics',
   'test:quarry-balance',
+  'test:rich-stone',
+  'test:fishing',
 ] as const;
 
 let failed = 0;

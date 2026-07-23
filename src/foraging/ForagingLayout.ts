@@ -6,17 +6,20 @@ import {
   mulberry32,
 } from '../props/forestField.ts';
 import { hashF64 } from '../rivers/riverHash.ts';
+import type { RiverLayout, RiverPoint } from '../rivers/RiverLayout.ts';
 
-export type ForagingNodeKind = 'game' | 'berries';
+export type ForagingNodeKind = 'game' | 'berries' | 'fish';
 
 export type ForagingSite = {
   x: number;
   z: number;
   kind: ForagingNodeKind;
+  isRich?: boolean;
 };
 
 export type ForagingLayoutOptions = {
   forestCores: ForestCore[];
+  riverLayout: RiverLayout;
   playableHalf?: number;
   seed?: number;
 };
@@ -65,9 +68,81 @@ export class ForagingLayout {
       const berrySite = pickBerrySite(rng, seed ^ (0x9e37 + i * 0x5151), extent, forestCores, sites);
       if (berrySite) sites.push(berrySite);
     }
+    sites.push(...pickFishSites(options.riverLayout, extent, seed ^ 0x46a91d));
 
     return new ForagingLayout(seed, sites, gameRespawnCandidates);
   }
+}
+
+type FishCandidate = RiverPoint & { corridorIndex: number };
+
+function pickFishSites(
+  riverLayout: RiverLayout,
+  extent: number,
+  seed: number,
+): ForagingSite[] {
+  const margin = Math.max(24, extent * 0.06);
+  const candidates: FishCandidate[] = [];
+  for (let corridorIndex = 0; corridorIndex < riverLayout.corridors.length; corridorIndex++) {
+    const corridor = riverLayout.corridors[corridorIndex];
+    for (let pointIndex = 0; pointIndex < corridor.points.length; pointIndex += 7) {
+      const point = corridor.points[pointIndex];
+      if (point.progress < 0.18 || point.progress > 0.82) continue;
+      if (Math.abs(point.x) > extent - margin || Math.abs(point.z) > extent - margin) continue;
+      if (!riverLayout.isWaterAt(point.x, point.z)) continue;
+      candidates.push({ ...point, corridorIndex });
+    }
+  }
+
+  if (candidates.length < 2) {
+    const fallback = riverLayout.corridors[0]?.points ?? [];
+    const small = fallback[Math.floor(fallback.length * 0.35)] ?? { x: -36, z: -72 };
+    const rich = fallback[Math.floor(fallback.length * 0.72)] ?? riverLayout.drain;
+    return [
+      { x: small.x, z: small.z, kind: 'fish', isRich: false },
+      { x: rich.x, z: rich.z, kind: 'fish', isRich: true },
+    ];
+  }
+
+  const rich = candidates.reduce((best, candidate) => {
+    const score = fishCandidateNoise(seed, candidate, 1)
+      + candidate.halfWidth * 12
+      - Math.abs(candidate.progress - 0.68) * 24;
+    const bestScore = fishCandidateNoise(seed, best, 1)
+      + best.halfWidth * 12
+      - Math.abs(best.progress - 0.68) * 24;
+    return score > bestScore ? candidate : best;
+  });
+
+  const preferredSpacing = Math.max(120, extent * 0.32);
+  const spacedCandidates = candidates.filter(
+    (candidate) => Math.hypot(candidate.x - rich.x, candidate.z - rich.z) >= preferredSpacing,
+  );
+  const smallPool = spacedCandidates.length > 0 ? spacedCandidates : candidates;
+  const small = smallPool.reduce((best, candidate) => {
+    const distance = Math.hypot(candidate.x - rich.x, candidate.z - rich.z);
+    const score = distance
+      - candidate.halfWidth * 5
+      + fishCandidateNoise(seed, candidate, 2);
+    const bestDistance = Math.hypot(best.x - rich.x, best.z - rich.z);
+    const bestScore = bestDistance
+      - best.halfWidth * 5
+      + fishCandidateNoise(seed, best, 2);
+    return score > bestScore ? candidate : best;
+  });
+
+  return [
+    { x: small.x, z: small.z, kind: 'fish', isRich: false },
+    { x: rich.x, z: rich.z, kind: 'fish', isRich: true },
+  ];
+}
+
+function fishCandidateNoise(seed: number, candidate: FishCandidate, salt: number): number {
+  return hashF64(
+    seed ^ salt * 0x9e37,
+    candidate.corridorIndex,
+    Math.round(candidate.progress * 10_000),
+  ) * 3;
 }
 
 function collectDenseForestCandidates(

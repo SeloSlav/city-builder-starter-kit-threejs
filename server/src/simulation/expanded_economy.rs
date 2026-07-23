@@ -301,7 +301,7 @@ pub fn step_smokehouse(
         clock,
         &smokehouse,
         CommodityKind::Food,
-        &["hunters_hall", "foragers_shed", "granary", "swineherd"],
+        &["hunters_hall", "foragers_shed", "fishing_camp", "granary", "swineherd"],
         SMOKEHOUSE_FOOD_PER_CYCLE * 2.0,
     );
     request_connected_commodity(ctx, tick, clock, &smokehouse, CommodityKind::Firewood, &["woodcutters_lodge", "village_storehouse"], SMOKEHOUSE_FIREWOOD_PER_CYCLE * 3.0);

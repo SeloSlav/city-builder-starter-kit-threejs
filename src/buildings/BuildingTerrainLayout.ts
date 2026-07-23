@@ -35,9 +35,11 @@ const PAD_PARAMS: Record<BuildingKind, BuildingPadParams> = {
   reforester: { radiusX: 4.4, radiusZ: 4.1, innerFade: 0.88, outerFade: 1.32 },
   woodcutters_lodge: { radiusX: 4.6, radiusZ: 4.3, innerFade: 0.88, outerFade: 1.34 },
   stone_quarry: { radiusX: 10.5, radiusZ: 10.5, innerFade: 0.82, outerFade: 1.42 },
+  large_quarry: { radiusX: 13.0, radiusZ: 12.0, innerFade: 0.84, outerFade: 1.24 },
   well: { radiusX: 2.2, radiusZ: 2.2, innerFade: 0.9, outerFade: 1.2 },
   hunters_hall: { radiusX: 5.2, radiusZ: 4.8, innerFade: 0.88, outerFade: 1.34 },
   foragers_shed: { radiusX: 4.2, radiusZ: 3.8, innerFade: 0.88, outerFade: 1.3 },
+  fishing_camp: { radiusX: 5.4, radiusZ: 4.5, innerFade: 0.88, outerFade: 1.3 },
   chapel: { radiusX: 3.4, radiusZ: 4.2, innerFade: 0.9, outerFade: 1.28 },
   marketplace: { radiusX: 4.2, radiusZ: 3.4, innerFade: 0.9, outerFade: 1.3 },
   town_hall: { radiusX: 7.2, radiusZ: 5.8, innerFade: 0.88, outerFade: 1.32 },
@@ -216,6 +218,7 @@ function createBuildingPadSite(
     rotation,
     platformHeight,
     shape: 'ellipse',
+    maxRaise: building.kind === 'large_quarry' ? 1.5 : undefined,
   };
 }
 

@@ -50,7 +50,9 @@ pub fn step_village_storehouse(
         }
         let commodity = match source.kind.as_str() {
             "lumber_mill" if storehouse.storehouse_accepts_timber => CommodityKind::Timber,
-            "stone_quarry" if storehouse.storehouse_accepts_stone => CommodityKind::Stone,
+            "stone_quarry" | "large_quarry" if storehouse.storehouse_accepts_stone => {
+                CommodityKind::Stone
+            }
             "woodcutters_lodge" if storehouse.storehouse_accepts_firewood => CommodityKind::Firewood,
             _ => continue,
         };

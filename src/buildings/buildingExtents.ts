@@ -13,6 +13,7 @@ const WORK_EXTENT_KINDS = new Set<BuildingKind>([
   'stone_quarry',
   'hunters_hall',
   'foragers_shed',
+  'fishing_camp',
   'threshing_barn',
   'pastoral_farmstead',
   'swineherd',

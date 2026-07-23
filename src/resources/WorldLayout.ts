@@ -55,6 +55,7 @@ export function createWorldLayout(settings: WorldGenerationSettings = DEFAULT_WO
   const forestCores = createForestCores(mulberry32(forestSeed), spawnConfig);
   const foragingLayout = ForagingLayout.create({
     forestCores,
+    riverLayout,
     playableHalf: dims.playableHalf,
     seed: settings.seed ^ 0x4f0d21,
   });

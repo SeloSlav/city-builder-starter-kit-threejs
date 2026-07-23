@@ -11,8 +11,12 @@ declare global {
   }
 }
 
-const COLS = 7;
-const ROWS = 4;
+const requestedKind = new URLSearchParams(window.location.search).get('kind');
+const selectedKinds = requestedKind && BUILDING_KINDS.includes(requestedKind as (typeof BUILDING_KINDS)[number])
+  ? [requestedKind as (typeof BUILDING_KINDS)[number]]
+  : BUILDING_KINDS;
+const COLS = selectedKinds.length === 1 ? 1 : 7;
+const ROWS = selectedKinds.length === 1 ? 1 : 4;
 const root = document.querySelector<HTMLElement>('#lineup-root');
 const labels = document.querySelector<HTMLElement>('#labels');
 if (!root || !labels) throw new Error('Building lineup host is missing.');
@@ -27,7 +31,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 root.prepend(renderer.domElement);
 
 const viewSpecs = [
-  ...BUILDING_KINDS.map((kind) => ({
+  ...selectedKinds.map((kind) => ({
     mesh: createBuildingMesh(kind),
     label: getBuildingDefinition(kind).label,
   })),
@@ -35,7 +39,7 @@ const viewSpecs = [
     mesh: createConstructionSiteMesh('village_storehouse', 0.55, 0.72, 1),
     label: 'Storehouse construction · 55%',
   },
-];
+].slice(0, selectedKinds.length === 1 ? 1 : undefined);
 
 const views = viewSpecs.map((spec) => {
   const scene = new THREE.Scene();

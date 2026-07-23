@@ -10,6 +10,7 @@ import { RiverField } from '../rivers/RiverField.ts';
 import { setActiveRiverLayout, setActiveQuarryLayout, getActivePlacedBuildingLayout } from '../terrain/TerrainHeight.ts';
 import { createQuarrySystem, type QuarrySystem } from '../quarries/QuarrySystem.ts';
 import { createWorldLayout, type WorldLayout } from '../resources/WorldLayout.ts';
+import type { ResourceNodeState } from '../resources/types.ts';
 import type { WorldGenerationSettings } from '../world/worldGenerationSettings.ts';
 import { resolveWorldDimensions } from '../world/worldGenerationSettings.ts';
 import { forestDensityScale } from '../world/worldGenerationSettings.ts';
@@ -628,6 +629,14 @@ export class SceneManager {
     this.grassField?.syncRoadClearance(network);
     updateTerrainRoadWear(this.terrain, network);
     this.refreshShadowMap();
+  }
+
+  syncQuarryNodes(nodes: Iterable<ResourceNodeState>): boolean {
+    const changed = this.quarrySystem.syncNodes(nodes);
+    if (!changed) return false;
+    this.rebuildRockSpatialIndex();
+    this.refreshShadowMap();
+    return true;
   }
 
   private refreshForestClearance(): void {

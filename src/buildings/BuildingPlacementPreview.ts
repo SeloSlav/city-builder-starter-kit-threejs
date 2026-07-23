@@ -16,9 +16,11 @@ const PREVIEW_HEIGHT: Record<BuildingKind, number> = {
   reforester: 5.5,
   woodcutters_lodge: 5.6,
   stone_quarry: 6.4,
+  large_quarry: 9.2,
   well: 4.7,
   hunters_hall: 5.7,
   foragers_shed: 4.9,
+  fishing_camp: 5.2,
   chapel: 9.5,
   marketplace: 5.3,
   town_hall: 9.2,
@@ -91,6 +93,7 @@ function createPreviewFootprintGeometry(
 ): THREE.BufferGeometry {
   switch (kind) {
     case 'stone_quarry':
+    case 'large_quarry':
       return new THREE.CylinderGeometry(params.radiusX * scale, params.radiusX * scale, height, 24);
     case 'lumber_mill':
       return new THREE.BoxGeometry(params.radiusX * 2 * scale, height, params.radiusZ * 2 * scale);
@@ -99,6 +102,7 @@ function createPreviewFootprintGeometry(
     case 'well':
     case 'hunters_hall':
     case 'foragers_shed':
+    case 'fishing_camp':
     case 'chapel':
     case 'marketplace':
     case 'town_hall':

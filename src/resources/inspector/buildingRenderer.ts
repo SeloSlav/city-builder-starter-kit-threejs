@@ -5,6 +5,7 @@ import { renderHarvestBuildingInspector } from './harvestBuildingRenderer.ts';
 import { renderLumberMillInspector } from './lumberMillRenderer.ts';
 import { renderReforesterInspector } from './reforesterRenderer.ts';
 import { renderStoneQuarryInspector } from './stoneQuarryRenderer.ts';
+import { renderLargeQuarryInspector } from './largeQuarryRenderer.ts';
 import { renderWoodcuttersLodgeInspector } from './woodcuttersLodgeRenderer.ts';
 import { renderWellInspector } from './wellRenderer.ts';
 import type { InspectorRenderContext, InspectorView } from './renderInspectableTarget.ts';
@@ -37,12 +38,15 @@ export function renderBuildingInspector(
       return renderWoodcuttersLodgeInspector(target, context);
     case 'stone_quarry':
       return renderStoneQuarryInspector(target, context);
+    case 'large_quarry':
+      return renderLargeQuarryInspector(target, context);
     case 'reforester':
       return renderReforesterInspector(target, context);
     case 'well':
       return renderWellInspector(target, context);
     case 'hunters_hall':
     case 'foragers_shed':
+    case 'fishing_camp':
       return renderHarvestBuildingInspector(target, context);
     case 'threshing_barn':
     case 'monastery':

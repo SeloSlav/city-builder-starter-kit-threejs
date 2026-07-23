@@ -89,6 +89,7 @@ export const GAME_CONTROL_SECTIONS: readonly GameControlSection[] = [
       { action: 'Lumber mill', keys: 'L' },
       { action: 'Reforester', keys: 'F' },
       { action: "Stonecutter's camp", keys: 'S' },
+      { action: 'Large Quarry', keys: 'G' },
       { action: 'Carpenter & wheelwright', keys: 'R' },
     ],
   },

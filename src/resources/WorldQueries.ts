@@ -244,6 +244,14 @@ export class WorldQueries {
       }
     }
 
+    const fishDefinition = this.registry.findNearestForagingNode(x, z, 'fish');
+    if (fishDefinition) {
+      const nodeState = state.foragingNodes.get(fishDefinition.id);
+      if (nodeState && nodeState.remaining > 0) {
+        return { kind: 'foraging', definition: fishDefinition, state: nodeState };
+      }
+    }
+
     const river = this.getRiverAccessInfo(x, z);
     if (river.onWater || river.shoreDistance <= RIVER_INSPECT_MAX_SHORE) {
       return { kind: 'river', x, z, ...river };
@@ -666,7 +674,10 @@ export class WorldQueries {
 
   findForagingTarget(nodeId: string): Extract<InspectableTarget, { kind: 'foraging' }> | null {
     const definition = this.registry.getDefinition(nodeId);
-    if (!definition || (definition.kind !== 'game' && definition.kind !== 'berries')) return null;
+    if (
+      !definition
+      || (definition.kind !== 'game' && definition.kind !== 'berries' && definition.kind !== 'fish')
+    ) return null;
 
     const state = this.getGameState().foragingNodes.get(nodeId);
     if (!state) return null;
@@ -709,7 +720,7 @@ export class WorldQueries {
     x: number,
     z: number,
     radius: number,
-    nodeKind: 'game' | 'berries',
+    nodeKind: 'game' | 'berries' | 'fish',
   ): ResourceNodeState | null {
     return findNearestResourceNodeWithRemaining(
       this.getGameState().foragingNodes.values(),

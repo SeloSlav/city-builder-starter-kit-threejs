@@ -24,6 +24,7 @@ pub fn bootstrap_quarries(ctx: &ReducerContext, quarries: Vec<QuarryBootstrap>) 
                 z: quarry.z,
                 max_yield: quarry.max_yield,
                 remaining: rebalanced_remaining,
+                is_rich: quarry.is_rich,
                 ..existing
             });
         } else {
@@ -33,6 +34,7 @@ pub fn bootstrap_quarries(ctx: &ReducerContext, quarries: Vec<QuarryBootstrap>) 
                 z: quarry.z,
                 max_yield: quarry.max_yield,
                 remaining: quarry.max_yield,
+                is_rich: quarry.is_rich,
             });
         }
     }

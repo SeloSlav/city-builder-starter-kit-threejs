@@ -98,6 +98,8 @@ pub struct Quarry {
     pub z: f64,
     pub max_yield: f64,
     pub remaining: f64,
+    #[default(false)]
+    pub is_rich: bool,
 }
 
 #[spacetimedb::table(accessor = foraging_node, public)]

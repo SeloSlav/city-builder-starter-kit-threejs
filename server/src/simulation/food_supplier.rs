@@ -2,8 +2,8 @@ use spacetimedb::ReducerContext;
 
 use crate::building_defs::building_def;
 use crate::constants::{
-    BERRIES_PER_HARVEST, FOOD_DELIVERY_SPEED_MPS, FOOD_DELIVERY_UNLOAD_SEC, FOOD_PER_DELIVERY,
-    GAME_PER_HARVEST, TICK_DT,
+    BERRIES_PER_HARVEST, FISH_PER_HARVEST, FOOD_DELIVERY_SPEED_MPS, FOOD_DELIVERY_UNLOAD_SEC,
+    FOOD_PER_DELIVERY, GAME_PER_HARVEST, RICH_FISH_YIELD_MULTIPLIER, TICK_DT,
 };
 use crate::db::*;
 use crate::economy::{building_food_storage_cap, deposit_building_food};
@@ -25,11 +25,15 @@ use crate::simulation::tick_context::SimTickContext;
 use crate::tables::{Building, ForagingNode, Residence};
 
 pub fn step_hunters_hall(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, building: Building) {
-    step_food_supplier(ctx, tick, clock, building, "game", GAME_PER_HARVEST);
+    step_food_supplier(ctx, tick, clock, building, "game", GAME_PER_HARVEST, true);
 }
 
 pub fn step_foragers_shed(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, building: Building) {
-    step_food_supplier(ctx, tick, clock, building, "berries", BERRIES_PER_HARVEST);
+    step_food_supplier(ctx, tick, clock, building, "berries", BERRIES_PER_HARVEST, true);
+}
+
+pub fn step_fishing_camp(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, building: Building) {
+    step_food_supplier(ctx, tick, clock, building, "fish", FISH_PER_HARVEST, false);
 }
 
 fn step_food_supplier(
@@ -39,6 +43,7 @@ fn step_food_supplier(
     building: Building,
     node_kind: &str,
     harvest_amount: f64,
+    depletes_node: bool,
 ) {
     if labor_and_logistics_paused(ctx, building.owner, clock) {
         return;
@@ -79,7 +84,14 @@ fn step_food_supplier(
     );
 
     if do_harvest {
-        supplier = harvest_from_node(ctx, supplier, node_kind, harvest_amount, split.processing);
+        supplier = harvest_from_node(
+            ctx,
+            supplier,
+            node_kind,
+            harvest_amount,
+            split.processing,
+            depletes_node,
+        );
         supplier.action_cooldown = def.action_interval;
     }
     if do_deliver {
@@ -108,6 +120,7 @@ fn harvest_from_node(
     node_kind: &str,
     harvest_amount: f64,
     workers: u32,
+    depletes_node: bool,
 ) -> Building {
     if workers == 0 {
         return building;
@@ -129,20 +142,31 @@ fn harvest_from_node(
     };
 
     let labor = workers as f64;
-    let requested = harvest_amount * labor;
-    let extracted = requested.min(node.remaining);
+    let richness_multiplier = if !depletes_node && node.max_yield >= 200.0 {
+        RICH_FISH_YIELD_MULTIPLIER
+    } else {
+        1.0
+    };
+    let requested = harvest_amount * richness_multiplier * labor;
+    let extracted = if depletes_node {
+        requested.min(node.remaining)
+    } else {
+        requested
+    };
     if extracted <= 0.0 {
         return building;
     }
 
-    let updated_node = ForagingNode {
-        remaining: node.remaining - extracted,
-        ..node
-    };
-    if updated_node.remaining <= 1e-6 {
-        mark_foraging_depleted(ctx, updated_node);
-    } else {
-        ctx.db.foraging_node().node_id().update(updated_node);
+    if depletes_node {
+        let updated_node = ForagingNode {
+            remaining: node.remaining - extracted,
+            ..node
+        };
+        if updated_node.remaining <= 1e-6 {
+            mark_foraging_depleted(ctx, updated_node);
+        } else {
+            ctx.db.foraging_node().node_id().update(updated_node);
+        }
     }
 
     let (deposited, updated_building) = deposit_building_food(&building, food_cap, extracted);

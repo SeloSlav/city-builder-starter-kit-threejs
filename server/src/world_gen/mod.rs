@@ -23,6 +23,7 @@ struct EmbeddedQuarry {
     x: f64,
     z: f64,
     max_yield: f64,
+    is_rich: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,6 +62,7 @@ pub struct WorldBootstrapQuarry {
     pub x: f64,
     pub z: f64,
     pub max_yield: f64,
+    pub is_rich: bool,
 }
 
 pub struct WorldBootstrapTree {
@@ -129,6 +131,7 @@ pub fn bootstrap_quarry_rows() -> Vec<WorldBootstrapQuarry> {
             x: quarry.x,
             z: quarry.z,
             max_yield: quarry.max_yield,
+            is_rich: quarry.is_rich,
         })
         .collect()
 }

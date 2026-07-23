@@ -94,7 +94,10 @@ export function claimResidencesForFoodSuppliers(
 ): Map<string, string> {
   const claims = new Map<string, string>();
   const foodSuppliers = suppliers.filter(
-    (building) => building.kind === 'hunters_hall' || building.kind === 'foragers_shed',
+    (building) =>
+      building.kind === 'hunters_hall'
+      || building.kind === 'foragers_shed'
+      || building.kind === 'fishing_camp',
   );
 
   for (const residence of residences) {

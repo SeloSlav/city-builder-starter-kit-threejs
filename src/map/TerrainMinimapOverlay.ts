@@ -31,6 +31,7 @@ const MARKER_KIND_CLASS: Record<WorldMapMarkerKind, string> = {
   quarry: 'terrain-minimap__marker--quarry',
   game: 'terrain-minimap__marker--game',
   berries: 'terrain-minimap__marker--berries',
+  fish: 'terrain-minimap__marker--fish',
   building: 'terrain-minimap__marker--building',
 };
 
