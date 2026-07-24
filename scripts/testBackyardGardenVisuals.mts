@@ -85,16 +85,26 @@ disposeBackyardGardenMesh(cherryDetail);
 const flowerDetail = createBackyardGardenMesh('flower_garden', { width: 6.2, depth: 5.4, seed: 4271 });
 let petalCount = 0;
 let modeledFlowerMeshes = 0;
+let texturedRoseCards = 0;
 let swayingBloom: THREE.Object3D | null = null;
 flowerDetail.traverse((object) => {
   petalCount += Number(object.userData.petalCount ?? 0);
   if (object.name === 'Modeled rose blossom' || object.name === 'Modeled cottage flower') {
     modeledFlowerMeshes += 1;
   }
+  if (object.name === 'Textured rose blossom card') {
+    texturedRoseCards += 1;
+    assert.equal(
+      object.userData.texturePath,
+      '/assets/textures/vegetation/rose_blossom_card.png',
+      'rose cards should reference the dedicated blossom texture',
+    );
+  }
   if (!swayingBloom && object.name.startsWith('Swaying rose bloom')) swayingBloom = object;
 });
 assert.ok(petalCount >= 100, 'flower gardens should use modeled petals instead of colored orb placeholders');
 assert.ok(modeledFlowerMeshes <= 60, 'petals should be consolidated per blossom to protect draw-call cost');
+assert.ok(texturedRoseCards >= 24, 'each rose shrub should carry botanically readable textured blossoms');
 assert.ok(swayingBloom, 'rose bushes should expose animated bloom anchors');
 animateBackyardGardenMesh(flowerDetail, 0);
 const firstBloomPosition = swayingBloom!.position.clone();
@@ -125,6 +135,15 @@ assert.ok(
 const backyardAssetSource = readFileSync(
   join(process.cwd(), 'src/vegetation/seedthree/backyardPlantAssets.ts'),
   'utf8',
+);
+const backyardGardenSource = readFileSync(
+  join(process.cwd(), 'src/residences/backyardGardenMesh.ts'),
+  'utf8',
+);
+assert.match(
+  backyardGardenSource,
+  /rose_blossom_card\.png/,
+  'rose rendering should retain its dedicated blossom texture',
 );
 assert.match(
   backyardAssetSource,

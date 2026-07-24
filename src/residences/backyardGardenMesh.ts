@@ -52,6 +52,28 @@ const FLOWER_MATERIALS = [
   new THREE.MeshStandardMaterial({ color: 0xd9a43c, roughness: 0.8 }),
 ] as const;
 
+const ROSE_BLOSSOM_TEXTURE_PATH = '/assets/textures/vegetation/rose_blossom_card.png';
+const roseBlossomTexture = typeof document === 'undefined'
+  ? null
+  : new THREE.TextureLoader().load(ROSE_BLOSSOM_TEXTURE_PATH);
+if (roseBlossomTexture) {
+  roseBlossomTexture.colorSpace = THREE.SRGBColorSpace;
+  roseBlossomTexture.wrapS = THREE.ClampToEdgeWrapping;
+  roseBlossomTexture.wrapT = THREE.ClampToEdgeWrapping;
+}
+
+const ROSE_CARD_MATERIALS = FLOWER_MATERIALS.slice(0, 3).map((flowerMaterial) => {
+  const material = new THREE.SpriteMaterial({
+    map: roseBlossomTexture,
+    color: flowerMaterial.color,
+    transparent: true,
+    alphaTest: 0.18,
+    depthWrite: true,
+  });
+  material.name = 'Textured rose blossom material';
+  return material;
+});
+
 type BackyardSwayBinding = {
   object: THREE.Object3D;
   basePosition: THREE.Vector3;
@@ -147,6 +169,21 @@ function addFlowerHead(
   );
   mesh.userData.petalCount = petalCount;
   return flower;
+}
+
+function addTexturedRoseCard(
+  parent: THREE.Object3D,
+  material: THREE.SpriteMaterial,
+  scale: number,
+): THREE.Sprite {
+  const roseCard = new THREE.Sprite(material);
+  roseCard.name = 'Textured rose blossom card';
+  roseCard.position.y = 0.035;
+  roseCard.scale.setScalar(scale);
+  roseCard.renderOrder = 6;
+  roseCard.userData.texturePath = ROSE_BLOSSOM_TEXTURE_PATH;
+  parent.add(roseCard);
+  return roseCard;
 }
 
 function coloredFlowerPart(
@@ -485,6 +522,7 @@ function addRoseShrub(
     }
   }
   const flower = FLOWER_MATERIALS[index % 3]!;
+  const roseCard = ROSE_CARD_MATERIALS[index % 3]!;
   for (let bloom = 0; bloom < 8; bloom++) {
     const angle = (bloom / 8) * Math.PI * 2 + index * 0.37;
     const bloomRoot = new THREE.Group();
@@ -504,6 +542,7 @@ function addRoseShrub(
       0.62 + (bloom % 3) * 0.045,
       true,
     );
+    addTexturedRoseCard(bloomRoot, roseCard, 0.25 + (bloom % 3) * 0.015);
     registerBackyardSway(
       group,
       bloomRoot,
