@@ -1,15 +1,19 @@
 import * as THREE from 'three';
+import {
+  CATTAIL_TEXTURE_FILES,
+  createCattailGeometry,
+} from '@seedthree/core/cattails.js';
 import { grassEdgeFadeFromFocusDistance, resolveReedLod } from '../grass/grassLodMath.ts';
 import type { RendererBackendKind } from '../scene/RendererBackend.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
 import {
   addSeedThreeGroundCoverInstanceAttributes,
-  createSeedThreeCardClumpGeometry,
   createSeedThreeGroundCoverMaterial,
   disposeSeedThreeGroundCoverTextures,
   loadSeedThreeGroundCoverTextures,
   seedThreeGroundCoverWindVector,
 } from '../vegetation/seedthree/seedThreeGroundCover.ts';
+import { seedThreeLeafUrl } from '../vegetation/seedthree/seedThreeTextures.ts';
 import type { RiverField } from './RiverField.ts';
 
 type ReedPlacement = {
@@ -68,17 +72,13 @@ export async function createRiverReeds(
 ): Promise<RiverReedField> {
   const placements = createReedPlacements(riverField, rng);
   const textures = await loadSeedThreeGroundCoverTextures({
-    albedo: '/assets/textures/vegetation/cattail_reed_card.png',
+    albedo: seedThreeLeafUrl(CATTAIL_TEXTURE_FILES.albedo)
+      ?? '/assets/textures/vegetation/cattail_reed_card.png',
+    normal: seedThreeLeafUrl(CATTAIL_TEXTURE_FILES.normal),
+    roughness: seedThreeLeafUrl(CATTAIL_TEXTURE_FILES.roughness),
+    translucency: seedThreeLeafUrl(CATTAIL_TEXTURE_FILES.translucency),
   }, maxAnisotropy);
-  const geometry = createSeedThreeCardClumpGeometry({
-    quads: 4,
-    width: 0.78,
-    tiltMin: 0.025,
-    tiltSpan: 0.12,
-    heightMin: 0.9,
-    heightSpan: 0.2,
-    baseSpread: 0.08,
-  });
+  const geometry = createCattailGeometry();
   const material = createSeedThreeGroundCoverMaterial(
     'SeedThree cattail reeds',
     textures,

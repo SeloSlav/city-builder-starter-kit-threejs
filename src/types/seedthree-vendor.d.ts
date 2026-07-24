@@ -71,6 +71,109 @@ declare module '@seedthree/core/wind.js' {
   export const windSpeed: { value: number };
   export const WIND_DIR: THREE.Vector3;
   export function grassWindPosition(bladeHeight?: number): unknown;
+  export function groundCoverWindPosition(amount?: number): unknown;
+}
+
+declare module '@seedthree/core/wildflowers.js' {
+  import type * as THREE from 'three';
+
+  export const WILDFLOWER_COLORS: readonly number[];
+  export function createWildflowerGeometry(): THREE.BufferGeometry;
+  export function createWildflowerMaterial(options?: {
+    name?: string;
+    positionNode?: unknown;
+  }): THREE.Material;
+  export function sampleWildflowerColor(
+    paletteIndex: number,
+    rng: () => number,
+    out?: THREE.Color,
+  ): THREE.Color;
+}
+
+declare module '@seedthree/core/ground-cover.js' {
+  import type * as THREE from 'three';
+
+  export type GroundCoverTextures = {
+    albedo: THREE.Texture;
+    normal: THREE.Texture | null;
+    roughness: THREE.Texture | null;
+    translucency: THREE.Texture | null;
+  };
+
+  export function loadGroundCoverTextures(
+    sources: {
+      albedo: string | undefined;
+      normal?: string | undefined;
+      roughness?: string | undefined;
+      translucency?: string | undefined;
+    },
+    maxAnisotropy?: number,
+  ): Promise<GroundCoverTextures>;
+
+  export function createGroundCoverMaterial(options: {
+    name?: string;
+    textures: GroundCoverTextures;
+    transmit?: [number, number, number];
+    windAmount?: number;
+    positionNode?: unknown;
+    alphaTest?: number;
+  }): THREE.Material;
+
+  export function createCardClumpGeometry(spec: {
+    quads: number;
+    width: number;
+    tiltMin: number;
+    tiltSpan: number;
+    heightMin: number;
+    heightSpan: number;
+    baseSpread: number;
+  }): THREE.BufferGeometry;
+
+  export function addGroundCoverInstanceAttributes(
+    geometry: THREE.BufferGeometry,
+    capacity: number,
+  ): {
+    tint: THREE.InstancedBufferAttribute;
+    anchor: THREE.InstancedBufferAttribute;
+    wind: THREE.InstancedBufferAttribute;
+  };
+
+  export function groundCoverWindVector(
+    yaw: number,
+    scale: THREE.Vector3,
+    out?: THREE.Vector3,
+  ): THREE.Vector3;
+  export function disposeGroundCoverTextures(textures: GroundCoverTextures): void;
+}
+
+declare module '@seedthree/core/cattails.js' {
+  import type * as THREE from 'three';
+
+  export const CATTAIL_TEXTURE_FILES: {
+    albedo: string;
+    normal: string;
+    roughness: string;
+    translucency: string;
+  };
+  export function createCattailGeometry(
+    overrides?: Partial<{
+      quads: number;
+      width: number;
+      tiltMin: number;
+      tiltSpan: number;
+      heightMin: number;
+      heightSpan: number;
+      baseSpread: number;
+    }>,
+  ): THREE.BufferGeometry;
+}
+
+declare module '@seedthree/species/apple.js' {
+  export const apple: Record<string, unknown>;
+}
+
+declare module '@seedthree/species/cherry.js' {
+  export const cherry: Record<string, unknown>;
 }
 
 declare module '@seedthree/species/index.js' {
