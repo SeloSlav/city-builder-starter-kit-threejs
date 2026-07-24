@@ -113,9 +113,37 @@ export type GameBalance = {
     monthsPerYear: number;
     daysPerWeek: number;
     sundayWeekday: number;
+    startMonth: number;
     dayStartHour: number;
     workStartHour: number;
     workEndHour: number;
+  };
+  seasons: {
+    springRainChance: number;
+    springRainCropGrowthMultiplier: number;
+    springRainWellRefillMultiplier: number;
+    summerDroughtChance: number;
+    summerDroughtDurationDays: number;
+    droughtCropGrowthMultiplier: number;
+    droughtForageRegrowthMultiplier: number;
+    droughtWellRefillMultiplier: number;
+    droughtFishLossFractionPerDay: number;
+    springFirewoodDemandMultiplier: number;
+    summerFirewoodDemandMultiplier: number;
+    autumnFirewoodDemandMultiplier: number;
+    winterFirewoodDemandMultiplier: number;
+    springPastureCapacityMultiplier: number;
+    summerPastureCapacityMultiplier: number;
+    autumnPastureCapacityMultiplier: number;
+    winterPastureCapacityMultiplier: number;
+    droughtPastureCapacityMultiplier: number;
+    springBreedingMultiplier: number;
+    winterBreedingMultiplier: number;
+    freshFoodSpoilageSpringPerDay: number;
+    freshFoodSpoilageSummerPerDay: number;
+    freshFoodSpoilageAutumnPerDay: number;
+    freshFoodSpoilageWinterPerDay: number;
+    freshFoodSpoilageDroughtPerDay: number;
   };
   economy: {
     startingTimber: number;
@@ -377,10 +405,37 @@ function generateRust(): string {
     `pub const CALENDAR_MONTHS_PER_YEAR: u32 = ${b.calendar.monthsPerYear};`,
     `pub const CALENDAR_DAYS_PER_WEEK: u32 = ${b.calendar.daysPerWeek};`,
     `pub const CALENDAR_SUNDAY_WEEKDAY: u32 = ${b.calendar.sundayWeekday};`,
+    `pub const CALENDAR_START_MONTH: u32 = ${b.calendar.startMonth};`,
     `pub const CALENDAR_DAY_START_HOUR: u32 = ${b.calendar.dayStartHour};`,
-    `pub const CALENDAR_DAY_START_OFFSET_SECONDS: f64 = ${rustF64(b.calendar.dayStartHour * 3600)};`,
+    `pub const CALENDAR_DAY_START_OFFSET_SECONDS: f64 = ${rustF64(b.calendar.secondsPerDay * b.calendar.dayStartHour / b.calendar.hoursPerDay)};`,
     `pub const CALENDAR_WORK_START_HOUR: u32 = ${b.calendar.workStartHour};`,
     `pub const CALENDAR_WORK_END_HOUR: u32 = ${b.calendar.workEndHour};`,
+    '',
+    `pub const SPRING_RAIN_CHANCE: f64 = ${rustF64(b.seasons.springRainChance)};`,
+    `pub const SPRING_RAIN_CROP_GROWTH_MULTIPLIER: f64 = ${rustF64(b.seasons.springRainCropGrowthMultiplier)};`,
+    `pub const SPRING_RAIN_WELL_REFILL_MULTIPLIER: f64 = ${rustF64(b.seasons.springRainWellRefillMultiplier)};`,
+    `pub const SUMMER_DROUGHT_CHANCE: f64 = ${rustF64(b.seasons.summerDroughtChance)};`,
+    `pub const SUMMER_DROUGHT_DURATION_DAYS: u32 = ${b.seasons.summerDroughtDurationDays};`,
+    `pub const DROUGHT_CROP_GROWTH_MULTIPLIER: f64 = ${rustF64(b.seasons.droughtCropGrowthMultiplier)};`,
+    `pub const DROUGHT_FORAGE_REGROWTH_MULTIPLIER: f64 = ${rustF64(b.seasons.droughtForageRegrowthMultiplier)};`,
+    `pub const DROUGHT_WELL_REFILL_MULTIPLIER: f64 = ${rustF64(b.seasons.droughtWellRefillMultiplier)};`,
+    `pub const DROUGHT_FISH_LOSS_FRACTION_PER_DAY: f64 = ${rustF64(b.seasons.droughtFishLossFractionPerDay)};`,
+    `pub const SPRING_FIREWOOD_DEMAND_MULTIPLIER: f64 = ${rustF64(b.seasons.springFirewoodDemandMultiplier)};`,
+    `pub const SUMMER_FIREWOOD_DEMAND_MULTIPLIER: f64 = ${rustF64(b.seasons.summerFirewoodDemandMultiplier)};`,
+    `pub const AUTUMN_FIREWOOD_DEMAND_MULTIPLIER: f64 = ${rustF64(b.seasons.autumnFirewoodDemandMultiplier)};`,
+    `pub const WINTER_FIREWOOD_DEMAND_MULTIPLIER: f64 = ${rustF64(b.seasons.winterFirewoodDemandMultiplier)};`,
+    `pub const SPRING_PASTURE_CAPACITY_MULTIPLIER: f64 = ${rustF64(b.seasons.springPastureCapacityMultiplier)};`,
+    `pub const SUMMER_PASTURE_CAPACITY_MULTIPLIER: f64 = ${rustF64(b.seasons.summerPastureCapacityMultiplier)};`,
+    `pub const AUTUMN_PASTURE_CAPACITY_MULTIPLIER: f64 = ${rustF64(b.seasons.autumnPastureCapacityMultiplier)};`,
+    `pub const WINTER_PASTURE_CAPACITY_MULTIPLIER: f64 = ${rustF64(b.seasons.winterPastureCapacityMultiplier)};`,
+    `pub const DROUGHT_PASTURE_CAPACITY_MULTIPLIER: f64 = ${rustF64(b.seasons.droughtPastureCapacityMultiplier)};`,
+    `pub const SPRING_BREEDING_MULTIPLIER: f64 = ${rustF64(b.seasons.springBreedingMultiplier)};`,
+    `pub const WINTER_BREEDING_MULTIPLIER: f64 = ${rustF64(b.seasons.winterBreedingMultiplier)};`,
+    `pub const FRESH_FOOD_SPOILAGE_SPRING_PER_DAY: f64 = ${rustF64(b.seasons.freshFoodSpoilageSpringPerDay)};`,
+    `pub const FRESH_FOOD_SPOILAGE_SUMMER_PER_DAY: f64 = ${rustF64(b.seasons.freshFoodSpoilageSummerPerDay)};`,
+    `pub const FRESH_FOOD_SPOILAGE_AUTUMN_PER_DAY: f64 = ${rustF64(b.seasons.freshFoodSpoilageAutumnPerDay)};`,
+    `pub const FRESH_FOOD_SPOILAGE_WINTER_PER_DAY: f64 = ${rustF64(b.seasons.freshFoodSpoilageWinterPerDay)};`,
+    `pub const FRESH_FOOD_SPOILAGE_DROUGHT_PER_DAY: f64 = ${rustF64(b.seasons.freshFoodSpoilageDroughtPerDay)};`,
     '',
     `pub const STARTING_TIMBER: f64 = ${rustF64(b.economy.startingTimber)};`,
     `pub const STARTING_STONE: f64 = ${rustF64(b.economy.startingStone)};`,
@@ -812,11 +867,38 @@ function generateTypeScript(): string {
     `export const CALENDAR_MONTHS_PER_YEAR = ${b.calendar.monthsPerYear};`,
     `export const CALENDAR_DAYS_PER_WEEK = ${b.calendar.daysPerWeek};`,
     `export const CALENDAR_SUNDAY_WEEKDAY = ${b.calendar.sundayWeekday};`,
+    `export const CALENDAR_START_MONTH = ${b.calendar.startMonth};`,
     `export const CALENDAR_DAY_START_HOUR = ${b.calendar.dayStartHour};`,
-    `export const CALENDAR_DAY_START_OFFSET_SECONDS = ${b.calendar.dayStartHour * 3600};`,
+    `export const CALENDAR_DAY_START_OFFSET_SECONDS = ${b.calendar.secondsPerDay * b.calendar.dayStartHour / b.calendar.hoursPerDay};`,
     `export const CALENDAR_WORK_START_HOUR = ${b.calendar.workStartHour};`,
     `export const CALENDAR_WORK_END_HOUR = ${b.calendar.workEndHour};`,
     `export const SECONDS_PER_DAY = ${b.calendar.secondsPerDay};`,
+    '',
+    `export const SPRING_RAIN_CHANCE = ${b.seasons.springRainChance};`,
+    `export const SPRING_RAIN_CROP_GROWTH_MULTIPLIER = ${b.seasons.springRainCropGrowthMultiplier};`,
+    `export const SPRING_RAIN_WELL_REFILL_MULTIPLIER = ${b.seasons.springRainWellRefillMultiplier};`,
+    `export const SUMMER_DROUGHT_CHANCE = ${b.seasons.summerDroughtChance};`,
+    `export const SUMMER_DROUGHT_DURATION_DAYS = ${b.seasons.summerDroughtDurationDays};`,
+    `export const DROUGHT_CROP_GROWTH_MULTIPLIER = ${b.seasons.droughtCropGrowthMultiplier};`,
+    `export const DROUGHT_FORAGE_REGROWTH_MULTIPLIER = ${b.seasons.droughtForageRegrowthMultiplier};`,
+    `export const DROUGHT_WELL_REFILL_MULTIPLIER = ${b.seasons.droughtWellRefillMultiplier};`,
+    `export const DROUGHT_FISH_LOSS_FRACTION_PER_DAY = ${b.seasons.droughtFishLossFractionPerDay};`,
+    `export const SPRING_FIREWOOD_DEMAND_MULTIPLIER = ${b.seasons.springFirewoodDemandMultiplier};`,
+    `export const SUMMER_FIREWOOD_DEMAND_MULTIPLIER = ${b.seasons.summerFirewoodDemandMultiplier};`,
+    `export const AUTUMN_FIREWOOD_DEMAND_MULTIPLIER = ${b.seasons.autumnFirewoodDemandMultiplier};`,
+    `export const WINTER_FIREWOOD_DEMAND_MULTIPLIER = ${b.seasons.winterFirewoodDemandMultiplier};`,
+    `export const SPRING_PASTURE_CAPACITY_MULTIPLIER = ${b.seasons.springPastureCapacityMultiplier};`,
+    `export const SUMMER_PASTURE_CAPACITY_MULTIPLIER = ${b.seasons.summerPastureCapacityMultiplier};`,
+    `export const AUTUMN_PASTURE_CAPACITY_MULTIPLIER = ${b.seasons.autumnPastureCapacityMultiplier};`,
+    `export const WINTER_PASTURE_CAPACITY_MULTIPLIER = ${b.seasons.winterPastureCapacityMultiplier};`,
+    `export const DROUGHT_PASTURE_CAPACITY_MULTIPLIER = ${b.seasons.droughtPastureCapacityMultiplier};`,
+    `export const SPRING_BREEDING_MULTIPLIER = ${b.seasons.springBreedingMultiplier};`,
+    `export const WINTER_BREEDING_MULTIPLIER = ${b.seasons.winterBreedingMultiplier};`,
+    `export const FRESH_FOOD_SPOILAGE_SPRING_PER_DAY = ${b.seasons.freshFoodSpoilageSpringPerDay};`,
+    `export const FRESH_FOOD_SPOILAGE_SUMMER_PER_DAY = ${b.seasons.freshFoodSpoilageSummerPerDay};`,
+    `export const FRESH_FOOD_SPOILAGE_AUTUMN_PER_DAY = ${b.seasons.freshFoodSpoilageAutumnPerDay};`,
+    `export const FRESH_FOOD_SPOILAGE_WINTER_PER_DAY = ${b.seasons.freshFoodSpoilageWinterPerDay};`,
+    `export const FRESH_FOOD_SPOILAGE_DROUGHT_PER_DAY = ${b.seasons.freshFoodSpoilageDroughtPerDay};`,
     '',
     `export const STARTING_TIMBER = ${b.economy.startingTimber};`,
     `export const STARTING_STONE = ${b.economy.startingStone};`,

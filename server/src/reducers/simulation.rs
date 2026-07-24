@@ -4,6 +4,7 @@ use crate::db::*;
 use crate::simulation::{
     step_backyard_gardens,
     step_chapels, step_chapel_parish, step_construction_sites, step_delivery_trips, step_fishing_camp, step_foragers_shed, step_foraging_lifecycle,
+    step_fresh_food_spoilage,
     step_household_market_orders, step_hunters_hall, step_lumber_mill, step_marketplace_caravans,
     step_large_quarry, step_reforester, step_residence, step_stone_quarry, step_well, step_woodcutters_lodge,
     step_apiary, step_brewery, step_carpenter, step_ferry_landing,
@@ -20,10 +21,29 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
     let Some(config) = ctx.db.world_config().id().find(&0) else {
         return;
     };
+    if !config.configured || config.game_speed == 0 {
+        return;
+    }
+    let substeps = if matches!(config.game_speed, 1 | 4 | 12) {
+        config.game_speed
+    } else {
+        1
+    };
+    for _ in 0..substeps {
+        run_one_sim_tick(ctx);
+    }
+}
+
+fn run_one_sim_tick(ctx: &ReducerContext) {
+    let Some(config) = ctx.db.world_config().id().find(&0) else {
+        return;
+    };
     if !config.configured {
         return;
     }
 
+    let world_seed = config.seed;
+    let world_hydrology = config.hydrology;
     ctx.db.world_config().id().update(WorldConfig {
         sim_tick: config.sim_tick + 1,
         ..config
@@ -37,7 +57,9 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
         .map(|config| config.sim_tick)
         .unwrap_or(0);
     let clock = crate::simulation::game_clock(sim_tick);
-    step_foraging_lifecycle(ctx, &clock);
+    let environment =
+        crate::season_policy::environment_for(world_seed, world_hydrology, &clock);
+    step_foraging_lifecycle(ctx, &clock, environment);
 
     reconcile_all_building_labor(ctx);
 
@@ -162,7 +184,7 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
         let Some(building) = ctx.db.building().id().find(&building_id) else {
             continue;
         };
-        step_well(ctx, &tick, sim_tick, &clock, building);
+        step_well(ctx, &tick, sim_tick, &clock, environment, building);
     }
 
     for (sim_kind, building_id) in expanded_ids {
@@ -171,7 +193,7 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
         };
         match sim_kind {
             crate::building_defs::BuildingSimKind::ThreshingBarn => {
-                step_threshing_barn(ctx, &tick, &clock, building)
+                step_threshing_barn(ctx, &tick, &clock, environment, building)
             }
             crate::building_defs::BuildingSimKind::Monastery => {
                 step_monastery(ctx, &tick, &clock, building)
@@ -201,10 +223,10 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
                 step_vineyard(ctx, &tick, &clock, building)
             }
             crate::building_defs::BuildingSimKind::PastoralFarmstead => {
-                step_pastoral_farmstead(ctx, &tick, &clock, building)
+                step_pastoral_farmstead(ctx, &tick, &clock, environment, building)
             }
             crate::building_defs::BuildingSimKind::Swineherd => {
-                step_swineherd(ctx, &tick, &clock, building)
+                step_swineherd(ctx, &tick, &clock, environment, building)
             }
             crate::building_defs::BuildingSimKind::VillageStorehouse => {
                 step_village_storehouse(ctx, &tick, &clock, building)
@@ -213,7 +235,8 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
         }
     }
 
-    step_backyard_gardens(ctx, &tick, &clock);
+    step_backyard_gardens(ctx, &tick, &clock, environment);
+    step_fresh_food_spoilage(ctx, environment);
 
     let chapels: Vec<Building> = ctx
         .db
@@ -234,6 +257,14 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
     step_chapel_parish(ctx, &tick, sim_tick, &clock, &chapels, &residences);
 
     for residence in residences {
-        step_residence(ctx, &tick, &chapels, &monasteries, residence, &clock);
+        step_residence(
+            ctx,
+            &tick,
+            &chapels,
+            &monasteries,
+            residence,
+            &clock,
+            environment,
+        );
     }
 }

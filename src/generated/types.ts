@@ -308,6 +308,7 @@ export const WorldConfig = __t.object("WorldConfig", {
   seed: __t.u64(),
   nextBuildingId: __t.u64(),
   simTick: __t.u64(),
+  gameSpeed: __t.u8(),
   mapSize: __t.u8(),
   topography: __t.u8(),
   hydrology: __t.u8(),

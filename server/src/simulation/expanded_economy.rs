@@ -37,6 +37,7 @@ use crate::simulation::landmark_access::monastery_linked_to_chapel;
 use crate::simulation::labor_and_logistics_paused;
 use crate::simulation::residence_needs::{apply_need_delivery, load_needs, need_stock, ResidenceNeedKind};
 use crate::simulation::tick_context::SimTickContext;
+use crate::season_policy::{EnvironmentState, WeatherKind};
 use crate::simulation::water_logistics::ensure_building_water;
 use crate::tables::{farm_field, Building, FarmField, Residence};
 
@@ -44,11 +45,11 @@ pub fn step_threshing_barn(
     ctx: &ReducerContext,
     tick: &SimTickContext,
     clock: &GameClock,
+    environment: EnvironmentState,
     mut building: Building,
 ) {
-    if !labor_and_logistics_paused(ctx, building.owner, clock) {
-        step_farmstead_fields(ctx, &mut building);
-    }
+    let work_allowed = !labor_and_logistics_paused(ctx, building.owner, clock);
+    step_farmstead_fields(ctx, &mut building, clock, environment, work_allowed);
     if !labor_and_logistics_paused(ctx, building.owner, clock) && building.assigned_labor > 0 {
         dispatch_to_building(
             ctx,
@@ -132,7 +133,13 @@ pub fn step_granary(
     ctx.db.building().id().update(granary);
 }
 
-fn step_farmstead_fields(ctx: &ReducerContext, farmstead: &mut Building) {
+fn step_farmstead_fields(
+    ctx: &ReducerContext,
+    farmstead: &mut Building,
+    clock: &GameClock,
+    environment: EnvironmentState,
+    work_allowed: bool,
+) {
     let mut fields: Vec<FarmField> = ctx
         .db
         .farm_field()
@@ -140,28 +147,60 @@ fn step_farmstead_fields(ctx: &ReducerContext, farmstead: &mut Building) {
         .filter(&farmstead.id)
         .collect();
 
-    // Growth continues without assigned farm labor; only field work consumes the crew budget.
+    // Rain and drought persistently change soil moisture, which later affects yield.
     for field in &mut fields {
-        if field.stage != STAGE_GROWING {
+        let moisture_change_per_day = match environment.weather {
+            WeatherKind::Rain => 0.012,
+            WeatherKind::Drought => -0.035,
+            _ => 0.0,
+        };
+        field.moisture = (field.moisture
+            + moisture_change_per_day * TICK_DT / CALENDAR_SECONDS_PER_DAY)
+            .clamp(0.0, 1.0);
+    }
+
+    // Seasonal boundaries are authoritative. A partial sowing dies at winter,
+    // immature crops fail in September, and uncollected harvest is lost in October.
+    for field in &mut fields {
+        if matches!(clock.month, 12 | 1 | 2) && field.stage == STAGE_SOWING {
+            fail_field_cycle(field);
+        } else if clock.month == 9 && field.stage == STAGE_GROWING {
+            if field.crop == CROP_FALLOW {
+                if field.stage_progress >= 0.75 {
+                    finish_field_cycle(field, 0.0);
+                } else {
+                    fail_field_cycle(field);
+                }
+            } else if field.stage_progress >= 0.75 {
+                field.stage = STAGE_HARVESTING;
+                field.stage_progress = 0.0;
+            } else {
+                fail_field_cycle(field);
+            }
+        } else if clock.month == 10 && field.stage == STAGE_HARVESTING {
+            fail_field_cycle(field);
+        }
+    }
+
+    // Fully sown grain is dormant in winter, then grows through spring and summer.
+    for field in &mut fields {
+        if field.stage != STAGE_GROWING || !matches!(clock.month, 3..=8) {
             continue;
         }
         let crop_growth_multiplier = if field.crop == CROP_FALLOW { 0.72 } else { 1.0 };
         field.stage_progress = (field.stage_progress
-            + TICK_DT * crop_growth_multiplier / FARM_GROWTH_SECONDS.max(1.0))
+            + TICK_DT
+                * crop_growth_multiplier
+                * environment.crop_growth_multiplier()
+                / FARM_GROWTH_SECONDS.max(1.0))
             .min(1.0);
-        if field.stage_progress >= 1.0 - 1e-9 {
-            if field.crop == CROP_FALLOW {
-                finish_field_cycle(field, 0.0);
-            } else {
-                field.stage = STAGE_HARVESTING;
-                field.stage_progress = 0.0;
-            }
-        }
     }
 
-    let mut work_budget = farmstead.assigned_labor as f64
-        * FARM_WORK_METERS_PER_WORKER_PER_SEC
-        * TICK_DT;
+    let mut work_budget = if work_allowed {
+        farmstead.assigned_labor as f64 * FARM_WORK_METERS_PER_WORKER_PER_SEC * TICK_DT
+    } else {
+        0.0
+    };
     fields.sort_by(|a, b| {
         b.priority
             .cmp(&a.priority)
@@ -170,7 +209,11 @@ fn step_farmstead_fields(ctx: &ReducerContext, farmstead: &mut Building) {
     });
 
     for field in &mut fields {
-        if work_budget <= 1e-9 || field.stage == STAGE_GROWING || field.priority == 0 {
+        if work_budget <= 1e-9
+            || field.stage == STAGE_GROWING
+            || field.priority == 0
+            || !field_work_allowed(field.stage, clock.month)
+        {
             continue;
         }
         let corners = field_corners(field);
@@ -252,6 +295,21 @@ fn finish_field_cycle_with_manure(field: &mut FarmField, harvested: f64, manure_
     field.crop = field.next_crop;
     field.stage = STAGE_PLOUGHING;
     field.stage_progress = 0.0;
+}
+
+fn fail_field_cycle(field: &mut FarmField) {
+    field.last_yield = 0.0;
+    field.crop = field.next_crop;
+    field.stage = STAGE_PLOUGHING;
+    field.stage_progress = 0.0;
+}
+
+fn field_work_allowed(stage: u8, month: u32) -> bool {
+    match stage {
+        STAGE_HARVESTING => month == 9,
+        STAGE_PLOUGHING | STAGE_SOWING => matches!(month, 10 | 11),
+        _ => false,
+    }
 }
 
 fn field_corners(field: &FarmField) -> ZoneCorners {

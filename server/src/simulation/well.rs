@@ -16,6 +16,7 @@ use crate::simulation::delivery_supplier::{
 };
 use crate::simulation::game_calendar::GameClock;
 use crate::simulation::labor_and_logistics_paused;
+use crate::season_policy::EnvironmentState;
 use crate::simulation::residence_needs::{
     load_needs, need_stock, ResidenceNeedKind,
 };
@@ -25,7 +26,14 @@ use crate::simulation::road_logistics::{
 use crate::simulation::tick_context::SimTickContext;
 use crate::tables::{Building, Residence};
 
-pub fn step_well(ctx: &ReducerContext, tick: &SimTickContext, sim_tick: u64, clock: &GameClock, building: Building) {
+pub fn step_well(
+    ctx: &ReducerContext,
+    tick: &SimTickContext,
+    sim_tick: u64,
+    clock: &GameClock,
+    environment: EnvironmentState,
+    building: Building,
+) {
     if labor_and_logistics_paused(ctx, building.owner, clock) {
         return;
     }
@@ -75,7 +83,12 @@ pub fn step_well(ctx: &ReducerContext, tick: &SimTickContext, sim_tick: u64, clo
 
     if do_refill {
         let labor = split.processing as f64;
-        well.water = (well.water + WELL_BASE_REFILL_PER_SEC * hydrology * labor * TICK_DT)
+        well.water = (well.water
+            + WELL_BASE_REFILL_PER_SEC
+                * hydrology
+                * labor
+                * environment.well_refill_multiplier()
+                * TICK_DT)
             .min(capacity);
 
         if well.action_cooldown <= 0.0 && should_surge(well.id, sim_tick, hydrology) {

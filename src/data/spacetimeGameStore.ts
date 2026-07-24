@@ -59,6 +59,7 @@ import { applyAuthoritativeWorldGeneration } from '../world/worldGenerationConte
 import { GameTableSync } from './spacetimeTableSync/gameTableSync.ts';
 import { syncWorldConfig } from './spacetimeTableSync/syncWorldConfig.ts';
 import type { GameTableSyncState } from './spacetimeTableSync/gameTableSyncState.ts';
+import type { GameSpeed } from '../world/gameSpeed.ts';
 
 export type SpacetimeGameSnapshot = {
   connected: boolean;
@@ -81,6 +82,7 @@ export type SpacetimeGameSnapshot = {
   deliveryTrips: Map<string, DeliveryTripState>;
   roads: RoadNetworkSnapshot | null;
   simTick: number;
+  gameSpeed: GameSpeed;
   worldGeneration: AuthoritativeWorldGeneration | null;
 };
 
@@ -90,6 +92,7 @@ function createEmptyTableState(): GameTableSyncState {
   return {
     identityHex: null,
     simTick: 0,
+    gameSpeed: 1,
     worldGeneration: null,
     stockpile: createEmptyStockpile(),
     economicActivityTaxRate: ECONOMIC_ACTIVITY_TAX_RATE_DEFAULT,
@@ -166,6 +169,7 @@ export class SpacetimeGameStore {
       deliveryTrips: this.snapshotMap(state.deliveryTrips),
       roads: this.snapshotRoads(state.roads),
       simTick: state.simTick,
+      gameSpeed: state.gameSpeed,
       worldGeneration: state.worldGeneration
         ? this.snapshotRecord(state.worldGeneration)
         : null,
@@ -271,6 +275,19 @@ export class SpacetimeGameStore {
 
   placeBuilding(kind: BuildingKind, x: number, z: number): Promise<void> {
     return spacetimeReducers.placeBuilding(kind, x, z);
+  }
+
+  async setGameSpeed(speed: GameSpeed): Promise<void> {
+    const previous = this.tableState.gameSpeed;
+    this.tableState.gameSpeed = speed;
+    this.emit();
+    try {
+      await spacetimeReducers.setGameSpeed(speed);
+    } catch (error) {
+      this.tableState.gameSpeed = previous;
+      this.emit();
+      throw error;
+    }
   }
 
   grantCheatResources(amount: number): Promise<void> {

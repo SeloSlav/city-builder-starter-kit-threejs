@@ -8,6 +8,25 @@ use crate::world_entities::{clear_global_world_entities, has_global_world_entiti
 const MAP_SIZE_SMALL: u8 = 0;
 const MAP_SIZE_MEDIUM: u8 = 1;
 const MAP_SIZE_LARGE: u8 = 2;
+const VALID_GAME_SPEEDS: [u8; 4] = [0, 1, 4, 12];
+
+#[reducer]
+pub fn set_game_speed(ctx: &ReducerContext, speed: u8) -> Result<(), String> {
+    if !VALID_GAME_SPEEDS.contains(&speed) {
+        return Err("speed must be 0 (paused), 1, 4, or 12".into());
+    }
+    let config = ctx
+        .db
+        .world_config()
+        .id()
+        .find(&0)
+        .ok_or_else(|| "world_config row missing".to_string())?;
+    ctx.db.world_config().id().update(WorldConfig {
+        game_speed: speed,
+        ..config
+    });
+    Ok(())
+}
 
 #[reducer]
 pub fn configure_world(
@@ -83,6 +102,7 @@ pub fn default_world_config() -> WorldConfig {
         seed: DEFAULT_WORLD_SEED,
         next_building_id: 1,
         sim_tick: 0,
+        game_speed: 1,
         map_size: MAP_SIZE_MEDIUM,
         topography: 50,
         hydrology: 50,

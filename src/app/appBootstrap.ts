@@ -604,6 +604,12 @@ export async function bootstrapAppSession(
       sceneManager.setHydrologyOverlayVisible(active);
       toolbar.setWaterOverlayActive(active);
     },
+    onSetGameSpeed: (speed) => {
+      void spacetimeStore.setGameSpeed(speed).catch((error) => {
+        const message = error instanceof Error ? error.message : 'Could not change game speed.';
+        toastManager?.show(message, { variant: 'error', durationMs: 4500 });
+      });
+    },
     onMenuOpenChange: (open) => {
       cameraController.setInputEnabled(!open && !firstPersonController.isActive());
     },

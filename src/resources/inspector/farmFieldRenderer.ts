@@ -3,6 +3,7 @@ import { cropLabel, expectedFieldYield, fieldShapeEfficiency, fieldSizeEfficienc
 import type { FarmCrop, InspectableTarget } from '../types.ts';
 import type { InspectorRenderContext, InspectorView } from './renderInspectableTarget.ts';
 import { hiddenLabor } from './renderInspectableTarget.ts';
+import { gameClock } from '../../world/gameCalendar.ts';
 
 const STAGE_LABEL = {
   ploughing: 'Ploughing',
@@ -19,7 +20,7 @@ function cropButton(crop: FarmCrop, current: FarmCrop, disabled: boolean): strin
 
 export function renderFarmFieldInspector(
   target: Extract<InspectableTarget, { kind: 'farm-field' }>,
-  _context: InspectorRenderContext,
+  context: InspectorRenderContext,
 ): InspectorView {
   const { field, farmstead } = target;
   const stageProgress = Math.max(0, Math.min(100, Math.round(field.stageProgress * 100)));
@@ -28,10 +29,25 @@ export function renderFarmFieldInspector(
   const sizeEfficiency = Math.round(fieldSizeEfficiency(field.area) * 100);
   const moistureFit = Math.round(moistureSuitability(field.crop, field.moisture) * 100);
   const active = Boolean(farmstead && farmstead.assignedLabor > 0 && field.priority > 0);
+  const month = gameClock(context.gameState.tick).month;
+  const seasonalWindow = month === 9
+    ? 'September harvest'
+    : month === 10 || month === 11
+      ? 'Autumn ploughing and sowing'
+      : month >= 3 && month <= 8
+        ? 'Spring/summer growth'
+        : 'Winter dormancy';
+  const stageAllowed = field.stage === 'growing'
+    ? month >= 3 && month <= 8
+    : field.stage === 'harvesting'
+      ? month === 9
+      : month === 10 || month === 11;
   const statusText = !farmstead
     ? 'Orphaned — farmstead missing'
     : field.priority === 0
       ? 'Paused by priority'
+      : !stageAllowed
+        ? `${STAGE_LABEL[field.stage]} waiting · ${seasonalWindow}`
       : farmstead.assignedLabor === 0 && field.stage !== 'growing'
         ? 'Waiting for farmstead workers'
         : `${STAGE_LABEL[field.stage]} · ${stageProgress}%`;

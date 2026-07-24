@@ -5,6 +5,7 @@ import {
   CALENDAR_HOURS_PER_DAY,
   CALENDAR_MONTHS_PER_YEAR,
   CALENDAR_SECONDS_PER_DAY,
+  CALENDAR_START_MONTH,
   CALENDAR_SUNDAY_WEEKDAY,
   CALENDAR_WORK_END_HOUR,
   CALENDAR_WORK_START_HOUR,
@@ -22,18 +23,18 @@ export const WEEKDAY_NAMES = [
 ] as const;
 
 export const MONTH_NAMES = [
-  'Frostfall',
-  'Seedmoon',
-  'Rainmere',
-  'Greening',
-  'Highsun',
-  'Harvest',
-  'Goldwane',
-  'Mistral',
-  'Lowtide',
-  'Ember',
-  'Deepnight',
-  'Yule',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ] as const;
 
 export type GameClock = {
@@ -63,14 +64,17 @@ export function gameClockAtElapsedSeconds(elapsedSeconds: number): GameClock {
   const simTick = elapsed / SIM_TICK_SECONDS;
   const totalDays = Math.floor(calendarElapsed / CALENDAR_SECONDS_PER_DAY);
   const secondsIntoDay = calendarElapsed % CALENDAR_SECONDS_PER_DAY;
-  const hour = Math.min(CALENDAR_HOURS_PER_DAY - 1, Math.floor(secondsIntoDay / 3600));
-  const minute = Math.min(59, Math.floor((secondsIntoDay % 3600) / 60));
+  const hoursIntoDay = secondsIntoDay / CALENDAR_SECONDS_PER_DAY * CALENDAR_HOURS_PER_DAY;
+  const hour = Math.min(CALENDAR_HOURS_PER_DAY - 1, Math.floor(hoursIntoDay));
+  const minute = Math.min(59, Math.floor((hoursIntoDay - hour) * 60));
   const weekday = totalDays % CALENDAR_DAYS_PER_WEEK;
   const daysPerYear = CALENDAR_DAYS_PER_MONTH * CALENDAR_MONTHS_PER_YEAR;
-  const dayOfYear = totalDays % daysPerYear;
+  const startDayOfYear = (CALENDAR_START_MONTH - 1) * CALENDAR_DAYS_PER_MONTH;
+  const absoluteCalendarDay = startDayOfYear + totalDays;
+  const dayOfYear = absoluteCalendarDay % daysPerYear;
   const month = Math.floor(dayOfYear / CALENDAR_DAYS_PER_MONTH) + 1;
   const monthDay = (dayOfYear % CALENDAR_DAYS_PER_MONTH) + 1;
-  const year = Math.floor(totalDays / daysPerYear) + 1;
+  const year = Math.floor(absoluteCalendarDay / daysPerYear) + 1;
   const isSunday = weekday === CALENDAR_SUNDAY_WEEKDAY;
   const isWorkHours = hour >= CALENDAR_WORK_START_HOUR && hour < CALENDAR_WORK_END_HOUR;
 

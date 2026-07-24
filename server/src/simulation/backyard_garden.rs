@@ -12,9 +12,15 @@ use crate::simulation::residence_needs::food;
 use crate::simulation::residence_needs::state::{find_need_mut, load_needs, persist_needs};
 use crate::simulation::residence_needs::ResidenceNeedKind;
 use crate::simulation::tick_context::SimTickContext;
+use crate::season_policy::{EnvironmentState, Season, WeatherKind};
 use crate::tables::{Building, Residence};
 
-pub fn step_backyard_gardens(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock) {
+pub fn step_backyard_gardens(
+    ctx: &ReducerContext,
+    tick: &SimTickContext,
+    clock: &GameClock,
+    environment: EnvironmentState,
+) {
     let marketplaces: Vec<Building> = ctx
         .db
         .building()
@@ -37,7 +43,15 @@ pub fn step_backyard_gardens(ctx: &ReducerContext, tick: &SimTickContext, clock:
         }
         let has_market_access =
             residence_has_marketplace_access(tick, garden.owner, &residence, &marketplaces);
-        step_one_garden(ctx, kind, &residence, garden.owner, has_market_access);
+        step_one_garden(
+            ctx,
+            kind,
+            &residence,
+            garden.owner,
+            has_market_access,
+            clock,
+            environment,
+        );
     }
 }
 
@@ -47,12 +61,19 @@ fn step_one_garden(
     residence: &Residence,
     owner: spacetimedb::Identity,
     has_market_access: bool,
+    clock: &GameClock,
+    environment: EnvironmentState,
 ) {
     let def = backyard_garden_def(kind);
     let population = residence.population as f64;
+    let seasonal_multiplier = garden_seasonal_multiplier(kind, clock, environment);
+    if seasonal_multiplier <= 1e-9 {
+        return;
+    }
 
     if def.food_per_person_per_sec > 1e-9 {
-        let total_food = def.food_per_person_per_sec * population * TICK_DT;
+        let total_food =
+            def.food_per_person_per_sec * population * seasonal_multiplier * TICK_DT;
         let self_food = total_food * def.food_self_share.clamp(0.0, 1.0);
         if self_food > 1e-9 {
             deposit_self_food(ctx, residence.id, self_food);
@@ -63,7 +84,8 @@ fn step_one_garden(
         return;
     }
 
-    let economic_activity = garden_market_activity(def, population, TICK_DT);
+    let economic_activity =
+        garden_market_activity(def, population, TICK_DT) * seasonal_multiplier;
     if economic_activity <= 1e-9 {
         return;
     }
@@ -77,6 +99,38 @@ fn step_one_garden(
     }
     if tax > 1e-9 {
         credit_treasury_gold(ctx, owner, tax);
+    }
+}
+
+fn garden_seasonal_multiplier(
+    kind: BackyardGardenKind,
+    clock: &GameClock,
+    environment: EnvironmentState,
+) -> f64 {
+    use BackyardGardenKind::*;
+    let base = match kind {
+        AppleOrchard | CherryOrchard => {
+            if clock.month == 9 { 12.0 } else { 0.0 }
+        }
+        VegetableGarden | HerbGarden => match environment.season {
+            Season::Spring | Season::Summer => 1.0,
+            Season::Autumn => 0.55,
+            Season::Winter => 0.0,
+        },
+        FlowerGarden => match environment.season {
+            Season::Spring => 1.4,
+            Season::Summer => 1.0,
+            Season::Autumn => 0.35,
+            Season::Winter => 0.0,
+        },
+        HenYard => if environment.season == Season::Winter { 0.75 } else { 1.0 },
+    };
+    if environment.weather == WeatherKind::Drought
+        && !matches!(kind, HenYard | AppleOrchard | CherryOrchard)
+    {
+        base * 0.55
+    } else {
+        base
     }
 }
 

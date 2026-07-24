@@ -20,6 +20,7 @@ import {
   residenceWaterRunwayDays,
 } from '../logistics/waterLogistics.ts';
 import type { ResidenceState } from '../resources/types.ts';
+import { GAME_DAY_SECONDS } from '../world/gameCalendar.ts';
 import {
   getNeed,
   activeResidenceNeedKinds,
@@ -366,7 +367,7 @@ function activeNeedKinds(residence: ResidenceState): ResidenceNeedKind[] {
 function residenceFoodRunwayDays(residence: ResidenceState): number | null {
   if (residence.abandoned || residence.population === 0) return null;
   const stock = getNeed(residence.needs, 'food').stock;
-  const dailyUse = residence.population * RESIDENCE_FOOD_PER_PERSON_PER_SEC * 86400;
+  const dailyUse = residence.population * RESIDENCE_FOOD_PER_PERSON_PER_SEC * GAME_DAY_SECONDS;
   if (dailyUse <= 1e-9) return null;
   return stock / dailyUse;
 }

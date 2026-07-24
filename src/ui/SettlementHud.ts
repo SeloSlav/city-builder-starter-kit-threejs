@@ -4,6 +4,13 @@ import {
   formatClockTime,
   formatWeekday,
 } from '../world/gameCalendar.ts';
+import type { EnvironmentState } from '../world/seasonPolicy.ts';
+import { describeEnvironment } from '../world/seasonPolicy.ts';
+import {
+  GAME_SPEEDS,
+  gameSpeedLabel,
+  type GameSpeed,
+} from '../world/gameSpeed.ts';
 
 const SETTLEMENT_HUD_HTML = `
   <div class="settlement-hud" data-settlement-hud data-fps-panel aria-label="Settlement overview" aria-live="polite">
@@ -11,6 +18,19 @@ const SETTLEMENT_HUD_HTML = `
       <span class="settlement-hud__clock-date" data-clock-date>Year 1</span>
       <span class="settlement-hud__clock-time" data-clock-time>06:00</span>
       <span class="settlement-hud__clock-detail" data-clock-detail></span>
+      <span class="settlement-hud__season" data-season-status></span>
+      <div class="settlement-hud__speed" role="group" aria-label="Simulation speed">
+        ${GAME_SPEEDS.map((speed) => `
+          <button
+            type="button"
+            class="settlement-hud__speed-button"
+            data-game-speed="${speed}"
+            data-tooltip="${gameSpeedLabel(speed)}${speed === 0 ? ' (Space)' : ` (${speed === 1 ? 1 : speed === 4 ? 2 : 3})`}"
+            aria-label="${gameSpeedLabel(speed)}"
+            aria-pressed="${speed === 1}"
+          >${speed === 0 ? 'Ⅱ' : `${speed}×`}</button>
+        `).join('')}
+      </div>
     </div>
     <div class="settlement-hud__perf">
       <div
@@ -106,11 +126,13 @@ export class SettlementHud {
   private readonly clockDate: HTMLElement;
   private readonly clockTime: HTMLElement;
   private readonly clockDetail: HTMLElement;
+  private readonly seasonStatus: HTMLElement;
+  private readonly speedButtons: HTMLButtonElement[];
   private readonly fpsValue: HTMLElement;
   private readonly zoomValue: HTMLElement;
   readonly zoomStat: HTMLElement;
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, onSetGameSpeed?: (speed: GameSpeed) => void) {
     const wrapper = document.createElement('div');
     wrapper.innerHTML = SETTLEMENT_HUD_HTML.trim();
     const panel = wrapper.firstElementChild;
@@ -123,9 +145,38 @@ export class SettlementHud {
     this.clockDate = this.mustElement('[data-clock-date]');
     this.clockTime = this.mustElement('[data-clock-time]');
     this.clockDetail = this.mustElement('[data-clock-detail]');
+    this.seasonStatus = this.mustElement('[data-season-status]');
+    this.speedButtons = [...this.panel.querySelectorAll<HTMLButtonElement>('[data-game-speed]')];
+    for (const button of this.speedButtons) {
+      button.addEventListener('click', () => {
+        const speed = Number(button.dataset.gameSpeed) as GameSpeed;
+        if (GAME_SPEEDS.includes(speed)) {
+          onSetGameSpeed?.(speed);
+        }
+      });
+    }
     this.fpsValue = this.mustElement('[data-stat="fps"]');
     this.zoomValue = this.mustElement('[data-stat="zoom"]');
     this.zoomStat = this.mustElement('[data-stat-row="zoom"]');
+  }
+
+  setSimulationState(speed: GameSpeed, environment: EnvironmentState): void {
+    const description = describeEnvironment(environment);
+    this.seasonStatus.textContent = `${description.symbol} ${description.title}`;
+    this.seasonStatus.dataset.tooltip = description.detail;
+    this.panel.classList.toggle('is-paused', speed === 0);
+    for (const button of this.speedButtons) {
+      const buttonSpeed = Number(button.dataset.gameSpeed);
+      const active = buttonSpeed === speed;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    }
+  }
+
+  setSpeedControlsEnabled(enabled: boolean): void {
+    for (const button of this.speedButtons) {
+      button.disabled = !enabled;
+    }
   }
 
   setSettlementClock(schedule: SettlementSchedule): void {

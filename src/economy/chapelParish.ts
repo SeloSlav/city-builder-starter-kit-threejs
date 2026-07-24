@@ -10,6 +10,7 @@ import {
   CHAPEL_UNSTAFFED_UPKEEP_FRACTION,
   CHAPEL_UPKEEP_GOLD_PER_DAY,
   SIM_TICK_SECONDS,
+  CALENDAR_SECONDS_PER_DAY,
 } from '../generated/gameBalance.ts';
 import type { BuildingState } from '../resources/types.ts';
 import { chapelCofferGold } from '../resources/chapelCoffer.ts';
@@ -130,7 +131,8 @@ export function payableAutoSweepPerDay(
   }
 
   const sweepPerInterval = excess * CHAPEL_AUTO_SWEEP_FRACTION;
-  const intervalsPerDay = 86_400 / (CHAPEL_AUTO_SWEEP_INTERVAL_TICKS * SIM_TICK_SECONDS);
+  const intervalsPerDay = CALENDAR_SECONDS_PER_DAY
+    / (CHAPEL_AUTO_SWEEP_INTERVAL_TICKS * SIM_TICK_SECONDS);
   return sweepPerInterval * intervalsPerDay;
 }
 

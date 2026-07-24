@@ -32,30 +32,34 @@ use crate::simulation::game_calendar::GameClock;
 use crate::simulation::labor_and_logistics_paused;
 use crate::simulation::residence_needs::ResidenceNeedKind;
 use crate::simulation::tick_context::SimTickContext;
+use crate::season_policy::{EnvironmentState, Season};
 use crate::tables::{farm_field, Building, FarmField, LivestockHerd, Pasture};
 
 pub fn step_pastoral_farmstead(
     ctx: &ReducerContext,
     tick: &SimTickContext,
     clock: &GameClock,
+    environment: EnvironmentState,
     building: Building,
 ) {
-    step_livestock_building(ctx, tick, clock, building, false);
+    step_livestock_building(ctx, tick, clock, environment, building, false);
 }
 
 pub fn step_swineherd(
     ctx: &ReducerContext,
     tick: &SimTickContext,
     clock: &GameClock,
+    environment: EnvironmentState,
     building: Building,
 ) {
-    step_livestock_building(ctx, tick, clock, building, true);
+    step_livestock_building(ctx, tick, clock, environment, building, true);
 }
 
 fn step_livestock_building(
     ctx: &ReducerContext,
     tick: &SimTickContext,
     clock: &GameClock,
+    environment: EnvironmentState,
     mut building: Building,
     swine_building: bool,
 ) {
@@ -72,7 +76,8 @@ fn step_livestock_building(
     if swine_building && herd.species != SPECIES_SWINE {
         herd.species = SPECIES_SWINE;
     }
-    herd.pasture_capacity = grazing_capacity(ctx, &building, &herd);
+    herd.pasture_capacity =
+        grazing_capacity(ctx, &building, &herd) * environment.pasture_capacity_multiplier();
     herd.supplied_capacity = herd.pasture_capacity.min(herd.head_count as f64);
 
     let paused = labor_and_logistics_paused(ctx, building.owner, clock);
@@ -93,7 +98,7 @@ fn step_livestock_building(
         }
 
         if building.action_cooldown <= 1e-6 {
-            run_livestock_cycle(ctx, clock, &mut building, &mut herd);
+            run_livestock_cycle(ctx, clock, environment, &mut building, &mut herd);
             let labor = building.assigned_labor.max(1) as f64;
             building.action_cooldown = building_def(&building.kind)
                 .map(|def| def.action_interval / labor)
@@ -137,6 +142,7 @@ fn step_livestock_building(
 fn run_livestock_cycle(
     ctx: &ReducerContext,
     clock: &GameClock,
+    environment: EnvironmentState,
     building: &mut Building,
     herd: &mut LivestockHerd,
 ) {
@@ -182,7 +188,9 @@ fn run_livestock_cycle(
     deposit_building_commodity(building, CommodityKind::Food, food);
     deposit_building_commodity(building, CommodityKind::PreservedFood, preserved);
 
-    herd.last_wool_gold = if herd.species == SPECIES_SHEEP {
+    herd.last_wool_gold = if herd.species == SPECIES_SHEEP
+        && environment.season != Season::Winter
+    {
         productive_heads * SHEEP_WOOL_GOLD_PER_CYCLE_PER_HEAD
     } else {
         0.0
@@ -192,7 +200,9 @@ fn run_livestock_cycle(
     }
 
     if support_ratio >= 0.9 && herd.health >= 0.72 {
-        herd.breeding_progress += productive_heads * species_breeding_per_cycle(herd.species);
+        herd.breeding_progress += productive_heads
+            * species_breeding_per_cycle(herd.species)
+            * environment.breeding_multiplier();
         let max_herd = species_max_herd(herd.species);
         while herd.breeding_progress >= 1.0 && herd.head_count < max_herd {
             herd.head_count += 1;

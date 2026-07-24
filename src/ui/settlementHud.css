@@ -38,6 +38,53 @@
   letter-spacing: 0.02em;
 }
 
+.settlement-hud__season {
+  width: max-content;
+  color: #b9cf98;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: help;
+}
+
+.settlement-hud__speed {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.settlement-hud__speed-button {
+  min-width: 0;
+  padding: 4px 2px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 10px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.settlement-hud__speed-button:hover:not(:disabled) {
+  border-color: rgba(215, 180, 99, 0.55);
+  color: var(--ink);
+}
+
+.settlement-hud__speed-button.is-active {
+  border-color: rgba(215, 180, 99, 0.8);
+  color: #f2d486;
+  background: rgba(215, 180, 99, 0.14);
+}
+
+.settlement-hud__speed-button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.settlement-hud.is-paused .settlement-hud__clock-time {
+  color: #d8c9a8;
+}
+
 .settlement-hud.is-night .settlement-hud__clock-time {
   color: #9ec5e8;
 }

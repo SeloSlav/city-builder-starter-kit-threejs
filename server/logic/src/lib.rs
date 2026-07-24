@@ -22,6 +22,13 @@ pub mod hydrology;
 #[path = "../../src/simulation/game_calendar.rs"]
 pub mod game_calendar;
 
+pub mod simulation {
+    pub use crate::game_calendar::GameClock;
+}
+
+#[path = "../../src/season_policy.rs"]
+pub mod season_policy;
+
 #[path = "../../src/quarry_balance.rs"]
 pub mod quarry_balance;
 

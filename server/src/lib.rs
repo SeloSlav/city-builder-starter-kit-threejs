@@ -20,6 +20,7 @@ mod db;
 mod lifecycle;
 mod reducers;
 mod roads;
+mod season_policy;
 mod simulation;
 mod world_entities;
 

@@ -8,6 +8,7 @@ import type { BuildingKind, BuildingState, ResidenceState } from '../resources/t
 import { getNeedStock } from '../residences/residenceNeedState.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
 import { roadPathDistance } from './roadLogistics.ts';
+import { GAME_DAY_SECONDS } from '../world/gameCalendar.ts';
 
 export const MONASTERY_MIN_PARISH_POPULATION = 12;
 
@@ -69,7 +70,7 @@ export function residencePreservedFoodRunwaySeconds(residence: ResidenceState): 
 export function residencePreservedFoodRunwayDays(residence: ResidenceState): number | null {
   const runwaySeconds = residencePreservedFoodRunwaySeconds(residence);
   if (runwaySeconds == null) return null;
-  return runwaySeconds / 86400;
+  return runwaySeconds / GAME_DAY_SECONDS;
 }
 
 export function residenceAleRunwaySeconds(residence: ResidenceState): number | null {
@@ -83,7 +84,7 @@ export function residenceAleRunwaySeconds(residence: ResidenceState): number | n
 export function residenceAleRunwayDays(residence: ResidenceState): number | null {
   const runwaySeconds = residenceAleRunwaySeconds(residence);
   if (runwaySeconds == null) return null;
-  return runwaySeconds / 86400;
+  return runwaySeconds / GAME_DAY_SECONDS;
 }
 
 export function formatSpecialtyRunwayDays(days: number): string {

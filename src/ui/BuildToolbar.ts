@@ -30,6 +30,8 @@ import {
   type ToolbarStats,
 } from './buildToolbarStatus.ts';
 import { SettlementHud } from './SettlementHud.ts';
+import type { EnvironmentState } from '../world/seasonPolicy.ts';
+import type { GameSpeed } from '../world/gameSpeed.ts';
 
 export type { ToolbarStats };
 
@@ -127,12 +129,30 @@ export class BuildToolbar {
   private readonly onToggleCityAdministration: () => void;
   private cityAdministrationOpen = false;
   private gameplayEnabled = true;
+  private currentGameSpeed: GameSpeed = 1;
+  private lastRunningGameSpeed: Exclude<GameSpeed, 0> = 1;
+  private readonly requestGameSpeed: (speed: GameSpeed) => void;
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (isTypingTarget(event.target) || this.firstPersonActive || this.isGameMenuOpen()) return;
     if (!this.gameplayEnabled) return;
     if (event.altKey || event.ctrlKey || event.metaKey) return;
 
     const key = event.key.toLowerCase();
+    const speed = key === '1' ? 1 : key === '2' ? 4 : key === '3' ? 12 : null;
+    if (speed !== null) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.requestGameSpeed(speed);
+      return;
+    }
+    if (key === ' ' || event.code === 'Space') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.requestGameSpeed(
+        this.currentGameSpeed === 0 ? this.lastRunningGameSpeed : 0,
+      );
+      return;
+    }
     if (key === 'escape') {
       if (dismissDockToggles(this.dockToggles)) {
         event.preventDefault();
@@ -208,6 +228,7 @@ export class BuildToolbar {
       canOpenMenuFromKeyboard?: () => boolean;
       onNewWorld?: () => void;
       onGrantCheatResources?: (amount: number) => Promise<void>;
+      onSetGameSpeed?: (speed: GameSpeed) => void;
     },
   ) {
     root.innerHTML = `
@@ -360,8 +381,12 @@ export class BuildToolbar {
 
     this.root = root;
     this.onToggleCityAdministration = handlers.onToggleCityAdministration;
+    this.requestGameSpeed = (speed) => {
+      if (!this.gameplayEnabled) return;
+      handlers.onSetGameSpeed?.(speed);
+    };
     const hudStack = this.mustElement(root, '.hud-right-stack');
-    this.settlementHud = new SettlementHud(hudStack);
+    this.settlementHud = new SettlementHud(hudStack, this.requestGameSpeed);
     this.toolbarHandlers = {
       onSelectBuilding: handlers.onSelectBuilding,
       onSelectResidences: handlers.onSelectResidences,
@@ -495,6 +520,7 @@ export class BuildToolbar {
     this.ruralIndustryBuildMenuButton.disabled = !enabled;
     this.waterOverlayButton.disabled = !enabled;
     this.cityAdminButton.disabled = !enabled;
+    this.settlementHud.setSpeedControlsEnabled(enabled);
     if (!enabled) {
       this.closeAllBuildMenus();
       dismissDockToggles(this.dockToggles);
@@ -763,6 +789,14 @@ export class BuildToolbar {
       ruralIndustryConstruction,
       browsing,
     );
+  }
+
+  setSimulationState(speed: GameSpeed, environment: EnvironmentState): void {
+    this.currentGameSpeed = speed;
+    if (speed !== 0) {
+      this.lastRunningGameSpeed = speed;
+    }
+    this.settlementHud.setSimulationState(speed, environment);
   }
 
   private syncBuildMenuButton(

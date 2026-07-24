@@ -2,15 +2,18 @@ import type { WorldConfig } from '../../generated/types.ts';
 import type { GameTableSyncState } from './gameTableSyncState.ts';
 import { worldConfigRowToGeneration } from '../../world/worldConfigAuthority.ts';
 import { applyAuthoritativeWorldGeneration } from '../../world/worldGenerationContext.ts';
+import { normalizeGameSpeed } from '../../world/gameSpeed.ts';
 
 export function syncWorldConfig(rows: Iterable<WorldConfig>, state: GameTableSyncState): void {
   const worldRows = [...rows];
   if (worldRows.length === 0) {
     state.worldGeneration = null;
+    state.gameSpeed = 1;
     return;
   }
   const row = worldRows[0];
   state.simTick = Number(row.simTick);
+  state.gameSpeed = normalizeGameSpeed(row.gameSpeed);
   const nextGeneration = worldConfigRowToGeneration(row);
   if (!sameGeneration(state.worldGeneration, nextGeneration)) {
     state.worldGeneration = nextGeneration;

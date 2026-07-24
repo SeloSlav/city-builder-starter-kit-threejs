@@ -4,6 +4,7 @@ use crate::balance_generated::{GAME_HABITAT_DISRUPTION_RADIUS, TICK_DT};
 use crate::building_defs::building_def;
 use crate::db::*;
 use crate::foraging_policy::population_growth_per_second;
+use crate::season_policy::EnvironmentState;
 use crate::simulation::game_calendar::GameClock;
 use crate::tables::{Building, ForagingNode};
 use crate::world_gen;
@@ -11,7 +12,11 @@ use crate::world_gen;
 /// Advances persistent wild-resource populations. Nodes are never deleted or
 /// rerolled here: seasonal plants recover in place, fish and game reproduce
 /// from survivors, and only a disturbed game habitat may migrate.
-pub fn step_foraging_lifecycle(ctx: &ReducerContext, clock: &GameClock) {
+pub fn step_foraging_lifecycle(
+    ctx: &ReducerContext,
+    clock: &GameClock,
+    environment: EnvironmentState,
+) {
     let nodes: Vec<ForagingNode> = ctx.db.foraging_node().iter().collect();
     for node in nodes {
         let growth = population_growth_per_second(
@@ -19,8 +24,14 @@ pub fn step_foraging_lifecycle(ctx: &ReducerContext, clock: &GameClock) {
             node.remaining,
             node.max_yield,
             clock.month,
-        ) * TICK_DT;
-        let remaining = (node.remaining + growth).min(node.max_yield);
+        ) * environment.forage_regrowth_multiplier()
+            * TICK_DT;
+        let drought_loss = if node.node_kind == "fish" {
+            node.max_yield * environment.fish_loss_per_second() * TICK_DT
+        } else {
+            0.0
+        };
+        let remaining = (node.remaining + growth - drought_loss).clamp(0.0, node.max_yield);
         if (remaining - node.remaining).abs() <= 1e-12 && node.respawn_cooldown <= 0.0 {
             continue;
         }

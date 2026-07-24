@@ -8,6 +8,7 @@ use crate::simulation::landmark_access::{
 use crate::simulation::residence_needs::{step_residence_needs, step_residence_recovery};
 use crate::simulation::residence_settlement::step_residence_settlement;
 use crate::simulation::tick_context::SimTickContext;
+use crate::season_policy::EnvironmentState;
 use crate::tables::{Building, Residence};
 
 pub fn step_residence(
@@ -17,6 +18,7 @@ pub fn step_residence(
     monasteries: &[Building],
     residence: Residence,
     clock: &GameClock,
+    environment: EnvironmentState,
 ) {
     let residence_id = residence.id;
     let has_chapel_access =
@@ -61,5 +63,6 @@ pub fn step_residence(
         has_chapel_access,
         has_monastery_coverage,
         clock,
+        environment,
     );
 }

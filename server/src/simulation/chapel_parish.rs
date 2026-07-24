@@ -4,7 +4,7 @@ use crate::balance_generated::{
     CHAPEL_AUTO_SWEEP_FRACTION, CHAPEL_AUTO_SWEEP_INTERVAL_TICKS, CHAPEL_CHARITY_GOLD_PER_DAY,
     CHAPEL_CHARITY_MIN_COFFER_GOLD, CHAPEL_CHARITY_RELIEF_FRACTION, CHAPEL_CHARITY_WEALTH_FRACTION,
     CHAPEL_PRIEST_SALARY_GOLD_PER_DAY, CHAPEL_UNSTAFFED_UPKEEP_FRACTION, CHAPEL_UPKEEP_GOLD_PER_DAY,
-    TICK_DT,
+    CALENDAR_SECONDS_PER_DAY, TICK_DT,
 };
 use crate::db::*;
 use crate::economy::{
@@ -25,10 +25,8 @@ use crate::simulation::tick_context::SimTickContext;
 use crate::balance_generated::all_market_food_commodities;
 use crate::tables::{Building, Residence};
 
-const SECONDS_PER_DAY: f64 = 86_400.0;
-
 pub fn chapel_gold_per_tick(daily_rate: f64) -> f64 {
-    daily_rate * TICK_DT / SECONDS_PER_DAY
+    daily_rate * TICK_DT / CALENDAR_SECONDS_PER_DAY
 }
 
 pub fn chapel_priest_salary_per_tick(assigned_labor: u32) -> f64 {
@@ -292,7 +290,8 @@ mod tests {
 
     #[test]
     fn priest_salary_per_tick_matches_balance() {
-        let expected = CHAPEL_PRIEST_SALARY_GOLD_PER_DAY * TICK_DT / 86_400.0;
+        let expected =
+            CHAPEL_PRIEST_SALARY_GOLD_PER_DAY * TICK_DT / CALENDAR_SECONDS_PER_DAY;
         assert!((chapel_priest_salary_per_tick(1) - expected).abs() < 1e-9);
         assert_eq!(chapel_priest_salary_per_tick(0), 0.0);
     }
@@ -307,7 +306,7 @@ mod tests {
 
     #[test]
     fn charity_per_tick_matches_balance() {
-        let expected = CHAPEL_CHARITY_GOLD_PER_DAY * TICK_DT / 86_400.0;
+        let expected = CHAPEL_CHARITY_GOLD_PER_DAY * TICK_DT / CALENDAR_SECONDS_PER_DAY;
         assert!((chapel_charity_per_tick() - expected).abs() < 1e-9);
     }
 }

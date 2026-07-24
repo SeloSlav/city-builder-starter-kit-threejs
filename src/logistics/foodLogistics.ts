@@ -9,6 +9,7 @@ import { foodDeliveryTripSeconds } from './deliveryLogistics.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
 import { lodgeLaborAlternates, lodgeLaborSplit } from './lodgeLogistics.ts';
 import { roadPathDistance } from './roadLogistics.ts';
+import { GAME_DAY_SECONDS } from '../world/gameCalendar.ts';
 
 export type FoodLaborSplit = {
   harvesting: number;
@@ -48,7 +49,7 @@ export function residenceFoodRunwaySeconds(residence: ResidenceState): number | 
 export function residenceFoodRunwayDays(residence: ResidenceState): number | null {
   const runwaySeconds = residenceFoodRunwaySeconds(residence);
   if (runwaySeconds == null) return null;
-  return runwaySeconds / 86400;
+  return runwaySeconds / GAME_DAY_SECONDS;
 }
 
 export function formatFoodRunwayDays(days: number): string {

@@ -12,6 +12,7 @@ const tests = [
   'test:marketplace-gating',
   'test:marketplace-trade',
   'test:settlement-schedule',
+  'test:seasons',
   'test:world-config',
   'test:connection-recovery',
   'test:building-processor-status',

@@ -59,6 +59,7 @@ import SetChapelParishPolicyReducer from "./set_chapel_parish_policy_reducer";
 import SetEconomicActivityTaxRateReducer from "./set_economic_activity_tax_rate_reducer";
 import SetFarmFieldCropReducer from "./set_farm_field_crop_reducer";
 import SetFarmFieldPriorityReducer from "./set_farm_field_priority_reducer";
+import SetGameSpeedReducer from "./set_game_speed_reducer";
 import SetLivestockSpeciesReducer from "./set_livestock_species_reducer";
 import SetMonasteryPolicyReducer from "./set_monastery_policy_reducer";
 import SetStorehousePolicyReducer from "./set_storehouse_policy_reducer";
@@ -355,6 +356,7 @@ const reducersSchema = __reducers(
   __reducerSchema("set_economic_activity_tax_rate", SetEconomicActivityTaxRateReducer),
   __reducerSchema("set_farm_field_crop", SetFarmFieldCropReducer),
   __reducerSchema("set_farm_field_priority", SetFarmFieldPriorityReducer),
+  __reducerSchema("set_game_speed", SetGameSpeedReducer),
   __reducerSchema("set_livestock_species", SetLivestockSpeciesReducer),
   __reducerSchema("set_monastery_policy", SetMonasteryPolicyReducer),
   __reducerSchema("set_storehouse_policy", SetStorehousePolicyReducer),

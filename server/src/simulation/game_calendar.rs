@@ -1,7 +1,8 @@
 use crate::balance_generated::{
     CALENDAR_DAYS_PER_MONTH, CALENDAR_DAYS_PER_WEEK, CALENDAR_DAY_START_OFFSET_SECONDS,
     CALENDAR_HOURS_PER_DAY, CALENDAR_MONTHS_PER_YEAR, CALENDAR_SECONDS_PER_DAY,
-    CALENDAR_SUNDAY_WEEKDAY, CALENDAR_WORK_END_HOUR, CALENDAR_WORK_START_HOUR, TICK_DT,
+    CALENDAR_START_MONTH, CALENDAR_SUNDAY_WEEKDAY, CALENDAR_WORK_END_HOUR,
+    CALENDAR_WORK_START_HOUR, TICK_DT,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,14 +28,19 @@ pub fn game_clock(sim_tick: u64) -> GameClock {
     let calendar_elapsed = elapsed + CALENDAR_DAY_START_OFFSET_SECONDS;
     let total_days = (calendar_elapsed / CALENDAR_SECONDS_PER_DAY).floor() as u64;
     let seconds_into_day = calendar_elapsed % CALENDAR_SECONDS_PER_DAY;
-    let hour = (seconds_into_day / 3600.0).floor() as u32;
-    let minute = ((seconds_into_day % 3600.0) / 60.0).floor() as u32;
+    let hours_into_day =
+        seconds_into_day / CALENDAR_SECONDS_PER_DAY * CALENDAR_HOURS_PER_DAY as f64;
+    let hour = hours_into_day.floor() as u32;
+    let minute = ((hours_into_day - hour as f64) * 60.0).floor() as u32;
     let weekday = (total_days % CALENDAR_DAYS_PER_WEEK as u64) as u32;
     let days_per_year = CALENDAR_DAYS_PER_MONTH as u64 * CALENDAR_MONTHS_PER_YEAR as u64;
-    let day_of_year = total_days % days_per_year;
+    let start_day_of_year =
+        (CALENDAR_START_MONTH.saturating_sub(1) * CALENDAR_DAYS_PER_MONTH) as u64;
+    let absolute_calendar_day = start_day_of_year + total_days;
+    let day_of_year = absolute_calendar_day % days_per_year;
     let month = (day_of_year / CALENDAR_DAYS_PER_MONTH as u64) as u32 + 1;
     let month_day = (day_of_year % CALENDAR_DAYS_PER_MONTH as u64) as u32 + 1;
-    let year = (total_days / days_per_year) as u32 + 1;
+    let year = (absolute_calendar_day / days_per_year) as u32 + 1;
     let is_sunday = weekday == CALENDAR_SUNDAY_WEEKDAY;
     let is_work_hours = hour >= CALENDAR_WORK_START_HOUR && hour < CALENDAR_WORK_END_HOUR;
 
@@ -65,12 +71,19 @@ mod tests {
     }
 
     #[test]
-    fn rational_calendar_months_are_thirty_days() {
+    fn rational_calendar_months_are_ten_days() {
         let day_ticks = (CALENDAR_SECONDS_PER_DAY / TICK_DT) as u64;
-        let clock = game_clock(day_ticks * 30);
+        let clock = game_clock(day_ticks * CALENDAR_DAYS_PER_MONTH as u64);
         assert_eq!(clock.month_day, 1);
-        assert_eq!(clock.month, 2);
+        assert_eq!(clock.month, 4);
         assert_eq!(clock.year, 1);
+    }
+
+    #[test]
+    fn new_game_starts_on_march_first() {
+        let clock = game_clock(0);
+        assert_eq!(clock.month, 3);
+        assert_eq!(clock.month_day, 1);
     }
 
     #[test]

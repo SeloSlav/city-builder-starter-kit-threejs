@@ -24,6 +24,7 @@ const row = {
   seed: BigInt(0xdeadbeef),
   nextBuildingId: BigInt(1),
   simTick: BigInt(0),
+  gameSpeed: 1,
   mapSize: 1,
   topography: 42,
   hydrology: 55,

@@ -13,8 +13,15 @@ pub enum ConsumeOutcome {
     Unmet,
 }
 
-pub fn consume(residence: &Residence, need: &NeedState) -> ConsumeOutcome {
-    let demand = residence.population as f64 * RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC * TICK_DT;
+pub fn consume(
+    residence: &Residence,
+    need: &NeedState,
+    demand_multiplier: f64,
+) -> ConsumeOutcome {
+    let demand = residence.population as f64
+        * RESIDENCE_FIREWOOD_PER_PERSON_PER_SEC
+        * demand_multiplier
+        * TICK_DT;
     if demand <= 1e-9 {
         return ConsumeOutcome::Met(*need);
     }

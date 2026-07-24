@@ -17,10 +17,12 @@ import type {
   ResourceStockpile,
   TreeEntityState,
 } from '../../resources/types.ts';
+import type { GameSpeed } from '../../world/gameSpeed.ts';
 
 export type GameTableSyncState = {
   identityHex: string | null;
   simTick: number;
+  gameSpeed: GameSpeed;
   worldGeneration: AuthoritativeWorldGeneration | null;
   stockpile: ResourceStockpile;
   economicActivityTaxRate: number;

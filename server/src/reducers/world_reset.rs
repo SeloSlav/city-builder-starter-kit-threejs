@@ -117,6 +117,7 @@ fn reset_world_progress(ctx: &ReducerContext) {
         ctx.db.world_config().id().update(WorldConfig {
             sim_tick: 0,
             next_building_id: 1,
+            game_speed: 1,
             configured: false,
             ..config
         });

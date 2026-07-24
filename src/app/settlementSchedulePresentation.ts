@@ -24,17 +24,21 @@ export type SettlementPresentationTargets = {
 type SnapshotAnchor = {
   simTick: number;
   receivedAtMs: number;
+  gameSpeed: SpacetimeGameSnapshot['gameSpeed'];
 };
 
 export class SettlementPresentationController {
   private lastDirtyKey = '';
   private anchor: SnapshotAnchor | null = null;
-  private lastSnapshot: Pick<SpacetimeGameSnapshot, 'simTick' | 'parishPolicy'> | null = null;
+  private lastSnapshot: Pick<
+    SpacetimeGameSnapshot,
+    'simTick' | 'parishPolicy' | 'gameSpeed'
+  > | null = null;
   private lastGameState: GameState | null = null;
 
   sync(
     targets: SettlementPresentationTargets,
-    snapshot: Pick<SpacetimeGameSnapshot, 'simTick' | 'parishPolicy'>,
+    snapshot: Pick<SpacetimeGameSnapshot, 'simTick' | 'parishPolicy' | 'gameSpeed'>,
     gameState: GameState | null,
     connected: boolean,
   ): SettlementSchedule | null {
@@ -44,7 +48,7 @@ export class SettlementPresentationController {
       return null;
     }
 
-    const dirtyKey = settlementScheduleDirtyKey(snapshot, gameState);
+    const dirtyKey = `${settlementScheduleDirtyKey(snapshot, gameState)}|${snapshot.gameSpeed}`;
     if (dirtyKey === this.lastDirtyKey) {
       return null;
     }
@@ -52,19 +56,24 @@ export class SettlementPresentationController {
     this.lastDirtyKey = dirtyKey;
     this.lastSnapshot = snapshot;
     this.lastGameState = gameState;
-    this.anchor = { simTick: snapshot.simTick, receivedAtMs: performance.now() };
+    this.anchor = {
+      simTick: snapshot.simTick,
+      receivedAtMs: performance.now(),
+      gameSpeed: snapshot.gameSpeed,
+    };
 
     const schedule = deriveSettlementSchedule(snapshot, gameState);
     this.applyPresentation(targets, schedule);
     return schedule;
   }
 
-  /** Smooth dawn/dusk between authoritative sim snapshots (1 real second = 1 sim second). */
+  /** Smooth dawn/dusk between authoritative snapshots at the current global speed. */
   tick(targets: SettlementPresentationTargets): void {
     if (!this.anchor || !this.lastSnapshot) return;
 
     const driftSeconds = (performance.now() - this.anchor.receivedAtMs) / 1000;
-    const elapsedSeconds = simElapsedSeconds(this.anchor.simTick) + driftSeconds;
+    const elapsedSeconds = simElapsedSeconds(this.anchor.simTick)
+      + driftSeconds * this.anchor.gameSpeed;
     const schedule = deriveInterpolatedSettlementSchedule(
       elapsedSeconds,
       this.lastSnapshot.parishPolicy,

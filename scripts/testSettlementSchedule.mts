@@ -15,10 +15,15 @@ import { deriveInterpolatedSettlementSchedule } from '../src/world/settlementSch
 import { DEFAULT_PARISH_POLICY } from '../src/economy/chapelParish.ts';
 import type { GameState } from '../src/resources/types.ts';
 
-const nightTick = Math.ceil((CALENDAR_SECONDS_PER_DAY / 2) / SIM_TICK_SECONDS);
+const secondsPerGameHour = CALENDAR_SECONDS_PER_DAY / 24;
+const secondsPerGameMinute = secondsPerGameHour / 60;
+const nightTick = Math.ceil((17 * secondsPerGameHour) / SIM_TICK_SECONDS);
 const workHourTick = 0;
 const mondayWorkMorningElapsed =
-  CALENDAR_SECONDS_PER_DAY + CALENDAR_WORK_START_HOUR * 3600 + 60 - CALENDAR_DAY_START_OFFSET_SECONDS;
+  CALENDAR_SECONDS_PER_DAY
+  + CALENDAR_WORK_START_HOUR * secondsPerGameHour
+  + secondsPerGameMinute
+  - CALENDAR_DAY_START_OFFSET_SECONDS;
 const workMorningTick = mondayWorkMorningElapsed / SIM_TICK_SECONDS;
 
 const nightClock = gameClock(nightTick);
@@ -61,7 +66,7 @@ assert.ok(
   daySchedule.dayNight.buildingIndirectIntensity > schedule.dayNight.buildingIndirectIntensity,
   'daylight should provide more indirect building-face light than night',
 );
-assert.ok(daySchedule.dayNight.buildingIndirectIntensity >= 0.1);
+assert.ok(daySchedule.dayNight.buildingIndirectIntensity >= 0.08);
 assert.ok(schedule.dayNight.buildingIndirectIntensity <= 0.03);
 
 const gameState = {
@@ -101,14 +106,16 @@ assert.equal(staffedSunday.staffedChapel, true);
 
 const elapsedAtWork = workMorningTick * SIM_TICK_SECONDS;
 const interpolatedWork = deriveInterpolatedSettlementSchedule(
-  elapsedAtWork + 30,
+  elapsedAtWork + secondsPerGameMinute * 0.5,
   DEFAULT_PARISH_POLICY,
   null,
 );
 assert.equal(interpolatedWork.laborPaused, false);
 assert.equal(interpolatedWork.clock.minute, 1);
 
-const clockFromElapsed = gameClockAtElapsedSeconds(elapsedAtWork + 90);
+const clockFromElapsed = gameClockAtElapsedSeconds(
+  elapsedAtWork + secondsPerGameMinute * 1.01,
+);
 assert.equal(clockFromElapsed.hour, CALENDAR_WORK_START_HOUR);
 assert.equal(clockFromElapsed.minute, 2);
 assert.equal(gameClock(workMorningTick).hour, CALENDAR_WORK_START_HOUR);

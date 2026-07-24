@@ -11,6 +11,7 @@ pub use state::{load_needs, need_stock};
 
 use crate::simulation::game_calendar::GameClock;
 use crate::simulation::labor_schedule::is_consumption_paused;
+use crate::season_policy::EnvironmentState;
 use spacetimedb::ReducerContext;
 
 use crate::db::*;
@@ -30,19 +31,22 @@ pub fn step_residence_needs(
     has_chapel_access: bool,
     has_monastery_coverage: bool,
     clock: &GameClock,
+    environment: EnvironmentState,
 ) {
     if residence.abandoned || residence.population == 0 {
         return;
     }
 
-    if is_consumption_paused(ctx, residence.owner, clock) {
-        return;
-    }
+    let general_consumption_paused = is_consumption_paused(ctx, residence.owner, clock);
 
     let mut needs = load_needs(ctx, residence.id);
     let mut any_unmet = false;
 
     for kind in ResidenceNeedKind::ALL {
+        // Heating is continuous. Other needs keep the existing workday cadence.
+        if general_consumption_paused && kind != ResidenceNeedKind::Firewood {
+            continue;
+        }
         if !kind.is_active_for_tier(residence.tier) {
             if let Some(need) = find_need_mut(&mut needs, kind) {
                 need.deficit_ticks = 0;
@@ -52,7 +56,7 @@ pub fn step_residence_needs(
         let Some(need) = find_need_mut(&mut needs, kind) else {
             continue;
         };
-        match consume_need(kind, &residence, need) {
+        match consume_need(kind, &residence, need, environment) {
             ConsumeResult::Met(updated) => {
                 *need = updated;
                 need.deficit_ticks = 0;
@@ -188,9 +192,18 @@ enum ConsumeResult {
     Unmet,
 }
 
-fn consume_need(kind: ResidenceNeedKind, residence: &Residence, need: &NeedState) -> ConsumeResult {
+fn consume_need(
+    kind: ResidenceNeedKind,
+    residence: &Residence,
+    need: &NeedState,
+    environment: EnvironmentState,
+) -> ConsumeResult {
     match kind {
-        ResidenceNeedKind::Firewood => match firewood::consume(residence, need) {
+        ResidenceNeedKind::Firewood => match firewood::consume(
+            residence,
+            need,
+            environment.firewood_demand_multiplier(),
+        ) {
             firewood::ConsumeOutcome::Met(updated) => ConsumeResult::Met(updated),
             firewood::ConsumeOutcome::Unmet => ConsumeResult::Unmet,
         },

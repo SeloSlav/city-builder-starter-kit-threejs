@@ -25,6 +25,7 @@
     "test:marketplace-gating": "npx tsx scripts/testMarketplaceGating.mts",
     "test:marketplace-trade": "npx tsx scripts/testMarketplaceTrade.mts",
     "test:settlement-schedule": "npx tsx scripts/testSettlementSchedule.mts",
+    "test:seasons": "node --experimental-strip-types scripts/testSeasonSimulation.mts",
     "test:world-config": "npx tsx scripts/testWorldConfigAuthority.mts",
     "test:connection-recovery": "npx tsx scripts/testConnectionRecoveryHints.mts",
     "test:building-processor-status": "npx tsx scripts/testBuildingProcessorStatus.mts",

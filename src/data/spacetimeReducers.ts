@@ -12,6 +12,7 @@ import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
 import { computeWorldBootstrapDataFromLayout } from '../world/worldBootstrapData.ts';
 import { settingsToConfigurePayload } from '../world/worldConfigAuthority.ts';
 import type { WorldGenerationSettings } from '../world/worldGenerationSettings.ts';
+import type { GameSpeed } from '../world/gameSpeed.ts';
 import {
   parseBuildingServerId,
   parseFarmFieldServerId,
@@ -306,6 +307,10 @@ export async function demolishBuilding(buildingId: string): Promise<void> {
 
 export async function resetWorld(): Promise<void> {
   await callReducer('resetWorld', 'reset_world', {});
+}
+
+export async function setGameSpeed(speed: GameSpeed): Promise<void> {
+  await callReducer('setGameSpeed', 'set_game_speed', { speed });
 }
 
 export async function configureWorld(settings: WorldGenerationSettings): Promise<void> {
