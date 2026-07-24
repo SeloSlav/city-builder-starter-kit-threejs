@@ -1,0 +1,117 @@
+//! Pure fire behavior shared by the authoritative simulation and native tests.
+
+use crate::balance_generated::{
+    FIRE_DAMAGE_PER_INTENSITY_SECOND, FIRE_DROUGHT_RISK_MULTIPLIER, FIRE_EXTINGUISH_CHANCE_BASE,
+    FIRE_EXTINGUISH_CHANCE_PER_WATER, FIRE_EXTINGUISH_INTENSITY_THRESHOLD,
+    FIRE_INTENSITY_GROWTH_PER_SECOND, FIRE_INTENSITY_REDUCTION_PER_WATER,
+    FIRE_RAIN_INTENSITY_DAMPING_PER_SECOND, FIRE_RAIN_RISK_MULTIPLIER,
+};
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FireStep {
+    pub intensity: f64,
+    pub damage: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SuppressionResult {
+    pub intensity: f64,
+    pub extinguish_chance: f64,
+    pub extinguished: bool,
+}
+
+pub fn weather_risk_multiplier(is_raining: bool, is_drought: bool) -> f64 {
+    if is_drought {
+        FIRE_DROUGHT_RISK_MULTIPLIER
+    } else if is_raining {
+        FIRE_RAIN_RISK_MULTIPLIER
+    } else {
+        1.0
+    }
+}
+
+pub fn step_fire(
+    intensity: f64,
+    damage: f64,
+    dt: f64,
+    is_raining: bool,
+    is_drought: bool,
+) -> FireStep {
+    let weather_growth = if is_raining {
+        -FIRE_RAIN_INTENSITY_DAMPING_PER_SECOND
+    } else {
+        FIRE_INTENSITY_GROWTH_PER_SECOND
+            * if is_drought {
+                FIRE_DROUGHT_RISK_MULTIPLIER
+            } else {
+                1.0
+            }
+    };
+    let next_intensity = (intensity + weather_growth * dt).clamp(0.04, 1.0);
+    let next_damage =
+        (damage + next_intensity * FIRE_DAMAGE_PER_INTENSITY_SECOND * dt).clamp(0.0, 1.0);
+    FireStep {
+        intensity: next_intensity,
+        damage: next_damage,
+    }
+}
+
+pub fn suppression_result(intensity: f64, damage: f64, water: f64, roll: f64) -> SuppressionResult {
+    let effective_water = water.max(0.0) * (1.0 - damage.clamp(0.0, 1.0) * 0.2);
+    let next_intensity =
+        (intensity - effective_water * FIRE_INTENSITY_REDUCTION_PER_WATER).max(0.0);
+    let threshold_bonus = if next_intensity <= FIRE_EXTINGUISH_INTENSITY_THRESHOLD {
+        (FIRE_EXTINGUISH_INTENSITY_THRESHOLD - next_intensity) * 0.8
+    } else {
+        0.0
+    };
+    let chance = (FIRE_EXTINGUISH_CHANCE_BASE
+        + water.max(0.0) * FIRE_EXTINGUISH_CHANCE_PER_WATER
+        + threshold_bonus
+        - next_intensity * 0.12
+        - damage.clamp(0.0, 1.0) * 0.08)
+        .clamp(0.04, 0.96);
+    SuppressionResult {
+        intensity: next_intensity,
+        extinguish_chance: chance,
+        extinguished: next_intensity <= 0.015
+            || (next_intensity <= FIRE_EXTINGUISH_INTENSITY_THRESHOLD && roll < chance),
+    }
+}
+
+pub fn distance_spread_factor(distance: f64, radius: f64) -> f64 {
+    if radius <= 1e-6 || distance >= radius {
+        return 0.0;
+    }
+    let normalized = 1.0 - distance.max(0.0) / radius;
+    normalized * normalized
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rain_damps_while_drought_accelerates_fire() {
+        let rain = step_fire(0.5, 0.0, 10.0, true, false);
+        let fair = step_fire(0.5, 0.0, 10.0, false, false);
+        let drought = step_fire(0.5, 0.0, 10.0, false, true);
+        assert!(rain.intensity < fair.intensity);
+        assert!(drought.intensity > fair.intensity);
+    }
+
+    #[test]
+    fn buckets_cool_before_the_extinguish_roll() {
+        let result = suppression_result(0.42, 0.2, 3.0, 1.0);
+        assert!(result.intensity < 0.42);
+        assert!(!result.extinguished);
+        let follow_up = suppression_result(result.intensity, 0.2, 3.0, 0.0);
+        assert!(follow_up.extinguished);
+    }
+
+    #[test]
+    fn spread_falls_off_quadratically() {
+        assert_eq!(distance_spread_factor(26.0, 26.0), 0.0);
+        assert!(distance_spread_factor(4.0, 26.0) > distance_spread_factor(18.0, 26.0));
+    }
+}

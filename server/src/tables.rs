@@ -416,7 +416,7 @@ pub struct DeliveryTrip {
     pub owner: Identity,
     pub building_id: u64,
     pub residence_id: u64,
-    /// 0 = residence delivery, 1 = building supply (see `target_building_id`)
+    /// 0 = residence delivery, 1 = building supply, 2 = emergency fire response.
     pub destination_kind: u8,
     /// Lodge or other building receiving a supply haul when `destination_kind == 1`.
     pub target_building_id: u64,
@@ -440,6 +440,42 @@ pub struct DeliveryTrip {
     pub travel_speed_multiplier: f64,
     /// JSON array of `[x, z]` polyline samples for authoritative movement.
     pub route_polyline_json: String,
+}
+
+/// A server-authoritative structural fire. Resolved fires linger briefly so the
+/// client can render steam; destroyed structures retain a ruin incident until demolition.
+#[spacetimedb::table(
+    accessor = fire_incident,
+    public,
+    index(accessor = owner, btree(columns = [owner])),
+    index(accessor = target_id, btree(columns = [target_id]))
+)]
+#[derive(Clone)]
+pub struct FireIncident {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub owner: Identity,
+    /// 0 = workplace/building, 1 = residence.
+    pub target_kind: u8,
+    pub target_id: u64,
+    pub x: f64,
+    pub z: f64,
+    /// 0 = lightning, 1 = hearth/workshop accident, 2 = spread.
+    pub ignition_source: u8,
+    /// 0 = burning, 1 = extinguished, 2 = destroyed.
+    pub state: u8,
+    pub intensity: f64,
+    pub damage: f64,
+    pub water_delivered: f64,
+    pub required_water: f64,
+    /// Probability used for the most recent bucket attempt.
+    pub extinguish_chance: f64,
+    pub started_tick: u64,
+    pub last_water_tick: u64,
+    pub resolved_tick: u64,
+    /// Well currently dispatching a responder, or zero while unclaimed.
+    pub response_well_id: u64,
 }
 
 #[spacetimedb::table(

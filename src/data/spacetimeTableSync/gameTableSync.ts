@@ -9,6 +9,7 @@ import {
 } from './syncBuildings.ts';
 import { syncBurgageZones } from './syncBurgageZones.ts';
 import { syncDeliveryTrips } from './syncDeliveryTrips.ts';
+import { syncFireIncidents } from './syncFireIncidents.ts';
 import { syncForagingNodes } from './syncForagingNodes.ts';
 import { syncFarmFields } from './syncFarmFields.ts';
 import { syncLivestockHerds, syncPastures } from './syncLivestock.ts';
@@ -71,6 +72,10 @@ export class GameTableSync {
     );
     this.state.deliveryTrips = syncDeliveryTrips(
       db.delivery_trip ? db.delivery_trip.iter() : [],
+      this.state.identityHex,
+    );
+    this.state.fireIncidents = syncFireIncidents(
+      db.fire_incident ? db.fire_incident.iter() : [],
       this.state.identityHex,
     );
     this.state.roads = syncRoadNetwork(
@@ -266,6 +271,13 @@ export class GameTableSync {
     bindTable(db.delivery_trip, () => {
       this.state.deliveryTrips = syncDeliveryTrips(
         db.delivery_trip ? db.delivery_trip.iter() : [],
+        this.state.identityHex,
+      );
+    });
+
+    bindTable(db.fire_incident, () => {
+      this.state.fireIncidents = syncFireIncidents(
+        db.fire_incident ? db.fire_incident.iter() : [],
         this.state.identityHex,
       );
     });

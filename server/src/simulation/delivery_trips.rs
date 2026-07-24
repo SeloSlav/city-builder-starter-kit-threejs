@@ -5,7 +5,8 @@ use spacetimedb::ReducerContext;
 use crate::balance_generated::CARPENTER_DELIVERY_SPEED_MULTIPLIER;
 use crate::balance_generated::{
     CONSTRUCTION_DELIVERY_SPEED_MPS, CONSTRUCTION_DELIVERY_UNLOAD_SEC,
-    CONSTRUCTION_HAUL_PER_WORKER, STOREHOUSE_HAUL_PER_WORKER,
+    CONSTRUCTION_HAUL_PER_WORKER, FIRE_BUCKET_SPEED_MPS, FIRE_BUCKET_UNLOAD_SECONDS,
+    FIRE_BUCKET_WATER, STOREHOUSE_HAUL_PER_WORKER,
 };
 use crate::constants::TICK_DT;
 use crate::db::*;
@@ -22,7 +23,10 @@ use crate::simulation::game_calendar::GameClock;
 use crate::simulation::labor_and_logistics_paused;
 use crate::simulation::residence_needs::{apply_need_delivery, ResidenceNeedKind};
 use crate::simulation::tick_context::SimTickContext;
-use crate::tables::{Building, DeliveryTrip, Residence};
+use crate::simulation::fires::{
+    apply_fire_water, release_fire_response, FIRE_TARGET_BUILDING, FIRE_TARGET_RESIDENCE,
+};
+use crate::tables::{Building, DeliveryTrip, FireIncident, Residence};
 
 pub fn serialize_route_polyline(polyline: &[[f64; 2]]) -> String {
     serde_json::to_string(polyline).unwrap_or_default()
@@ -55,6 +59,7 @@ fn cached_trip_route(
 
 pub const DELIVERY_DESTINATION_RESIDENCE: u8 = 0;
 pub const DELIVERY_DESTINATION_BUILDING: u8 = 1;
+pub const DELIVERY_DESTINATION_FIRE: u8 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeliveryTripPhase {
@@ -93,6 +98,8 @@ impl TripCargoKind {
 enum TripDestination {
     Residence { id: u64, x: f64, z: f64 },
     Building { id: u64, x: f64, z: f64 },
+    FireBuilding { id: u64, x: f64, z: f64 },
+    FireResidence { id: u64, x: f64, z: f64 },
 }
 
 impl TripDestination {
@@ -100,12 +107,17 @@ impl TripDestination {
         match self {
             Self::Residence { id, .. } => (DELIVERY_DESTINATION_RESIDENCE, id, 0),
             Self::Building { id, .. } => (DELIVERY_DESTINATION_BUILDING, 0, id),
+            Self::FireBuilding { id, .. } => (DELIVERY_DESTINATION_FIRE, 0, id),
+            Self::FireResidence { id, .. } => (DELIVERY_DESTINATION_FIRE, id, 0),
         }
     }
 
     fn end_point(self) -> (f64, f64) {
         match self {
-            Self::Residence { x, z, .. } | Self::Building { x, z, .. } => (x, z),
+            Self::Residence { x, z, .. }
+            | Self::Building { x, z, .. }
+            | Self::FireBuilding { x, z, .. }
+            | Self::FireResidence { x, z, .. } => (x, z),
         }
     }
 }
@@ -165,6 +177,7 @@ pub fn drain_trips_for_building(ctx: &ReducerContext, building_id: u64) -> Deliv
     }
     let mut totals = DeliveryCargoTotals::default();
     for trip in trips {
+        release_trip_fire_claim(ctx, &trip);
         if let Some(kind) = CommodityKind::from_u8(trip.cargo_kind) {
             totals.add_commodity(kind, trip.amount);
             if trip.building_id == building_id
@@ -201,6 +214,7 @@ pub fn cancel_trips_for_residence(ctx: &ReducerContext, residence_id: u64) {
         .filter(&residence_id)
         .collect();
     for trip in trips {
+        release_trip_fire_claim(ctx, &trip);
         return_trip_cargo_to_building(ctx, &trip);
         ctx.db.delivery_trip().id().delete(trip.id);
     }
@@ -346,6 +360,83 @@ pub fn try_start_building_supply_trip(
         |source, amount| withdraw_building_commodity(source, commodity, amount),
         |source| *origin = source.clone(),
     )
+}
+
+/// Dispatch one visible bucket carrier from a staffed well. Fire response may
+/// leave the road for the last leg, but still uses the cached authoritative route.
+pub fn try_start_fire_response_trip(
+    ctx: &ReducerContext,
+    network: &RoadNetwork,
+    well: &mut Building,
+    incident: &FireIncident,
+) -> bool {
+    if well.kind != "well"
+        || well.assigned_labor == 0
+        || well.water + 1e-6 < FIRE_BUCKET_WATER
+        || building_has_active_trip(ctx, well.id)
+    {
+        return false;
+    }
+
+    let dx = well.x - incident.x;
+    let dz = well.z - incident.z;
+    let length = (dx * dx + dz * dz).sqrt();
+    let stand_off = 4.2_f64.min(length * 0.35);
+    let (target_x, target_z) = if length > 1e-6 {
+        (
+            incident.x + dx / length * stand_off,
+            incident.z + dz / length * stand_off,
+        )
+    } else {
+        (incident.x, incident.z)
+    };
+    let route = network
+        .road_path_route(well.x, well.z, target_x, target_z)
+        .or_else(|| {
+            let distance = ((target_x - well.x).powi(2) + (target_z - well.z).powi(2)).sqrt();
+            (distance > 1e-6).then_some(RoadPathRoute {
+                distance,
+                polyline: vec![[well.x, well.z], [target_x, target_z]],
+            })
+        });
+    let Some(route) = route else {
+        return false;
+    };
+
+    let load = well.water.min(FIRE_BUCKET_WATER);
+    if load <= 1e-6 {
+        return false;
+    }
+    well.water -= load;
+    ctx.db.building().id().update(well.clone());
+    let destination = if incident.target_kind == FIRE_TARGET_RESIDENCE {
+        TripDestination::FireResidence {
+            id: incident.target_id,
+            x: target_x,
+            z: target_z,
+        }
+    } else {
+        TripDestination::FireBuilding {
+            id: incident.target_id,
+            x: target_x,
+            z: target_z,
+        }
+    };
+    insert_trip(
+        ctx,
+        network,
+        StartTripSpec {
+            origin: well.clone(),
+            destination,
+            cargo_kind: CommodityKind::Water.as_u8(),
+            delivery_workers: 1,
+            speed_mps: FIRE_BUCKET_SPEED_MPS,
+            unload_seconds: FIRE_BUCKET_UNLOAD_SECONDS,
+            load_amount: load,
+        },
+        route,
+    );
+    true
 }
 
 /// Loads reserved construction stock from any completed source and sends it to
@@ -540,7 +631,9 @@ fn step_one_trip(
     clock: &GameClock,
     mut trip: DeliveryTrip,
 ) {
-    if labor_and_logistics_paused(ctx, trip.owner, clock) {
+    if trip.destination_kind != DELIVERY_DESTINATION_FIRE
+        && labor_and_logistics_paused(ctx, trip.owner, clock)
+    {
         return;
     }
 
@@ -588,7 +681,7 @@ fn step_one_trip(
             trip.z = z;
 
             if trip.unload_remaining <= 0.0 {
-                complete_unload(ctx, &mut trip);
+                complete_unload(ctx, &mut trip, clock.sim_tick);
                 trip.phase = DeliveryTripPhase::Inbound.as_u8();
                 trip.progress = 0.0;
             }
@@ -615,6 +708,34 @@ fn trip_route(
 ) -> Option<RoadPathRoute> {
     let building = ctx.db.building().id().find(&trip.building_id)?;
     match trip.destination_kind {
+        DELIVERY_DESTINATION_FIRE => {
+            let (target_x, target_z) = if trip.target_building_id != 0 {
+                let target = ctx.db.building().id().find(&trip.target_building_id)?;
+                (target.x, target.z)
+            } else {
+                let target = ctx.db.residence().id().find(&trip.residence_id)?;
+                (target.x, target.z)
+            };
+            let dx = building.x - target_x;
+            let dz = building.z - target_z;
+            let length = (dx * dx + dz * dz).sqrt();
+            let stand_off = 4.2_f64.min(length * 0.35);
+            let (x, z) = if length > 1e-6 {
+                (
+                    target_x + dx / length * stand_off,
+                    target_z + dz / length * stand_off,
+                )
+            } else {
+                (target_x, target_z)
+            };
+            network.road_path_route(building.x, building.z, x, z).or_else(|| {
+                let distance = ((x - building.x).powi(2) + (z - building.z).powi(2)).sqrt();
+                (distance > 1e-6).then_some(RoadPathRoute {
+                    distance,
+                    polyline: vec![[building.x, building.z], [x, z]],
+                })
+            })
+        }
         DELIVERY_DESTINATION_BUILDING => {
             let target = ctx.db.building().id().find(&trip.target_building_id)?;
             network.road_path_route(building.x, building.z, target.x, target.z)
@@ -626,11 +747,20 @@ fn trip_route(
     }
 }
 
-fn complete_unload(ctx: &ReducerContext, trip: &mut DeliveryTrip) {
+fn complete_unload(ctx: &ReducerContext, trip: &mut DeliveryTrip, sim_tick: u64) {
     let Some(TripCargoKind::Commodity(commodity)) = TripCargoKind::from_trip(trip) else {
         return;
     };
-    if trip.destination_kind == DELIVERY_DESTINATION_BUILDING {
+    if trip.destination_kind == DELIVERY_DESTINATION_FIRE {
+        let (target_kind, target_id) = trip_fire_target(trip);
+        if commodity == CommodityKind::Water
+            && apply_fire_water(ctx, target_kind, target_id, trip.amount, sim_tick)
+        {
+            trip.amount = 0.0;
+        } else {
+            release_fire_response(ctx, target_kind, target_id, trip.building_id);
+        }
+    } else if trip.destination_kind == DELIVERY_DESTINATION_BUILDING {
         unload_commodity_to_building(ctx, trip, commodity);
     } else if let Some(need_kind) = ResidenceNeedKind::from_u8(trip.cargo_kind) {
         unload_need_to_residence(ctx, trip, need_kind);
@@ -729,6 +859,7 @@ fn finish_inbound_trip(ctx: &ReducerContext, trip: DeliveryTrip) {
 }
 
 fn return_trip_cargo_to_building(ctx: &ReducerContext, trip: &DeliveryTrip) {
+    release_trip_fire_claim(ctx, trip);
     if trip.amount <= 1e-6 {
         return;
     }
@@ -752,6 +883,22 @@ fn return_trip_cargo_to_building(ctx: &ReducerContext, trip: &DeliveryTrip) {
         }
         None => {}
     }
+}
+
+fn trip_fire_target(trip: &DeliveryTrip) -> (u8, u64) {
+    if trip.target_building_id != 0 {
+        (FIRE_TARGET_BUILDING, trip.target_building_id)
+    } else {
+        (FIRE_TARGET_RESIDENCE, trip.residence_id)
+    }
+}
+
+fn release_trip_fire_claim(ctx: &ReducerContext, trip: &DeliveryTrip) {
+    if trip.destination_kind != DELIVERY_DESTINATION_FIRE {
+        return;
+    }
+    let (target_kind, target_id) = trip_fire_target(trip);
+    release_fire_response(ctx, target_kind, target_id, trip.building_id);
 }
 
 fn return_commodity_to_building(

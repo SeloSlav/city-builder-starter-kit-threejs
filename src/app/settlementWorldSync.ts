@@ -7,6 +7,7 @@ import type { FarmFieldMarkers } from '../farming/FarmFieldMarkers.ts';
 import type { PastureMarkers } from '../farming/PastureMarkers.ts';
 import type { LivestockVisuals } from '../farming/LivestockVisuals.ts';
 import type { GameState } from '../resources/types.ts';
+import type { FireEffectsRenderer } from '../fires/FireEffectsRenderer.ts';
 import type { TreeRegistry } from '../resources/TreeRegistry.ts';
 import type { CrowdViewState } from '../settlement/crowdView.ts';
 import { gameClock } from '../world/gameCalendar.ts';
@@ -18,6 +19,7 @@ export type SettlementWorldSyncTargets = {
   livestockVisuals: LivestockVisuals | null;
   backyardGardenMarkers: BackyardGardenMarkers | null;
   deliveryAgents: DeliveryAgentRenderer | null;
+  fireEffects: FireEffectsRenderer | null;
   villagers: VillagerRenderer | null;
   getHeightAt: (x: number, z: number) => number;
   getRoadNetwork: () => RoadNetwork | null;
@@ -57,6 +59,10 @@ export function syncSettlementWorld(
   const deliveryTripsChanged = !previous || !mapEntriesShareValues(
     state.deliveryTrips,
     previous.deliveryTrips,
+  );
+  const fireIncidentsChanged = !previous || !mapEntriesShareValues(
+    state.fireIncidents,
+    previous.fireIncidents,
   );
   const workerBuildingsChanged = !previous || !mapEntriesMatch(
     state.buildings,
@@ -152,11 +158,19 @@ export function syncSettlementWorld(
   if (deliveryTripsChanged) {
     targets.deliveryAgents?.syncTrips(state.deliveryTrips.values());
     targets.deliveryAgents?.applyTripStates(state.deliveryTrips.values());
+    targets.fireEffects?.syncTrips(state.deliveryTrips.values());
+  }
+  if (fireIncidentsChanged || residencesChanged || workerBuildingsChanged) {
+    targets.fireEffects?.syncIncidents(
+      state.fireIncidents.values(),
+      state.buildings,
+      state.residences,
+    );
   }
 }
 
 export function tickSettlementWorld(
-  targets: Pick<SettlementWorldSyncTargets, 'residenceMarkers' | 'backyardGardenMarkers' | 'livestockVisuals' | 'deliveryAgents' | 'villagers'>,
+  targets: Pick<SettlementWorldSyncTargets, 'residenceMarkers' | 'backyardGardenMarkers' | 'livestockVisuals' | 'deliveryAgents' | 'fireEffects' | 'villagers'>,
   dt: number,
   view?: CrowdViewState,
   gameState?: Pick<GameState, 'deliveryTrips'>,
@@ -168,6 +182,7 @@ export function tickSettlementWorld(
   targets.backyardGardenMarkers?.tick(dt, view);
   targets.livestockVisuals?.tick(dt, view);
   targets.deliveryAgents?.update(dt, view);
+  targets.fireEffects?.tick(dt);
   targets.villagers?.tick(dt, view);
 }
 
@@ -180,6 +195,7 @@ export function disposeSettlementWorld(
   targets.livestockVisuals?.dispose();
   targets.backyardGardenMarkers?.dispose();
   targets.deliveryAgents?.dispose();
+  targets.fireEffects?.dispose();
   targets.villagers?.dispose();
 }
 

@@ -19,6 +19,7 @@ import type { RegionalMarketState } from '../economy/regionalMarket.ts';
 import { DEFAULT_REGIONAL_MARKET_STATE } from '../economy/regionalMarket.ts';
 import type { BackyardGardenKind } from '../residences/backyardGarden.ts';
 import { backyardIconPosition } from '../residences/backyardPosition.ts';
+import { fireForTarget, fireSourceLabel } from '../fires/fireIncident.ts';
 
 type ResourceInspectorOptions = {
   domElement: HTMLElement;
@@ -520,6 +521,35 @@ export class ResourceInspector {
       getTradeAvailability: () => computeTradeAvailability(this.options.getState()),
       getMarketState: () => this.options.getMarketState?.() ?? DEFAULT_REGIONAL_MARKET_STATE,
     });
+    const fire = target.kind === 'building'
+      ? fireForTarget(gameState.fireIncidents.values(), 'building', target.building.id)
+      : target.kind === 'residence'
+        ? fireForTarget(gameState.fireIncidents.values(), 'residence', target.residence.id)
+        : null;
+    if (fire) {
+      const response = fire.responseWellId
+        ? 'A staffed well has dispatched a bucket carrier'
+        : 'No staffed well currently has this fire inside its work extent';
+      view.detailsHtml = `
+        <li><span>Fire cause</span><strong>${fireSourceLabel(fire.ignitionSource)}</strong></li>
+        <li><span>Fire intensity</span><strong>${Math.round(fire.intensity * 100)}%</strong></li>
+        <li><span>Structural damage</span><strong>${Math.round(fire.damage * 100)}%</strong></li>
+        <li><span>Water delivered</span><strong>${fire.waterDelivered.toFixed(1)} / ${fire.requiredWater.toFixed(1)}</strong></li>
+        <li><span>Response</span><strong>${response}</strong></li>
+        ${fire.extinguishChance > 0
+          ? `<li><span>Last attempt odds</span><strong>${Math.round(fire.extinguishChance * 100)}%</strong></li>`
+          : ''}
+        ${view.detailsHtml}
+      `;
+      view.statusText = fire.status === 'burning'
+        ? 'Burning — production and household activity are suspended until the fire is out.'
+        : fire.status === 'destroyed'
+          ? 'Destroyed by fire — demolish the ruin before rebuilding.'
+          : 'Extinguished — cooling steam remains briefly.';
+      view.statusState = fire.status === 'burning' || fire.status === 'destroyed'
+        ? 'warning'
+        : 'warning';
+    }
 
     this.eyebrow.textContent = view.eyebrow;
     this.title.textContent = view.title;

@@ -3,10 +3,12 @@ import type { DeliveryTripState, DeliveryTripPhase } from '../logistics/delivery
 import { decodeRoutePolyline } from '../logistics/routePolyline.ts';
 import {
   createDeliveryCartMesh,
+  createFireBucketCarrierMesh,
   deliveryCartMeshName,
   disposeDeliveryCartMesh,
   disposeDeliveryCartModelSource,
   loadDeliveryCartModelSource,
+  fireBucketCarrierMeshName,
   type DeliveryCartModelSource,
 } from '../logistics/deliveryCartMesh.ts';
 import {
@@ -218,7 +220,9 @@ export class DeliveryAgentRenderer {
   }
 
   private ensureCartMesh(visual: TripVisual, trip: DeliveryTripState): void {
-    const desiredName = deliveryCartMeshName(trip.cargoKind, this.cartSource != null);
+    const desiredName = trip.destinationKind === 'fire'
+      ? fireBucketCarrierMeshName()
+      : deliveryCartMeshName(trip.cargoKind, this.cartSource != null);
     if (visual.mesh.name === desiredName) return;
     const replacement = this.createCartMesh(trip);
     replacement.position.copy(visual.mesh.position);
@@ -246,6 +250,9 @@ export class DeliveryAgentRenderer {
   }
 
   private createCartMesh(trip: DeliveryTripState): THREE.Group {
+    if (trip.destinationKind === 'fire') {
+      return createFireBucketCarrierMesh();
+    }
     return createDeliveryCartMesh(trip.cargoKind, {
       appearanceSeed: hashStringSeed(`delivery-cart:${trip.id}`),
       source: this.cartSource,

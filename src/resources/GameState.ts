@@ -56,6 +56,7 @@ export function createInitialGameState(registry: WorldLayoutRegistry, seed: numb
     residences: new Map(),
     backyardGardens: new Map(),
     deliveryTrips: new Map(),
+    fireIncidents: new Map(),
     nextBuildingId: 1,
   };
 }

@@ -15,6 +15,18 @@ const WHEEL_MATERIAL = new THREE.MeshStandardMaterial({
   roughness: 0.9,
   metalness: 0,
 });
+const FIRE_BUCKET_MATERIAL = new THREE.MeshStandardMaterial({
+  color: 0x6f7476,
+  roughness: 0.72,
+  metalness: 0.36,
+});
+const FIRE_BUCKET_WATER_MATERIAL = new THREE.MeshStandardMaterial({
+  color: 0x4e91bd,
+  roughness: 0.25,
+  metalness: 0,
+  transparent: true,
+  opacity: 0.82,
+});
 
 const CARGO_MATERIALS = {
   rope: createCargoMaterial('Cargo rope', 0x8b7048, 0.98),
@@ -625,6 +637,59 @@ export function deliveryCartMeshName(
   hasModelSource: boolean,
 ): string {
   return `DeliveryCart:${kind}:${hasModelSource ? 'quaternius' : 'fallback'}`;
+}
+
+export function fireBucketCarrierMeshName(): string {
+  return 'DeliveryFireBucketCarrier';
+}
+
+export function createFireBucketCarrierMesh(): THREE.Group {
+  const group = new THREE.Group();
+  group.name = fireBucketCarrierMeshName();
+  group.userData.deliveryCartAsset = 'fire-bucket-carrier';
+
+  for (const x of [-0.264, 0.264]) {
+    addNamedMesh(
+      group,
+      'Fire bucket hand rail',
+      new THREE.BoxGeometry(0.055, 0.055, 1.18),
+      timberMaterial('dark'),
+      new THREE.Vector3(x, 0.68, 0.66),
+    );
+  }
+  addNamedMesh(
+    group,
+    'Fire bucket carrier crossbar',
+    new THREE.BoxGeometry(0.68, 0.08, 0.08),
+    timberMaterial('mid'),
+    new THREE.Vector3(0, 0.57, 0.16),
+  );
+
+  for (const x of [-0.2, 0.2]) {
+    addNamedMesh(
+      group,
+      'Filled firefighting bucket',
+      new THREE.CylinderGeometry(0.18, 0.145, 0.42, 12, 1, true),
+      FIRE_BUCKET_MATERIAL,
+      new THREE.Vector3(x, 0.36, 0.08),
+    );
+    addNamedMesh(
+      group,
+      'Firefighting bucket water',
+      new THREE.CircleGeometry(0.158, 12),
+      FIRE_BUCKET_WATER_MATERIAL,
+      new THREE.Vector3(x, 0.575, 0.08),
+      new THREE.Euler(-Math.PI * 0.5, 0, 0),
+    );
+    addNamedMesh(
+      group,
+      'Firefighting bucket bail',
+      new THREE.TorusGeometry(0.18, 0.018, 5, 14, Math.PI),
+      metalMaterial(),
+      new THREE.Vector3(x, 0.57, 0.08),
+    );
+  }
+  return group;
 }
 
 export function createDeliveryCartMesh(

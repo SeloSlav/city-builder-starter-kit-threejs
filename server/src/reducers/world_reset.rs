@@ -3,7 +3,7 @@ use spacetimedb::{reducer, Identity, ReducerContext};
 use crate::db::*;
 use crate::tables::{
     farm_field, livestock_herd, pasture, BackyardGarden, Building, BurgageZone, DeliveryTrip,
-    FarmField, LivestockHerd, Pasture, ResidenceNeed, WorldConfig,
+    FarmField, FireIncident, LivestockHerd, Pasture, ResidenceNeed, WorldConfig,
 };
 use crate::world_entities::clear_global_world_entities;
 
@@ -49,6 +49,15 @@ fn clear_owner_settlement(ctx: &ReducerContext, owner: Identity) {
             continue;
         }
         ctx.db.delivery_trip().id().delete(trip.id);
+    }
+    for incident in ctx
+        .db
+        .fire_incident()
+        .owner()
+        .filter(&owner)
+        .collect::<Vec<FireIncident>>()
+    {
+        ctx.db.fire_incident().id().delete(incident.id);
     }
 
     let residence_ids: Vec<u64> = ctx

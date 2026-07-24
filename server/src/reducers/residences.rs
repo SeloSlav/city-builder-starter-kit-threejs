@@ -23,7 +23,8 @@ use crate::placement_validation::{
 };
 use crate::simulation::{
     cancel_trips_for_residence, clear_backyard_garden_for_residence, clear_residence_needs,
-    ensure_residence_needs,
+    clear_fire_for_target, ensure_residence_needs, residence_fire_state,
+    FIRE_TARGET_RESIDENCE,
 };
 use crate::tables::{farm_field, BurgageZone, Residence};
 
@@ -320,7 +321,11 @@ pub fn demolish_residence(ctx: &ReducerContext, residence_id: u64) -> Result<(),
     }
 
     let zone_id = residence.zone_id;
-    let refund = residence_zone_cost(1);
+    let refund = residence_zone_cost(if residence_fire_state(ctx, residence_id).is_some() {
+        0
+    } else {
+        1
+    });
     let salvage = ResourceAmount {
         timber: (refund.timber * TIMBER_SALVAGE_FRACTION).round(),
         stone: (refund.stone * STONE_SALVAGE_FRACTION).round(),
@@ -331,6 +336,7 @@ pub fn demolish_residence(ctx: &ReducerContext, residence_id: u64) -> Result<(),
     clear_residence_needs(ctx, residence_id);
     clear_backyard_garden_for_residence(ctx, residence_id);
     cancel_trips_for_residence(ctx, residence_id);
+    clear_fire_for_target(ctx, FIRE_TARGET_RESIDENCE, residence_id);
     ctx.db.residence().id().delete(residence_id);
     reconcile_building_labor(ctx, owner);
 
@@ -356,8 +362,14 @@ pub fn demolish_burgage_zone(ctx: &ReducerContext, zone_id: u64) -> Result<(), S
         return Err("You do not own this residence zone.".to_string());
     }
 
-    let residence_count = ctx.db.residence().zone_id().filter(&zone_id).count() as u32;
-    let refund = residence_zone_cost(residence_count);
+    let intact_residence_count = ctx
+        .db
+        .residence()
+        .zone_id()
+        .filter(&zone_id)
+        .filter(|residence| residence_fire_state(ctx, residence.id).is_none())
+        .count() as u32;
+    let refund = residence_zone_cost(intact_residence_count);
     let salvage = ResourceAmount {
         timber: (refund.timber * TIMBER_SALVAGE_FRACTION).round(),
         stone: (refund.stone * STONE_SALVAGE_FRACTION).round(),
@@ -369,6 +381,7 @@ pub fn demolish_burgage_zone(ctx: &ReducerContext, zone_id: u64) -> Result<(), S
         clear_residence_needs(ctx, residence.id);
         clear_backyard_garden_for_residence(ctx, residence.id);
         cancel_trips_for_residence(ctx, residence.id);
+        clear_fire_for_target(ctx, FIRE_TARGET_RESIDENCE, residence.id);
         ctx.db.residence().id().delete(residence.id);
     }
     ctx.db.burgage_zone().id().delete(zone_id);

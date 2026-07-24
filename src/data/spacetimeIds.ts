@@ -14,6 +14,10 @@ export function tripClientId(serverId: bigint | number): string {
   return `trip-${serverId}`;
 }
 
+export function fireIncidentClientId(serverId: bigint | number): string {
+  return `fire-${serverId}`;
+}
+
 export function gardenClientId(serverId: bigint | number): string {
   return `garden-${serverId}`;
 }

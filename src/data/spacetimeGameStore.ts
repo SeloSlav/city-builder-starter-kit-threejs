@@ -45,6 +45,7 @@ import type {
 } from '../resources/types.ts';
 import { createEmptyStockpile } from '../resources/types.ts';
 import type { DeliveryTripState } from '../logistics/deliveryTrips.ts';
+import type { FireIncidentState } from '../fires/fireIncident.ts';
 import type { WorldLayout } from '../resources/WorldLayout.ts';
 import type { WorldLayoutRegistry } from '../resources/WorldLayoutRegistry.ts';
 import type { WorldGenerationSettings } from '../world/worldGenerationSettings.ts';
@@ -80,6 +81,7 @@ export type SpacetimeGameSnapshot = {
   residences: Map<string, ResidenceState>;
   backyardGardens: Map<string, BackyardGardenState>;
   deliveryTrips: Map<string, DeliveryTripState>;
+  fireIncidents: Map<string, FireIncidentState>;
   roads: RoadNetworkSnapshot | null;
   simTick: number;
   gameSpeed: GameSpeed;
@@ -110,6 +112,7 @@ function createEmptyTableState(): GameTableSyncState {
     residences: new Map(),
     backyardGardens: new Map(),
     deliveryTrips: new Map(),
+    fireIncidents: new Map(),
     roads: null,
   };
 }
@@ -167,6 +170,7 @@ export class SpacetimeGameStore {
       residences: this.snapshotMap(state.residences),
       backyardGardens: this.snapshotMap(state.backyardGardens),
       deliveryTrips: this.snapshotMap(state.deliveryTrips),
+      fireIncidents: this.snapshotMap(state.fireIncidents),
       roads: this.snapshotRoads(state.roads),
       simTick: state.simTick,
       gameSpeed: state.gameSpeed,
@@ -241,6 +245,7 @@ export class SpacetimeGameStore {
       residences: snapshot.residences,
       backyardGardens: snapshot.backyardGardens,
       deliveryTrips: snapshot.deliveryTrips,
+      fireIncidents: snapshot.fireIncidents,
       nextBuildingId: inferNextBuildingId(snapshot.buildings),
     };
   }
@@ -481,6 +486,7 @@ export class SpacetimeGameStore {
       connection.subscriptionBuilder().subscribe('SELECT * FROM backyard_garden');
       connection.subscriptionBuilder().subscribe('SELECT * FROM residence_need');
       connection.subscriptionBuilder().subscribe('SELECT * FROM delivery_trip');
+      connection.subscriptionBuilder().subscribe('SELECT * FROM fire_incident');
       connection.subscriptionBuilder().subscribe('SELECT * FROM road_network_state');
       this.tableSync.attachHandlers(connection);
       this.subscribedConnection = connection;

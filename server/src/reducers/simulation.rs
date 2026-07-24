@@ -7,6 +7,7 @@ use crate::simulation::{
     step_fresh_food_spoilage,
     step_household_market_orders, step_hunters_hall, step_lumber_mill, step_marketplace_caravans,
     step_large_quarry, step_reforester, step_residence, step_stone_quarry, step_well, step_woodcutters_lodge,
+    step_fires, building_is_disabled_by_fire, residence_is_disabled_by_fire,
     step_apiary, step_brewery, step_carpenter, step_ferry_landing,
     step_granary, step_monastery, step_smokehouse, step_threshing_barn, step_vineyard,
     step_watermill, step_pastoral_farmstead, step_swineherd,
@@ -65,6 +66,7 @@ fn run_one_sim_tick(ctx: &ReducerContext) {
 
     let tick = SimTickContext::new(ctx);
     step_delivery_trips(ctx, &tick, &clock);
+    step_fires(ctx, &clock, environment, world_seed, sim_tick);
     step_construction_sites(ctx, &tick, &clock);
     step_household_market_orders(ctx, &tick, &clock, sim_tick);
     step_marketplace_caravans(ctx, &clock, &tick);
@@ -82,7 +84,7 @@ fn run_one_sim_tick(ctx: &ReducerContext) {
     let mut expanded_ids: Vec<(crate::building_defs::BuildingSimKind, u64)> = Vec::new();
 
     for building in ctx.db.building().iter() {
-        if !building.construction_complete {
+        if !building.construction_complete || building_is_disabled_by_fire(ctx, building.id) {
             continue;
         }
         let Some(sim_kind) =
@@ -242,13 +244,21 @@ fn run_one_sim_tick(ctx: &ReducerContext) {
         .db
         .building()
         .iter()
-        .filter(|building| building.kind == "chapel" && building.construction_complete)
+        .filter(|building| {
+            building.kind == "chapel"
+                && building.construction_complete
+                && !building_is_disabled_by_fire(ctx, building.id)
+        })
         .collect();
     let monasteries: Vec<Building> = ctx
         .db
         .building()
         .iter()
-        .filter(|building| building.kind == "monastery" && building.construction_complete)
+        .filter(|building| {
+            building.kind == "monastery"
+                && building.construction_complete
+                && !building_is_disabled_by_fire(ctx, building.id)
+        })
         .collect();
 
     step_chapels(ctx, &tick, sim_tick, &clock, &chapels, &monasteries);
@@ -257,6 +267,9 @@ fn run_one_sim_tick(ctx: &ReducerContext) {
     step_chapel_parish(ctx, &tick, sim_tick, &clock, &chapels, &residences);
 
     for residence in residences {
+        if residence_is_disabled_by_fire(ctx, residence.id) {
+            continue;
+        }
         step_residence(
             ctx,
             &tick,

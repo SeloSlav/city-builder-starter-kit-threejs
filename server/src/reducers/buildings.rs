@@ -18,7 +18,9 @@ use crate::placement_validation::{
     building_site_contains_point, is_near_open_water, is_on_quarry_pit, is_open_water,
 };
 use crate::roads::load_owner_road_network;
-use crate::simulation::drain_trips_for_building;
+use crate::simulation::{
+    building_fire_state, clear_fire_for_target, drain_trips_for_building, FIRE_TARGET_BUILDING,
+};
 use crate::tables::{farm_field, livestock_herd, pasture, Building, WorldConfig};
 
 fn overlaps_same_kind_functional_extent(ctx: &ReducerContext, kind: &str, x: f64, z: f64) -> bool {
@@ -531,9 +533,16 @@ pub fn demolish_building(ctx: &ReducerContext, building_id: u64) -> Result<(), S
         return Err("Remove this livestock building's pastures first.".to_string());
     }
 
+    let fire_damaged = building_fire_state(ctx, building_id).is_some();
     let trip_cargo = drain_trips_for_building(ctx, building_id);
+    clear_fire_for_target(ctx, FIRE_TARGET_BUILDING, building_id);
 
-    let refund = if building.construction_complete {
+    let refund = if fire_damaged {
+        crate::economy::ResourceAmount {
+            timber: 0.0,
+            stone: 0.0,
+        }
+    } else if building.construction_complete {
         building_salvage_refund(&building.kind)?
     } else {
         crate::economy::ResourceAmount {
@@ -545,51 +554,56 @@ pub fn demolish_building(ctx: &ReducerContext, building_id: u64) -> Result<(), S
                 .round(),
         }
     };
+    let recoverable = if fire_damaged { 0.0 } else { 1.0 };
     credit_treasury_timber(
         ctx,
         owner,
-        refund.timber + building.timber + trip_cargo.timber,
+        refund.timber + (building.timber + trip_cargo.timber) * recoverable,
     );
-    credit_treasury_stone(ctx, owner, refund.stone + building.stone + trip_cargo.stone);
-    credit_treasury_firewood(ctx, owner, building.firewood + trip_cargo.firewood);
-    credit_treasury_water(ctx, owner, building.water + trip_cargo.water);
-    credit_treasury_food(ctx, owner, building.food + trip_cargo.food);
-    credit_treasury_gold(ctx, owner, chapel_coffer_gold(&building));
+    credit_treasury_stone(
+        ctx,
+        owner,
+        refund.stone + (building.stone + trip_cargo.stone) * recoverable,
+    );
+    credit_treasury_firewood(ctx, owner, (building.firewood + trip_cargo.firewood) * recoverable);
+    credit_treasury_water(ctx, owner, (building.water + trip_cargo.water) * recoverable);
+    credit_treasury_food(ctx, owner, (building.food + trip_cargo.food) * recoverable);
+    credit_treasury_gold(ctx, owner, chapel_coffer_gold(&building) * recoverable);
     credit_treasury_commodity(
         ctx,
         owner,
         CommodityKind::Grain,
-        building.grain + trip_cargo.grain,
+        (building.grain + trip_cargo.grain) * recoverable,
     );
     credit_treasury_commodity(
         ctx,
         owner,
         CommodityKind::Flour,
-        building.flour + trip_cargo.flour,
+        (building.flour + trip_cargo.flour) * recoverable,
     );
     credit_treasury_commodity(
         ctx,
         owner,
         CommodityKind::Ale,
-        building.ale + trip_cargo.ale,
+        (building.ale + trip_cargo.ale) * recoverable,
     );
     credit_treasury_commodity(
         ctx,
         owner,
         CommodityKind::PreservedFood,
-        building.preserved_food + trip_cargo.preserved_food,
+        (building.preserved_food + trip_cargo.preserved_food) * recoverable,
     );
     credit_treasury_commodity(
         ctx,
         owner,
         CommodityKind::Honey,
-        building.honey + trip_cargo.honey,
+        (building.honey + trip_cargo.honey) * recoverable,
     );
     credit_treasury_commodity(
         ctx,
         owner,
         CommodityKind::Wine,
-        building.wine + trip_cargo.wine,
+        (building.wine + trip_cargo.wine) * recoverable,
     );
 
     if ctx

@@ -28,6 +28,7 @@ import { SceneManager } from '../scene/SceneManager.ts';
 import type { WorldMapUiBundle } from './worldMapIcons.ts';
 import { buildBuildingWorldMapMarkers } from '../map/worldMapMarkers.ts';
 import { DeliveryAgentRenderer } from '../logistics/DeliveryAgentRenderer.ts';
+import { FireEffectsRenderer } from '../fires/FireEffectsRenderer.ts';
 import { VillagerRenderer } from '../settlement/VillagerRenderer.ts';
 import { BuildToolbar, type ToolbarStats } from '../ui/BuildToolbar.ts';
 import { ToastManager } from '../ui/ToastManager.ts';
@@ -81,6 +82,7 @@ export class App {
   private villagerInspector: VillagerInspector | null = null;
   private worldMapUi: WorldMapUiBundle | null = null;
   private deliveryAgents: DeliveryAgentRenderer | null = null;
+  private fireEffects: FireEffectsRenderer | null = null;
   private villagers: VillagerRenderer | null = null;
   private gameState: GameState | null = null;
   private layoutRegistry: WorldLayoutRegistry | null = null;
@@ -131,6 +133,7 @@ export class App {
     this.farmFieldTool = session.farmFieldTool;
     this.buildingMarkers = session.buildingMarkers;
     this.deliveryAgents = session.deliveryAgents;
+    this.fireEffects = session.fireEffects;
     this.villagers = session.villagers;
     this.residenceMarkers = session.residenceMarkers;
     this.backyardGardenMarkers = session.backyardGardenMarkers;
@@ -237,6 +240,7 @@ export class App {
         livestockVisuals: this.livestockVisuals,
         backyardGardenMarkers: this.backyardGardenMarkers,
         deliveryAgents: this.deliveryAgents,
+        fireEffects: this.fireEffects,
         villagers: this.villagers,
         getHeightAt: (x, z) => this.sceneManager?.terrain.getHeightAt(x, z) ?? 0,
         getRoadNetwork: () => this.roadNetwork,
@@ -318,6 +322,7 @@ export class App {
       livestockVisuals: this.livestockVisuals,
       backyardGardenMarkers: this.backyardGardenMarkers,
       deliveryAgents: this.deliveryAgents,
+      fireEffects: this.fireEffects,
       villagers: this.villagers,
       getHeightAt: () => 0,
       getRoadNetwork: () => null,
@@ -396,6 +401,7 @@ export class App {
         backyardGardenMarkers: this.backyardGardenMarkers,
         livestockVisuals: this.livestockVisuals,
         deliveryAgents: this.deliveryAgents,
+        fireEffects: this.fireEffects,
         villagers: this.villagers,
       },
       dt,
@@ -546,6 +552,7 @@ export class App {
       state,
       previous,
     );
+    this.notifyFireChanges(state, previous);
 
     this.applyShowcaseView(state);
 
@@ -560,6 +567,10 @@ export class App {
         snapshot.worldGeneration?.hydrology ?? 50,
         gameClock(snapshot.simTick),
       ),
+    );
+    this.toolbar?.settlementHud.setFireState(
+      state.fireIncidents.values(),
+      state.deliveryTrips.values(),
     );
     this.settlementPresentation.sync(
       {
@@ -578,6 +589,32 @@ export class App {
   private syncForestClearance(): void {
     if (!this.gameState || !this.snapshotApplierDeps) return;
     this.spacetimeSnapshotApplier.syncForestClearance(this.snapshotApplierDeps, this.gameState);
+  }
+
+  private notifyFireChanges(state: GameState, previous: GameState | null): void {
+    if (!previous) return;
+    for (const incident of state.fireIncidents.values()) {
+      const prior = previous.fireIncidents.get(incident.id);
+      if (!prior && incident.status === 'burning') {
+        this.toastManager?.show(
+          'Structure fire reported. A staffed well can respond if the fire lies inside its work extent.',
+          { variant: 'error', durationMs: 7000 },
+        );
+        continue;
+      }
+      if (!prior || prior.status === incident.status) continue;
+      if (incident.status === 'extinguished') {
+        this.toastManager?.show(
+          `Fire extinguished after ${incident.waterDelivered.toFixed(1)} water. Damage: ${Math.round(incident.damage * 100)}%.`,
+          { variant: 'info', durationMs: 5200 },
+        );
+      } else if (incident.status === 'destroyed') {
+        this.toastManager?.show(
+          'A structure has been destroyed by fire. Its labor and stored goods were lost.',
+          { variant: 'error', durationMs: 7000 },
+        );
+      }
+    }
   }
 
   private applyShowcaseView(state: GameState): void {
@@ -702,5 +739,6 @@ function resourceUiNeedsSync(current: GameState, previous: GameState | null): bo
     || current.burgageZones !== previous.burgageZones
     || current.residences !== previous.residences
     || current.backyardGardens !== previous.backyardGardens
-    || current.deliveryTrips !== previous.deliveryTrips;
+    || current.deliveryTrips !== previous.deliveryTrips
+    || current.fireIncidents !== previous.fireIncidents;
 }

@@ -46,6 +46,41 @@
   cursor: help;
 }
 
+.settlement-hud__fire-alert {
+  display: grid;
+  gap: 1px;
+  margin-top: 4px;
+  padding: 6px 7px;
+  border: 1px solid rgba(236, 92, 49, 0.68);
+  border-radius: 6px;
+  color: #ffd4b0;
+  background: rgba(118, 25, 12, 0.42);
+  cursor: help;
+  animation: fire-alert-pulse 1.35s ease-in-out infinite;
+}
+
+.settlement-hud__fire-alert[hidden] {
+  display: none;
+}
+
+.settlement-hud__fire-alert strong {
+  font-size: 10px;
+  letter-spacing: 0.035em;
+}
+
+.settlement-hud__fire-alert span {
+  color: #e8a67e;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+@keyframes fire-alert-pulse {
+  50% {
+    border-color: rgba(255, 184, 86, 0.92);
+    box-shadow: 0 0 12px rgba(231, 72, 27, 0.24);
+  }
+}
+
 .settlement-hud__speed {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

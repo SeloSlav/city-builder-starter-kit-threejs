@@ -75,6 +75,7 @@ import BuildingRow from "./building_table";
 import BurgageZoneRow from "./burgage_zone_table";
 import DeliveryTripRow from "./delivery_trip_table";
 import FarmFieldRow from "./farm_field_table";
+import FireIncidentRow from "./fire_incident_table";
 import ForagingNodeRow from "./foraging_node_table";
 import LivestockHerdRow from "./livestock_herd_table";
 import MarketStateRow from "./market_state_table";
@@ -177,6 +178,23 @@ const tablesSchema = __schema({
       { name: 'farm_field_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, FarmFieldRow),
+  fire_incident: __table({
+    name: 'fire_incident',
+    indexes: [
+      { name: 'id', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { name: 'owner', algorithm: 'btree', columns: [
+        'owner',
+      ] },
+      { name: 'target_id', algorithm: 'btree', columns: [
+        'targetId',
+      ] },
+    ],
+    constraints: [
+      { name: 'fire_incident_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FireIncidentRow),
   foraging_node: __table({
     name: 'foraging_node',
     indexes: [

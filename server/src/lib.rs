@@ -8,6 +8,7 @@ mod constants;
 mod economy;
 mod farming;
 mod foraging_policy;
+mod fire_policy;
 mod hydrology;
 mod hydrology_grid_generated;
 mod placement_validation;

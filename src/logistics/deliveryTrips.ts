@@ -23,7 +23,7 @@ export const DELIVERY_CARGO_KINDS = [
 ] as const;
 export type DeliveryCargoKind = (typeof DELIVERY_CARGO_KINDS)[number];
 
-export const DELIVERY_DESTINATION_KINDS = ['residence', 'building'] as const;
+export const DELIVERY_DESTINATION_KINDS = ['residence', 'building', 'fire'] as const;
 export type DeliveryDestinationKind = (typeof DELIVERY_DESTINATION_KINDS)[number];
 
 export type DeliveryTripState = {
@@ -88,6 +88,8 @@ export function destinationKindFromId(value: number): DeliveryDestinationKind | 
       return 'residence';
     case 1:
       return 'building';
+    case 2:
+      return 'fire';
     default:
       return null;
   }
@@ -149,6 +151,18 @@ export function resolveTripEndpoints(
     return { origin, destinationX: target.x, destinationZ: target.z };
   }
 
+  if (trip.destinationKind === 'fire') {
+    if (trip.targetBuildingId) {
+      const target = state.buildings.get(trip.targetBuildingId);
+      if (target) return { origin, destinationX: target.x, destinationZ: target.z };
+    }
+    if (trip.residenceId) {
+      const target = state.residences.get(trip.residenceId);
+      if (target) return { origin, destinationX: target.x, destinationZ: target.z };
+    }
+    return null;
+  }
+
   if (!trip.residenceId) return null;
   const residence = state.residences.get(trip.residenceId);
   if (!residence) return null;
@@ -198,7 +212,7 @@ export function formatTripDestinationLabel(
   fallback: string,
 ): string {
   if (!trip) return fallback;
-  if (trip.destinationKind === 'building') return fallback;
+  if (trip.destinationKind !== 'residence') return fallback;
   if (!trip.residenceId) return fallback;
   const residence = getResidence(trip.residenceId);
   if (!residence) return fallback;

@@ -10,6 +10,7 @@ export type TreePhase = (typeof TREE_PHASES)[number];
 import { BUILDING_KINDS, type BuildingKind } from '../generated/gameBalance.ts';
 import type { ResidenceNeedsState } from '../residences/residenceNeedState.ts';
 import type { DeliveryTripState } from '../logistics/deliveryTrips.ts';
+import type { FireIncidentState } from '../fires/fireIncident.ts';
 
 export type { BuildingKind };
 export { BUILDING_KINDS };
@@ -203,6 +204,7 @@ export type GameState = {
   residences: Map<string, ResidenceState>;
   backyardGardens: Map<string, BackyardGardenState>;
   deliveryTrips: Map<string, DeliveryTripState>;
+  fireIncidents: Map<string, FireIncidentState>;
   nextBuildingId: number;
 };
 

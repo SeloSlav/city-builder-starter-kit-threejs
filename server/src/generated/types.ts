@@ -121,6 +121,27 @@ export const FarmField = __t.object("FarmField", {
 });
 export type FarmField = __Infer<typeof FarmField>;
 
+export const FireIncident = __t.object("FireIncident", {
+  id: __t.u64(),
+  owner: __t.identity(),
+  targetKind: __t.u8(),
+  targetId: __t.u64(),
+  x: __t.f64(),
+  z: __t.f64(),
+  ignitionSource: __t.u8(),
+  state: __t.u8(),
+  intensity: __t.f64(),
+  damage: __t.f64(),
+  waterDelivered: __t.f64(),
+  requiredWater: __t.f64(),
+  extinguishChance: __t.f64(),
+  startedTick: __t.u64(),
+  lastWaterTick: __t.u64(),
+  resolvedTick: __t.u64(),
+  responseWellId: __t.u64(),
+});
+export type FireIncident = __Infer<typeof FireIncident>;
+
 export const ForagingBootstrap = __t.object("ForagingBootstrap", {
   nodeId: __t.string(),
   nodeKind: __t.string(),

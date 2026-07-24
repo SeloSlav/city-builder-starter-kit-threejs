@@ -13,6 +13,7 @@ mod household_market_orders;
 mod marketplace_caravan;
 mod food_supplier;
 mod food_spoilage;
+mod fires;
 mod foraging_respawn;
 mod lodge_logistics;
 mod road_logistics;
@@ -36,6 +37,7 @@ pub use backyard_garden::{clear_backyard_garden_for_residence, step_backyard_gar
 pub use construction::step_construction_sites;
 pub use delivery_trips::{
     cancel_trips_for_residence, drain_trips_for_building, step_delivery_trips,
+    try_start_fire_response_trip,
 };
 pub use game_calendar::GameClock;
 pub use road_logistics::road_path_distance;
@@ -43,6 +45,12 @@ pub use household_market_orders::step_household_market_orders;
 pub use marketplace_caravan::{step_marketplace_caravans, try_dispatch_marketplace_caravan, MarketCaravanDispatch};
 pub use food_supplier::{step_fishing_camp, step_foragers_shed, step_hunters_hall};
 pub use food_spoilage::step_fresh_food_spoilage;
+pub use fires::{
+    building_fire_state, building_is_disabled_by_fire, clear_fire_for_target,
+    release_fire_response, reserve_fire_response, residence_fire_state,
+    residence_is_disabled_by_fire, select_fire_for_well, step_fires, FIRE_TARGET_BUILDING,
+    FIRE_TARGET_RESIDENCE,
+};
 pub use foraging_respawn::step_foraging_lifecycle;
 pub use lumber_mill::step_lumber_mill;
 pub use reforester::step_reforester;

@@ -8,6 +8,7 @@ use crate::constants::{
 };
 use crate::db::*;
 use crate::simulation::delivery_cargo::{any_target_needs_delivery, collect_claimed_delivery_targets};
+use crate::simulation::delivery_trips::building_has_active_trip;
 use crate::hydrology::sample_hydrology_score;
 use crate::roads::RoadNetwork;
 use crate::simulation::delivery_supplier::{
@@ -24,6 +25,10 @@ use crate::simulation::road_logistics::{
     claim_residences_for_wells, lodge_labor_split, owner_wells, sort_residences_for_water_delivery,
 };
 use crate::simulation::tick_context::SimTickContext;
+use crate::simulation::{
+    release_fire_response, reserve_fire_response, select_fire_for_well,
+    try_start_fire_response_trip,
+};
 use crate::tables::{Building, Residence};
 
 pub fn step_well(
@@ -34,10 +39,6 @@ pub fn step_well(
     environment: EnvironmentState,
     building: Building,
 ) {
-    if labor_and_logistics_paused(ctx, building.owner, clock) {
-        return;
-    }
-
     let Some(def) = building_def(&building.kind) else {
         return;
     };
@@ -50,8 +51,28 @@ pub fn step_well(
         return;
     };
 
-    let hydrology = sample_hydrology_score(building.x, building.z);
     let mut well = building;
+    if !building_has_active_trip(ctx, well.id) {
+        if let Some(incident) = select_fire_for_well(ctx, network, &well) {
+            if reserve_fire_response(ctx, incident.id, well.id) {
+                if try_start_fire_response_trip(ctx, network, &mut well, &incident) {
+                    return;
+                }
+                release_fire_response(
+                    ctx,
+                    incident.target_kind,
+                    incident.target_id,
+                    well.id,
+                );
+            }
+        }
+    }
+
+    if labor_and_logistics_paused(ctx, well.owner, clock) {
+        return;
+    }
+
+    let hydrology = sample_hydrology_score(well.x, well.z);
     let capacity = if well.water_capacity > 0.0 {
         well.water_capacity
     } else {
@@ -61,8 +82,17 @@ pub fn step_well(
     well.water_capacity = capacity;
     well.action_cooldown = (well.action_cooldown - TICK_DT).max(0.0);
 
-    let split = lodge_labor_split(well.assigned_labor);
-    let single_worker = well.assigned_labor == 1;
+    let workers_away = ctx
+        .db
+        .delivery_trip()
+        .building_id()
+        .filter(&well.id)
+        .next()
+        .map(|trip| trip.delivery_workers.min(well.assigned_labor))
+        .unwrap_or(0);
+    let available_labor = well.assigned_labor.saturating_sub(workers_away);
+    let split = lodge_labor_split(available_labor);
+    let single_worker = available_labor == 1;
     let refill_ready = split.processing > 0;
     let delivery_ready =
         delivery_work_ready(split.delivering, well.water > 0.0, well.id, ctx);

@@ -11,6 +11,8 @@ import {
   gameSpeedLabel,
   type GameSpeed,
 } from '../world/gameSpeed.ts';
+import type { FireIncidentState } from '../fires/fireIncident.ts';
+import type { DeliveryTripState } from '../logistics/deliveryTrips.ts';
 
 const SETTLEMENT_HUD_HTML = `
   <div class="settlement-hud" data-settlement-hud data-fps-panel aria-label="Settlement overview" aria-live="polite">
@@ -19,6 +21,10 @@ const SETTLEMENT_HUD_HTML = `
       <span class="settlement-hud__clock-time" data-clock-time>06:00</span>
       <span class="settlement-hud__clock-detail" data-clock-detail></span>
       <span class="settlement-hud__season" data-season-status></span>
+      <div class="settlement-hud__fire-alert" data-fire-alert hidden>
+        <strong data-fire-count>Fire</strong>
+        <span data-fire-response>Awaiting a staffed well</span>
+      </div>
       <div class="settlement-hud__speed" role="group" aria-label="Simulation speed">
         ${GAME_SPEEDS.map((speed) => `
           <button
@@ -127,6 +133,9 @@ export class SettlementHud {
   private readonly clockTime: HTMLElement;
   private readonly clockDetail: HTMLElement;
   private readonly seasonStatus: HTMLElement;
+  private readonly fireAlert: HTMLElement;
+  private readonly fireCount: HTMLElement;
+  private readonly fireResponse: HTMLElement;
   private readonly speedButtons: HTMLButtonElement[];
   private readonly fpsValue: HTMLElement;
   private readonly zoomValue: HTMLElement;
@@ -146,6 +155,9 @@ export class SettlementHud {
     this.clockTime = this.mustElement('[data-clock-time]');
     this.clockDetail = this.mustElement('[data-clock-detail]');
     this.seasonStatus = this.mustElement('[data-season-status]');
+    this.fireAlert = this.mustElement('[data-fire-alert]');
+    this.fireCount = this.mustElement('[data-fire-count]');
+    this.fireResponse = this.mustElement('[data-fire-response]');
     this.speedButtons = [...this.panel.querySelectorAll<HTMLButtonElement>('[data-game-speed]')];
     for (const button of this.speedButtons) {
       button.addEventListener('click', () => {
@@ -177,6 +189,38 @@ export class SettlementHud {
     for (const button of this.speedButtons) {
       button.disabled = !enabled;
     }
+  }
+
+  setFireState(
+    incidents: Iterable<FireIncidentState>,
+    trips: Iterable<DeliveryTripState>,
+  ): void {
+    const burning = [...incidents].filter((incident) => incident.status === 'burning');
+    this.fireAlert.hidden = burning.length === 0;
+    this.panel.classList.toggle('has-fire', burning.length > 0);
+    if (burning.length === 0) return;
+
+    const responders = [...trips].filter((trip) =>
+      trip.destinationKind === 'fire' && trip.phase !== 'inbound').length;
+    const worst = burning.reduce((current, incident) =>
+      incident.damage + incident.intensity > current.damage + current.intensity
+        ? incident
+        : current);
+    this.fireCount.textContent = burning.length === 1
+      ? '🔥 Structure fire'
+      : `🔥 ${burning.length} structure fires`;
+    this.fireResponse.textContent = responders > 0
+      ? `${responders} bucket ${responders === 1 ? 'carrier' : 'carriers'} responding`
+      : 'No bucket carrier in transit';
+    this.fireAlert.dataset.tooltip = [
+      `Worst fire: ${Math.round(worst.intensity * 100)}% intensity`,
+      `${Math.round(worst.damage * 100)}% damage`,
+      `${worst.waterDelivered.toFixed(1)} / ${worst.requiredWater.toFixed(1)} water delivered`,
+      worst.extinguishChance > 0
+        ? `${Math.round(worst.extinguishChance * 100)}% chance on the last bucket attempt`
+        : 'Extinguishing odds improve as buckets cool the fire',
+      'Only staffed wells whose work extent reaches the fire can respond.',
+    ].join(' · ');
   }
 
   setSettlementClock(schedule: SettlementSchedule): void {

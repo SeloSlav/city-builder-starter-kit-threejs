@@ -17,6 +17,7 @@ use crate::simulation::landmark_access::residence_has_marketplace_access;
 use crate::simulation::marketplace_caravan::MarketCaravanDispatch;
 use crate::simulation::residence_needs::{load_needs, need_stock, ResidenceNeedKind};
 use crate::simulation::road_logistics::{residence_food_runway_seconds, residence_water_runway_seconds};
+use crate::simulation::residence_is_disabled_by_fire;
 use crate::simulation::tick_context::SimTickContext;
 use crate::tables::Building;
 
@@ -57,7 +58,10 @@ pub fn step_household_market_orders(
             .collect();
 
         for residence in ctx.db.residence().owner().filter(&owner) {
-            if residence.abandoned || residence.population == 0 {
+            if residence.abandoned
+                || residence.population == 0
+                || residence_is_disabled_by_fire(ctx, residence.id)
+            {
                 continue;
             }
             if !residence_has_marketplace_access(tick, owner, &residence, &owner_marketplaces) {

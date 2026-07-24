@@ -145,6 +145,26 @@ export type GameBalance = {
     freshFoodSpoilageWinterPerDay: number;
     freshFoodSpoilageDroughtPerDay: number;
   };
+  fires: {
+    lightningIgnitionChancePerRainDay: number;
+    accidentIgnitionChancePerStructureDay: number;
+    droughtRiskMultiplier: number;
+    rainRiskMultiplier: number;
+    spreadRadius: number;
+    spreadChancePerSecond: number;
+    initialIntensity: number;
+    intensityGrowthPerSecond: number;
+    rainIntensityDampingPerSecond: number;
+    damagePerIntensitySecond: number;
+    bucketWater: number;
+    bucketSpeedMps: number;
+    bucketUnloadSeconds: number;
+    intensityReductionPerWater: number;
+    extinguishIntensityThreshold: number;
+    extinguishChanceBase: number;
+    extinguishChancePerWater: number;
+    resolvedRetentionSeconds: number;
+  };
   economy: {
     startingTimber: number;
     startingStone: number;
@@ -436,6 +456,25 @@ function generateRust(): string {
     `pub const FRESH_FOOD_SPOILAGE_AUTUMN_PER_DAY: f64 = ${rustF64(b.seasons.freshFoodSpoilageAutumnPerDay)};`,
     `pub const FRESH_FOOD_SPOILAGE_WINTER_PER_DAY: f64 = ${rustF64(b.seasons.freshFoodSpoilageWinterPerDay)};`,
     `pub const FRESH_FOOD_SPOILAGE_DROUGHT_PER_DAY: f64 = ${rustF64(b.seasons.freshFoodSpoilageDroughtPerDay)};`,
+    '',
+    `pub const FIRE_LIGHTNING_IGNITION_CHANCE_PER_RAIN_DAY: f64 = ${rustF64(b.fires.lightningIgnitionChancePerRainDay)};`,
+    `pub const FIRE_ACCIDENT_IGNITION_CHANCE_PER_STRUCTURE_DAY: f64 = ${rustF64(b.fires.accidentIgnitionChancePerStructureDay)};`,
+    `pub const FIRE_DROUGHT_RISK_MULTIPLIER: f64 = ${rustF64(b.fires.droughtRiskMultiplier)};`,
+    `pub const FIRE_RAIN_RISK_MULTIPLIER: f64 = ${rustF64(b.fires.rainRiskMultiplier)};`,
+    `pub const FIRE_SPREAD_RADIUS: f64 = ${rustF64(b.fires.spreadRadius)};`,
+    `pub const FIRE_SPREAD_CHANCE_PER_SECOND: f64 = ${rustF64(b.fires.spreadChancePerSecond)};`,
+    `pub const FIRE_INITIAL_INTENSITY: f64 = ${rustF64(b.fires.initialIntensity)};`,
+    `pub const FIRE_INTENSITY_GROWTH_PER_SECOND: f64 = ${rustF64(b.fires.intensityGrowthPerSecond)};`,
+    `pub const FIRE_RAIN_INTENSITY_DAMPING_PER_SECOND: f64 = ${rustF64(b.fires.rainIntensityDampingPerSecond)};`,
+    `pub const FIRE_DAMAGE_PER_INTENSITY_SECOND: f64 = ${rustF64(b.fires.damagePerIntensitySecond)};`,
+    `pub const FIRE_BUCKET_WATER: f64 = ${rustF64(b.fires.bucketWater)};`,
+    `pub const FIRE_BUCKET_SPEED_MPS: f64 = ${rustF64(b.fires.bucketSpeedMps)};`,
+    `pub const FIRE_BUCKET_UNLOAD_SECONDS: f64 = ${rustF64(b.fires.bucketUnloadSeconds)};`,
+    `pub const FIRE_INTENSITY_REDUCTION_PER_WATER: f64 = ${rustF64(b.fires.intensityReductionPerWater)};`,
+    `pub const FIRE_EXTINGUISH_INTENSITY_THRESHOLD: f64 = ${rustF64(b.fires.extinguishIntensityThreshold)};`,
+    `pub const FIRE_EXTINGUISH_CHANCE_BASE: f64 = ${rustF64(b.fires.extinguishChanceBase)};`,
+    `pub const FIRE_EXTINGUISH_CHANCE_PER_WATER: f64 = ${rustF64(b.fires.extinguishChancePerWater)};`,
+    `pub const FIRE_RESOLVED_RETENTION_SECONDS: f64 = ${rustF64(b.fires.resolvedRetentionSeconds)};`,
     '',
     `pub const STARTING_TIMBER: f64 = ${rustF64(b.economy.startingTimber)};`,
     `pub const STARTING_STONE: f64 = ${rustF64(b.economy.startingStone)};`,
@@ -899,6 +938,25 @@ function generateTypeScript(): string {
     `export const FRESH_FOOD_SPOILAGE_AUTUMN_PER_DAY = ${b.seasons.freshFoodSpoilageAutumnPerDay};`,
     `export const FRESH_FOOD_SPOILAGE_WINTER_PER_DAY = ${b.seasons.freshFoodSpoilageWinterPerDay};`,
     `export const FRESH_FOOD_SPOILAGE_DROUGHT_PER_DAY = ${b.seasons.freshFoodSpoilageDroughtPerDay};`,
+    '',
+    `export const FIRE_LIGHTNING_IGNITION_CHANCE_PER_RAIN_DAY = ${b.fires.lightningIgnitionChancePerRainDay};`,
+    `export const FIRE_ACCIDENT_IGNITION_CHANCE_PER_STRUCTURE_DAY = ${b.fires.accidentIgnitionChancePerStructureDay};`,
+    `export const FIRE_DROUGHT_RISK_MULTIPLIER = ${b.fires.droughtRiskMultiplier};`,
+    `export const FIRE_RAIN_RISK_MULTIPLIER = ${b.fires.rainRiskMultiplier};`,
+    `export const FIRE_SPREAD_RADIUS = ${b.fires.spreadRadius};`,
+    `export const FIRE_SPREAD_CHANCE_PER_SECOND = ${b.fires.spreadChancePerSecond};`,
+    `export const FIRE_INITIAL_INTENSITY = ${b.fires.initialIntensity};`,
+    `export const FIRE_INTENSITY_GROWTH_PER_SECOND = ${b.fires.intensityGrowthPerSecond};`,
+    `export const FIRE_RAIN_INTENSITY_DAMPING_PER_SECOND = ${b.fires.rainIntensityDampingPerSecond};`,
+    `export const FIRE_DAMAGE_PER_INTENSITY_SECOND = ${b.fires.damagePerIntensitySecond};`,
+    `export const FIRE_BUCKET_WATER = ${b.fires.bucketWater};`,
+    `export const FIRE_BUCKET_SPEED_MPS = ${b.fires.bucketSpeedMps};`,
+    `export const FIRE_BUCKET_UNLOAD_SECONDS = ${b.fires.bucketUnloadSeconds};`,
+    `export const FIRE_INTENSITY_REDUCTION_PER_WATER = ${b.fires.intensityReductionPerWater};`,
+    `export const FIRE_EXTINGUISH_INTENSITY_THRESHOLD = ${b.fires.extinguishIntensityThreshold};`,
+    `export const FIRE_EXTINGUISH_CHANCE_BASE = ${b.fires.extinguishChanceBase};`,
+    `export const FIRE_EXTINGUISH_CHANCE_PER_WATER = ${b.fires.extinguishChancePerWater};`,
+    `export const FIRE_RESOLVED_RETENTION_SECONDS = ${b.fires.resolvedRetentionSeconds};`,
     '',
     `export const STARTING_TIMBER = ${b.economy.startingTimber};`,
     `export const STARTING_STONE = ${b.economy.startingStone};`,

@@ -45,6 +45,7 @@ import { createInspectorSpacetimeActions } from './inspectorSpacetimeActions.ts'
 import { createWorldMapUi, resolveWorldMapFocus, type WorldMapUiBundle } from './worldMapIcons.ts';
 import { buildBuildingWorldMapMarkers } from '../map/worldMapMarkers.ts';
 import { DeliveryAgentRenderer } from '../logistics/DeliveryAgentRenderer.ts';
+import { FireEffectsRenderer } from '../fires/FireEffectsRenderer.ts';
 import { VillagerRenderer } from '../settlement/VillagerRenderer.ts';
 import { beginStartupTextureLoad } from '../scene/startupTextures.ts';
 import { sampleNaturalTerrainHeight } from '../terrain/TerrainHeight.ts';
@@ -97,6 +98,7 @@ export type BootstrappedSession = {
   farmFieldTool: FarmFieldTool;
   buildingMarkers: BuildingMarkers;
   deliveryAgents: DeliveryAgentRenderer;
+  fireEffects: FireEffectsRenderer;
   villagers: VillagerRenderer;
   residenceMarkers: ResidenceMarkers;
   backyardGardenMarkers: BackyardGardenMarkers;
@@ -231,6 +233,10 @@ export async function bootstrapAppSession(
     terrain: sceneManager.terrain,
     parent: sceneManager.selectionGroup,
   });
+  const fireEffects = new FireEffectsRenderer(
+    sceneManager.terrain,
+    sceneManager.selectionGroup,
+  );
   const villagers = new VillagerRenderer({
     parent: sceneManager.selectionGroup,
     getHeightAt: (x, z) => sceneManager.terrain.getHeightAt(x, z),
@@ -778,6 +784,7 @@ export async function bootstrapAppSession(
     farmFieldTool,
     buildingMarkers,
     deliveryAgents,
+    fireEffects,
     villagers,
     residenceMarkers,
     backyardGardenMarkers,
