@@ -5,6 +5,7 @@ import type { EnvironmentState } from '../src/world/seasonPolicy.ts';
 import {
   precipitationPreviewEnvironment,
   precipitationProfile,
+  standalonePrecipitationPreview,
 } from '../src/weather/precipitationPolicy.ts';
 
 function environment(weather: EnvironmentState['weather']): EnvironmentState {
@@ -37,6 +38,8 @@ assert.ok(drought.sunlightMultiplier > 1);
 assert.equal(precipitationPreviewEnvironment(environment('fair'), '?weather=rain').weather, 'rain');
 assert.equal(precipitationPreviewEnvironment(environment('fair'), '?weather=snow').weather, 'frost');
 assert.equal(precipitationPreviewEnvironment(environment('rain'), '?weather=clear').weather, 'fair');
+assert.equal(standalonePrecipitationPreview('?weather=snow')?.season, 'winter');
+assert.equal(standalonePrecipitationPreview('?weather=clear'), null);
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const rendererSource = readFileSync(
@@ -49,7 +52,7 @@ const appSource = readFileSync(`${projectRoot}src/app/App.ts`, 'utf8');
 assert.match(rendererSource, /Two identical vertical tiles prevent a visible empty band/);
 assert.match(rendererSource, /depthWrite:\s*false/);
 assert.match(rendererSource, /depthTest:\s*true/);
-assert.match(rendererSource, /points\.frustumCulled\s*=\s*false/);
+assert.match(rendererSource, /mesh\.frustumCulled\s*=\s*false/);
 assert.doesNotMatch(
   rendererSource,
   /position\.needsUpdate/,

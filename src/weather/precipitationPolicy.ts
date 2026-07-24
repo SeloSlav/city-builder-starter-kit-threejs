@@ -87,3 +87,17 @@ export function precipitationPreviewEnvironment(
   if (requested === 'clear') return { ...environment, weather: 'fair' };
   return environment;
 }
+
+export function standalonePrecipitationPreview(
+  search: string,
+): EnvironmentState | null {
+  const requested = new URLSearchParams(search).get('weather');
+  if (requested !== 'rain' && requested !== 'snow') return null;
+  return precipitationPreviewEnvironment({
+    season: 'spring',
+    weather: 'fair',
+    cropGrowthMultiplier: 1,
+    firewoodDemandMultiplier: 1,
+    pastureCapacityMultiplier: 1,
+  }, search);
+}

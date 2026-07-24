@@ -39,7 +39,10 @@ import { bootstrapAppSession, type BootstrappedSession, type SessionLiveContext 
 import { WorldGenerationMismatchError } from '../world/worldConfigAuthority.ts';
 import { gameClock } from '../world/gameCalendar.ts';
 import { environmentFor } from '../world/seasonPolicy.ts';
-import { precipitationPreviewEnvironment } from '../weather/precipitationPolicy.ts';
+import {
+  precipitationPreviewEnvironment,
+  standalonePrecipitationPreview,
+} from '../weather/precipitationPolicy.ts';
 import { SessionConnectionGate } from '../network/SessionConnectionGate.ts';
 import { SessionConnectionOverlay } from '../ui/SessionConnectionOverlay.ts';
 import {
@@ -121,6 +124,10 @@ export class App {
 
     this.liveContext = session.liveContext;
     this.sceneManager = session.sceneManager;
+    if (import.meta.env.DEV) {
+      const weatherPreview = standalonePrecipitationPreview(window.location.search);
+      if (weatherPreview) this.sceneManager.setEnvironment(weatherPreview);
+    }
     this.layoutRegistry = session.layoutRegistry;
     this.gameState = session.gameState;
     this.input = session.input;

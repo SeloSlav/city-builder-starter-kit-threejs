@@ -7,7 +7,7 @@ import {
 } from './precipitationPolicy.ts';
 
 type ParticleLayer = {
-  points: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
+  mesh: THREE.InstancedMesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   opacity: number;
   speedScale: number;
   radiusScale: number;
@@ -17,13 +17,14 @@ type ParticleLayer = {
 
 const VOLUME_HEIGHT = 72;
 const VOLUME_FLOOR_BELOW_CAMERA = 20;
-const RAIN_BASE_PARTICLES = 720;
-const SNOW_BASE_PARTICLES = 620;
+const BASE_VOLUME_RADIUS = 92;
+const RAIN_BASE_PARTICLES = 1_300;
+const SNOW_BASE_PARTICLES = 960;
 
 /**
  * Camera-local precipitation with a fixed particle budget.
  *
- * Static point clouds are vertically tiled and the two layer transforms move
+ * Static instanced cards are vertically tiled and the two layer transforms move
  * around the camera. That keeps rain/snow to two draw calls with no per-particle
  * CPU uploads, while depth testing still lets roofs, trees, and terrain occlude it.
  */
@@ -46,16 +47,16 @@ export class PrecipitationRenderer {
     this.group.frustumCulled = false;
 
     this.rainLayers = [
-      this.createLayer('rain', RAIN_BASE_PARTICLES, 0xbed8e8, 1.08, 0.46, 1, 0.92, 0x73a5c7),
-      this.createLayer('rain', Math.round(RAIN_BASE_PARTICLES * 0.58), 0xe1edf3, 1.75, 0.34, 1.18, 1.12, 0x9abbd0),
+      this.createLayer('rain', RAIN_BASE_PARTICLES, 0xc8deea, 1.08, 0.68, 1, 0.92, 0x7ba9c5),
+      this.createLayer('rain', Math.round(RAIN_BASE_PARTICLES * 0.58), 0xe7f1f5, 1.75, 0.48, 1.18, 1.12, 0x9fbfd2),
     ];
     this.snowLayers = [
-      this.createLayer('snow', SNOW_BASE_PARTICLES, 0xf4fbff, 0.72, 0.82, 0.9, 0.88, 0xcbdde8),
-      this.createLayer('snow', Math.round(SNOW_BASE_PARTICLES * 0.62), 0xffffff, 1.28, 0.68, 1.15, 1.1, 0xdceaf2),
+      this.createLayer('snow', SNOW_BASE_PARTICLES, 0xf4fbff, 0.22, 0.82, 0.9, 0.88, 0xcbdde8),
+      this.createLayer('snow', Math.round(SNOW_BASE_PARTICLES * 0.62), 0xffffff, 0.38, 0.68, 1.15, 1.1, 0xdceaf2),
     ];
 
     for (const layer of [...this.rainLayers, ...this.snowLayers]) {
-      this.group.add(layer.points);
+      this.group.add(layer.mesh);
     }
     parent.add(this.group);
     this.applyVisibility();
@@ -92,8 +93,8 @@ export class PrecipitationRenderer {
   dispose(): void {
     this.group.removeFromParent();
     for (const layer of [...this.rainLayers, ...this.snowLayers]) {
-      layer.points.geometry.dispose();
-      layer.points.material.dispose();
+      layer.mesh.geometry.dispose();
+      layer.mesh.material.dispose();
     }
     this.rainTexture.dispose();
     this.snowTexture.dispose();
@@ -110,12 +111,12 @@ export class PrecipitationRenderer {
     shadowColor: number,
   ): ParticleLayer {
     const seed = kind === 'rain' ? count * 19 + 71 : count * 29 + 131;
-    const geometry = createParticleGeometry(count, seed, color, shadowColor);
-    const material = new THREE.PointsMaterial({
+    const geometry = kind === 'rain'
+      ? createRainStreakGeometry()
+      : createSnowflakeGeometry();
+    const material = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       map: kind === 'rain' ? this.rainTexture : this.snowTexture,
-      size,
-      sizeAttenuation: true,
       transparent: true,
       opacity: 0,
       alphaTest: kind === 'rain' ? 0.035 : 0.02,
@@ -123,17 +124,27 @@ export class PrecipitationRenderer {
       depthWrite: false,
       vertexColors: true,
       fog: true,
+      side: THREE.DoubleSide,
       blending: THREE.NormalBlending,
     });
     material.name = kind === 'rain' ? 'Depth-tested rain streaks' : 'Soft depth-tested snowflakes';
 
-    const points = new THREE.Points(geometry, material);
-    points.name = kind === 'rain' ? 'Recycled rain layer' : 'Recycled snow layer';
-    points.frustumCulled = false;
-    points.renderOrder = 36;
+    const mesh = createParticleInstances(
+      geometry,
+      material,
+      count,
+      seed,
+      kind,
+      size,
+      color,
+      shadowColor,
+    );
+    mesh.name = kind === 'rain' ? 'Recycled instanced rain layer' : 'Recycled instanced snow layer';
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 36;
 
     return {
-      points,
+      mesh,
       opacity,
       speedScale,
       radiusScale,
@@ -159,77 +170,164 @@ export class PrecipitationRenderer {
       const snowSway = kind === 'snow'
         ? Math.sin(this.elapsed * (0.58 + index * 0.16) + layer.swayPhase) * radius * 0.035
         : 0;
-      layer.points.position.set(
+      layer.mesh.position.set(
         windTravel * this.profile.windX + snowSway,
         -layer.phase,
         windTravel * this.profile.windZ,
       );
-      layer.points.scale.set(radius * layer.radiusScale, 1, radius * layer.radiusScale);
-      layer.points.material.opacity = layer.opacity * amount;
+      const coverageScale = THREE.MathUtils.clamp(
+        radius * layer.radiusScale / BASE_VOLUME_RADIUS,
+        0.62,
+        1.38,
+      );
+      layer.mesh.scale.set(coverageScale, 1, coverageScale);
+      layer.mesh.material.opacity = layer.opacity * amount;
     }
   }
 
   private applyVisibility(): void {
-    for (const layer of this.rainLayers) layer.points.visible = this.rainAmount > 0.008;
-    for (const layer of this.snowLayers) layer.points.visible = this.snowAmount > 0.008;
+    for (const layer of this.rainLayers) layer.mesh.visible = this.rainAmount > 0.008;
+    for (const layer of this.snowLayers) layer.mesh.visible = this.snowAmount > 0.008;
   }
 }
 
-function createParticleGeometry(
+function createParticleInstances(
+  geometry: THREE.BufferGeometry,
+  material: THREE.MeshBasicMaterial,
   count: number,
   seed: number,
+  kind: Exclude<PrecipitationKind, 'none'>,
+  size: number,
   brightColor: number,
   shadowColor: number,
-): THREE.BufferGeometry {
+): THREE.InstancedMesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> {
   // Two identical vertical tiles prevent a visible empty band when a layer wraps.
-  const positions = new Float32Array(count * 2 * 3);
-  const colors = new Float32Array(count * 2 * 3);
+  const mesh = new THREE.InstancedMesh(geometry, material, count * 2);
   const bright = new THREE.Color(brightColor);
   const shadow = new THREE.Color(shadowColor);
   const rng = mulberry32(seed);
+  const matrix = new THREE.Matrix4();
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  const color = new THREE.Color();
 
   for (let index = 0; index < count; index += 1) {
     const angle = rng() * Math.PI * 2;
     const radius = Math.sqrt(rng());
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
+    const x = Math.cos(angle) * radius * BASE_VOLUME_RADIUS;
+    const z = Math.sin(angle) * radius * BASE_VOLUME_RADIUS;
     const y = rng() * VOLUME_HEIGHT;
     const brightness = 0.48 + rng() * 0.52;
-    const color = shadow.clone().lerp(bright, brightness);
+    color.copy(shadow).lerp(bright, brightness);
+    const scaleVariance = kind === 'rain'
+      ? 0.72 + rng() * 0.58
+      : 0.62 + rng() * 0.78;
+    scale.setScalar(size * scaleVariance);
 
-    writeParticle(positions, colors, index, x, y, z, color);
-    writeParticle(positions, colors, index + count, x, y + VOLUME_HEIGHT, z, color);
+    position.set(x, y, z);
+    matrix.compose(position, quaternion, scale);
+    mesh.setMatrixAt(index, matrix);
+    mesh.setColorAt(index, color);
+
+    position.y += VOLUME_HEIGHT;
+    matrix.compose(position, quaternion, scale);
+    mesh.setMatrixAt(index + count, matrix);
+    mesh.setColorAt(index + count, color);
   }
 
+  mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  return mesh;
+}
+
+function createRainStreakGeometry(): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const halfWidth = 0.025;
+  const halfHeight = 0.92;
+  const windLeanX = 0.13;
+  const windLeanZ = 0.055;
+  appendVerticalQuad(
+    positions,
+    uvs,
+    new THREE.Vector3(-halfWidth - windLeanX, -halfHeight, -windLeanZ),
+    new THREE.Vector3(halfWidth - windLeanX, -halfHeight, -windLeanZ),
+    new THREE.Vector3(halfWidth + windLeanX, halfHeight, windLeanZ),
+    new THREE.Vector3(-halfWidth + windLeanX, halfHeight, windLeanZ),
+  );
+  appendVerticalQuad(
+    positions,
+    uvs,
+    new THREE.Vector3(-windLeanX, -halfHeight, -halfWidth - windLeanZ),
+    new THREE.Vector3(-windLeanX, -halfHeight, halfWidth - windLeanZ),
+    new THREE.Vector3(windLeanX, halfHeight, halfWidth + windLeanZ),
+    new THREE.Vector3(windLeanX, halfHeight, -halfWidth + windLeanZ),
+  );
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.computeBoundingSphere();
   return geometry;
 }
 
-function writeParticle(
-  positions: Float32Array,
-  colors: Float32Array,
-  index: number,
-  x: number,
-  y: number,
-  z: number,
-  color: THREE.Color,
+function createSnowflakeGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const halfSize = 0.48;
+  appendVerticalQuad(
+    positions,
+    uvs,
+    new THREE.Vector3(-halfSize, -halfSize, 0),
+    new THREE.Vector3(halfSize, -halfSize, 0),
+    new THREE.Vector3(halfSize, halfSize, 0),
+    new THREE.Vector3(-halfSize, halfSize, 0),
+  );
+  appendVerticalQuad(
+    positions,
+    uvs,
+    new THREE.Vector3(0, -halfSize, -halfSize),
+    new THREE.Vector3(0, -halfSize, halfSize),
+    new THREE.Vector3(0, halfSize, halfSize),
+    new THREE.Vector3(0, halfSize, -halfSize),
+  );
+  appendVerticalQuad(
+    positions,
+    uvs,
+    new THREE.Vector3(-halfSize, 0, -halfSize),
+    new THREE.Vector3(halfSize, 0, -halfSize),
+    new THREE.Vector3(halfSize, 0, halfSize),
+    new THREE.Vector3(-halfSize, 0, halfSize),
+  );
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function appendVerticalQuad(
+  positions: number[],
+  uvs: number[],
+  bottomLeft: THREE.Vector3,
+  bottomRight: THREE.Vector3,
+  topRight: THREE.Vector3,
+  topLeft: THREE.Vector3,
 ): void {
-  const offset = index * 3;
-  positions[offset] = x;
-  positions[offset + 1] = y;
-  positions[offset + 2] = z;
-  colors[offset] = color.r;
-  colors[offset + 1] = color.g;
-  colors[offset + 2] = color.b;
+  const vertices = [bottomLeft, bottomRight, topRight, bottomLeft, topRight, topLeft];
+  const quadUvs = [[0, 0], [1, 0], [1, 1], [0, 0], [1, 1], [0, 1]];
+  for (let index = 0; index < vertices.length; index += 1) {
+    const vertex = vertices[index];
+    positions.push(vertex.x, vertex.y, vertex.z);
+    uvs.push(quadUvs[index][0], quadUvs[index][1]);
+  }
 }
 
 function createRainTexture(): THREE.DataTexture {
   return createParticleTexture(32, (x, y) => {
     const vertical = Math.sin(Math.PI * y);
-    const center = 0.46 + (y - 0.5) * 0.16;
+    const center = 0.5;
     const distance = Math.abs(x - center);
     const core = Math.exp(-(distance * distance) / 0.0015);
     const head = Math.exp(-Math.pow(y - 0.82, 2) / 0.03);
