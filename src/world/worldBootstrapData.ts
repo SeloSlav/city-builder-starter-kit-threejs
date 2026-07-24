@@ -21,7 +21,7 @@ export type WorldBootstrapQuarry = {
 
 export type WorldBootstrapForagingNode = {
   nodeId: string;
-  nodeKind: 'game' | 'berries' | 'fish';
+  nodeKind: 'game' | 'berries' | 'mushrooms' | 'fish';
   x: number;
   z: number;
   maxYield: number;
@@ -72,10 +72,15 @@ export function computeWorldBootstrapDataFromLayout(worldLayout: WorldLayout): W
     }));
 
   const foragingNodes: WorldBootstrapForagingNode[] = registry.definitionList
-    .filter((definition) => definition.kind === 'game' || definition.kind === 'berries' || definition.kind === 'fish')
+    .filter((definition) =>
+      definition.kind === 'game'
+      || definition.kind === 'berries'
+      || definition.kind === 'mushrooms'
+      || definition.kind === 'fish'
+    )
     .map((definition) => ({
       nodeId: definition.id,
-      nodeKind: definition.kind as 'game' | 'berries' | 'fish',
+      nodeKind: definition.kind as 'game' | 'berries' | 'mushrooms' | 'fish',
       x: definition.x,
       z: definition.z,
       maxYield: definition.maxYield,

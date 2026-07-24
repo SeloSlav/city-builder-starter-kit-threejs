@@ -8,7 +8,7 @@ import {
 import { hashF64 } from '../rivers/riverHash.ts';
 import type { RiverLayout, RiverPoint } from '../rivers/RiverLayout.ts';
 
-export type ForagingNodeKind = 'game' | 'berries' | 'fish';
+export type ForagingNodeKind = 'game' | 'berries' | 'mushrooms' | 'fish';
 
 export type ForagingSite = {
   x: number;
@@ -25,6 +25,7 @@ export type ForagingLayoutOptions = {
 };
 
 const DENSE_FOREST_MIN = 0.55;
+const MUSHROOM_FOREST_MIN = 0.68;
 const BERRY_EDGE_MIN = 0.28;
 const BERRY_EDGE_MAX = 0.48;
 const GAME_RESPAWN_CANDIDATE_TARGET = 48;
@@ -68,10 +69,57 @@ export class ForagingLayout {
       const berrySite = pickBerrySite(rng, seed ^ (0x9e37 + i * 0x5151), extent, forestCores, sites);
       if (berrySite) sites.push(berrySite);
     }
+    for (let i = 0; i < 2; i++) {
+      const mushroomSite = pickMushroomSite(
+        seed ^ (0x6d21 + i * 0x3137),
+        extent,
+        forestCores,
+        gameRespawnCandidates,
+        sites,
+      );
+      if (mushroomSite) sites.push(mushroomSite);
+    }
     sites.push(...pickFishSites(options.riverLayout, extent, seed ^ 0x46a91d));
 
     return new ForagingLayout(seed, sites, gameRespawnCandidates);
   }
+}
+
+function pickMushroomSite(
+  seed: number,
+  extent: number,
+  forestCores: ForestCore[],
+  denseCandidates: ReadonlyArray<{ x: number; z: number }>,
+  existing: ReadonlyArray<ForagingSite>,
+): ForagingSite | null {
+  const terrainExtent = extent * (1080 / 820);
+  const sufficientlySpaced = denseCandidates.filter((candidate) =>
+    hasMinimumDistance(existing, candidate.x, candidate.z, 118)
+  );
+  const pool = sufficientlySpaced.length > 0 ? sufficientlySpaced : denseCandidates;
+  let best: { x: number; z: number } | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+
+  for (let index = 0; index < pool.length; index++) {
+    const candidate = pool[index];
+    const density = forestDensityAt(
+      candidate.x,
+      candidate.z,
+      forestCores,
+      extent,
+      terrainExtent,
+    );
+    if (density < MUSHROOM_FOREST_MIN && sufficientlySpaced.length > 0) continue;
+    const edgeDistance = Math.min(extent - Math.abs(candidate.x), extent - Math.abs(candidate.z));
+    const score = density * 100
+      + Math.min(edgeDistance, 90) * 0.08
+      + hashF64(seed, index, 19) * 4;
+    if (score <= bestScore) continue;
+    best = candidate;
+    bestScore = score;
+  }
+
+  return best ? { ...best, kind: 'mushrooms' } : null;
 }
 
 type FishCandidate = RiverPoint & { corridorIndex: number };

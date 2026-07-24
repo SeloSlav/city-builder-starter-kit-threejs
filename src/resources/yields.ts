@@ -37,6 +37,8 @@ export function formatResourceAmount(kind: ResourceKind, amount: number): string
       return `${Math.round(amount)} game`;
     case 'berries':
       return `${Math.round(amount)} berries`;
+    case 'mushrooms':
+      return `${Math.round(amount)} mushrooms`;
     case 'fish':
       return `${Math.round(amount)} fish`;
     case 'food':

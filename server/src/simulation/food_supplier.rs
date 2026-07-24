@@ -3,12 +3,13 @@ use spacetimedb::ReducerContext;
 use crate::building_defs::building_def;
 use crate::constants::{
     BERRIES_PER_HARVEST, FISH_PER_HARVEST, FOOD_DELIVERY_SPEED_MPS, FOOD_DELIVERY_UNLOAD_SEC,
-    FOOD_PER_DELIVERY, GAME_PER_HARVEST, RICH_FISH_YIELD_MULTIPLIER, TICK_DT,
+    FOOD_PER_DELIVERY, GAME_ANIMALS_PER_HARVEST, GAME_PER_HARVEST,
+    MUSHROOMS_PER_HARVEST, RICH_FISH_YIELD_MULTIPLIER, TICK_DT,
 };
 use crate::db::*;
 use crate::economy::{building_food_storage_cap, deposit_building_food};
+use crate::foraging_policy::harvest_available;
 use crate::simulation::delivery_cargo::{any_target_needs_delivery, collect_claimed_delivery_targets};
-use crate::simulation::foraging_respawn::mark_foraging_depleted;
 use crate::simulation::delivery_supplier::{
     delivery_work_ready, dispatch_delivery_if_ready, should_alternate_single_worker,
     DeliveryDispatchConfig,
@@ -25,15 +26,42 @@ use crate::simulation::tick_context::SimTickContext;
 use crate::tables::{Building, ForagingNode, Residence};
 
 pub fn step_hunters_hall(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, building: Building) {
-    step_food_supplier(ctx, tick, clock, building, "game", GAME_PER_HARVEST, true);
+    step_food_supplier(
+        ctx,
+        tick,
+        clock,
+        building,
+        &["game"],
+        GAME_ANIMALS_PER_HARVEST,
+        GAME_PER_HARVEST,
+    );
 }
 
 pub fn step_foragers_shed(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, building: Building) {
-    step_food_supplier(ctx, tick, clock, building, "berries", BERRIES_PER_HARVEST, true);
+    // Both resources use the same three-unit basket size; the nearest
+    // seasonally available patch wins.
+    debug_assert!((BERRIES_PER_HARVEST - MUSHROOMS_PER_HARVEST).abs() <= f64::EPSILON);
+    step_food_supplier(
+        ctx,
+        tick,
+        clock,
+        building,
+        &["berries", "mushrooms"],
+        BERRIES_PER_HARVEST,
+        1.0,
+    );
 }
 
 pub fn step_fishing_camp(ctx: &ReducerContext, tick: &SimTickContext, clock: &GameClock, building: Building) {
-    step_food_supplier(ctx, tick, clock, building, "fish", FISH_PER_HARVEST, false);
+    step_food_supplier(
+        ctx,
+        tick,
+        clock,
+        building,
+        &["fish"],
+        FISH_PER_HARVEST,
+        1.0,
+    );
 }
 
 fn step_food_supplier(
@@ -41,9 +69,9 @@ fn step_food_supplier(
     tick: &SimTickContext,
     clock: &GameClock,
     building: Building,
-    node_kind: &str,
-    harvest_amount: f64,
-    depletes_node: bool,
+    node_kinds: &[&str],
+    resource_units_per_harvest: f64,
+    food_per_resource_unit: f64,
 ) {
     if labor_and_logistics_paused(ctx, building.owner, clock) {
         return;
@@ -52,13 +80,7 @@ fn step_food_supplier(
     let Some(def) = building_def(&building.kind) else {
         return;
     };
-    let Some(network) = tick.road_network(building.owner) else {
-        ctx.db.building().id().update(Building {
-            action_cooldown: (building.action_cooldown - TICK_DT).max(0.0),
-            ..building
-        });
-        return;
-    };
+    let network = tick.road_network(building.owner);
 
     let mut supplier = building;
     supplier.action_cooldown = (supplier.action_cooldown - TICK_DT).max(0.0);
@@ -66,11 +88,11 @@ fn step_food_supplier(
     let split = lodge_labor_split(supplier.assigned_labor);
     let single_worker = supplier.assigned_labor == 1;
     let harvest_ready = split.processing > 0 && supplier.action_cooldown <= 0.0;
-    let delivery_ready =
-        delivery_work_ready(split.delivering, supplier.food > 0.0, supplier.id, ctx);
+    let delivery_ready = network.is_some()
+        && delivery_work_ready(split.delivering, supplier.food > 0.0, supplier.id, ctx);
 
     let delivery_targets = if delivery_ready {
-        collect_delivery_targets(ctx, network, &supplier)
+        collect_delivery_targets(ctx, network.expect("delivery readiness requires a road network"), &supplier)
     } else {
         Vec::new()
     };
@@ -87,28 +109,31 @@ fn step_food_supplier(
         supplier = harvest_from_node(
             ctx,
             supplier,
-            node_kind,
-            harvest_amount,
+            node_kinds,
+            resource_units_per_harvest,
+            food_per_resource_unit,
             split.processing,
-            depletes_node,
+            clock.month,
         );
         supplier.action_cooldown = def.action_interval;
     }
     if do_deliver {
-        dispatch_delivery_if_ready(
-            ctx,
-            clock,
-            network,
-            &mut supplier,
-            split.delivering,
-            &delivery_targets,
-            DeliveryDispatchConfig {
-                need_kind: ResidenceNeedKind::Food,
-                speed_mps: FOOD_DELIVERY_SPEED_MPS,
-                unload_seconds: FOOD_DELIVERY_UNLOAD_SEC,
-                per_delivery: FOOD_PER_DELIVERY,
-            },
-        );
+        if let Some(network) = network {
+            dispatch_delivery_if_ready(
+                ctx,
+                clock,
+                network,
+                &mut supplier,
+                split.delivering,
+                &delivery_targets,
+                DeliveryDispatchConfig {
+                    need_kind: ResidenceNeedKind::Food,
+                    speed_mps: FOOD_DELIVERY_SPEED_MPS,
+                    unload_seconds: FOOD_DELIVERY_UNLOAD_SEC,
+                    per_delivery: FOOD_PER_DELIVERY,
+                },
+            );
+        }
     }
 
     ctx.db.building().id().update(supplier);
@@ -117,10 +142,11 @@ fn step_food_supplier(
 fn harvest_from_node(
     ctx: &ReducerContext,
     building: Building,
-    node_kind: &str,
-    harvest_amount: f64,
+    node_kinds: &[&str],
+    resource_units_per_harvest: f64,
+    food_per_resource_unit: f64,
     workers: u32,
-    depletes_node: bool,
+    month: u32,
 ) -> Building {
     if workers == 0 {
         return building;
@@ -131,49 +157,67 @@ fn harvest_from_node(
         return building;
     }
 
-    let Some(node) = find_nearest_foraging_node(
-        ctx,
-        building.x,
-        building.z,
-        building.work_radius,
-        node_kind,
-    ) else {
+    let Some(node) = find_nearest_harvestable_node(ctx, &building, node_kinds, month) else {
         return building;
     };
 
     let labor = workers as f64;
-    let richness_multiplier = if !depletes_node && node.max_yield >= 200.0 {
+    let richness_multiplier = if node.node_kind == "fish" && node.max_yield >= 200.0 {
         RICH_FISH_YIELD_MULTIPLIER
     } else {
         1.0
     };
-    let requested = harvest_amount * richness_multiplier * labor;
-    let extracted = if depletes_node {
-        requested.min(node.remaining)
-    } else {
-        requested
-    };
+    let requested = resource_units_per_harvest * richness_multiplier * labor;
+    let food_room = (food_cap - building.food).max(0.0);
+    let max_resource_for_room = food_room / food_per_resource_unit.max(1e-9);
+    let extracted = requested.min(node.remaining).min(max_resource_for_room);
     if extracted <= 0.0 {
         return building;
     }
 
-    if depletes_node {
-        let updated_node = ForagingNode {
-            remaining: node.remaining - extracted,
-            ..node
-        };
-        if updated_node.remaining <= 1e-6 {
-            mark_foraging_depleted(ctx, updated_node);
-        } else {
-            ctx.db.foraging_node().node_id().update(updated_node);
-        }
-    }
+    ctx.db.foraging_node().node_id().update(ForagingNode {
+        remaining: (node.remaining - extracted).max(0.0),
+        respawn_cooldown: 0.0,
+        ..node
+    });
 
-    let (deposited, updated_building) = deposit_building_food(&building, food_cap, extracted);
+    let produced_food = extracted * food_per_resource_unit;
+    let (deposited, updated_building) =
+        deposit_building_food(&building, food_cap, produced_food);
     if deposited <= 0.0 {
         return building;
     }
     updated_building
+}
+
+fn find_nearest_harvestable_node(
+    ctx: &ReducerContext,
+    building: &Building,
+    node_kinds: &[&str],
+    month: u32,
+) -> Option<ForagingNode> {
+    let mut nearest: Option<ForagingNode> = None;
+    let mut nearest_distance = f64::INFINITY;
+    for node_kind in node_kinds {
+        if !harvest_available(node_kind, month) {
+            continue;
+        }
+        let Some(node) = find_nearest_foraging_node(
+            ctx,
+            building.x,
+            building.z,
+            building.work_radius,
+            node_kind,
+        ) else {
+            continue;
+        };
+        let distance = (node.x - building.x).hypot(node.z - building.z);
+        if distance < nearest_distance {
+            nearest_distance = distance;
+            nearest = Some(node);
+        }
+    }
+    nearest
 }
 
 fn collect_delivery_targets(

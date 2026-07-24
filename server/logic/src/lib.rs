@@ -24,3 +24,6 @@ pub mod game_calendar;
 
 #[path = "../../src/quarry_balance.rs"]
 pub mod quarry_balance;
+
+#[path = "../../src/foraging_policy.rs"]
+pub mod foraging_policy;

@@ -36,6 +36,7 @@ import { SettlementPresentationController } from './settlementSchedulePresentati
 import { SpacetimeSnapshotApplier, type SpacetimeSnapshotApplierDeps } from './spacetimeSnapshotApplier.ts';
 import { bootstrapAppSession, type BootstrappedSession, type SessionLiveContext } from './appBootstrap.ts';
 import { WorldGenerationMismatchError } from '../world/worldConfigAuthority.ts';
+import { gameClock } from '../world/gameCalendar.ts';
 import { SessionConnectionGate } from '../network/SessionConnectionGate.ts';
 import { SessionConnectionOverlay } from '../ui/SessionConnectionOverlay.ts';
 import {
@@ -169,6 +170,7 @@ export class App {
               farmFields: this.gameState.farmFields.values(),
               pastures: this.gameState.pastures.values(),
               roadNetwork: this.roadNetwork,
+              foragingMonth: gameClock(this.gameState.tick).month,
             });
           }
         },

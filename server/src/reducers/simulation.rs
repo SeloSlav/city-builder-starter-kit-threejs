@@ -3,7 +3,7 @@ use spacetimedb::ReducerContext;
 use crate::db::*;
 use crate::simulation::{
     step_backyard_gardens,
-    step_chapels, step_chapel_parish, step_construction_sites, step_delivery_trips, step_fishing_camp, step_foragers_shed, step_foraging_respawn,
+    step_chapels, step_chapel_parish, step_construction_sites, step_delivery_trips, step_fishing_camp, step_foragers_shed, step_foraging_lifecycle,
     step_household_market_orders, step_hunters_hall, step_lumber_mill, step_marketplace_caravans,
     step_large_quarry, step_reforester, step_residence, step_stone_quarry, step_well, step_woodcutters_lodge,
     step_apiary, step_brewery, step_carpenter, step_ferry_landing,
@@ -29,8 +29,6 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
         ..config
     });
 
-    step_foraging_respawn(ctx);
-
     let sim_tick = ctx
         .db
         .world_config()
@@ -39,6 +37,7 @@ pub fn run_sim_tick(ctx: &ReducerContext, _schedule: crate::schedule::SimTickSch
         .map(|config| config.sim_tick)
         .unwrap_or(0);
     let clock = crate::simulation::game_clock(sim_tick);
+    step_foraging_lifecycle(ctx, &clock);
 
     reconcile_all_building_labor(ctx);
 

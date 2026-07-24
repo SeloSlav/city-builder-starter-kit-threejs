@@ -4,6 +4,8 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { mulberry32 } from '../props/forestField.ts';
 import type { Terrain } from '../terrain/Terrain.ts';
 import type { ForagingSite } from './ForagingLayout.ts';
+import { GAME_PATCH_MAX_YIELD } from './foragingYields.ts';
+import type { ForagingNodeState } from '../resources/types.ts';
 import {
   chooseInitialDeerMode,
   chooseRestDuration,
@@ -23,6 +25,8 @@ type DeerAnimationSet = {
 };
 
 type DeerVisual = {
+  nodeId: string;
+  actorIndex: number;
   root: THREE.Group;
   mixer: THREE.AnimationMixer;
   actions: DeerAnimationSet;
@@ -48,12 +52,13 @@ export type DeerWildlifeVisuals = {
     firstPersonObserver: DeerObserver | null,
     cameraDistance: number,
   ) => void;
+  sync: (nodes: Iterable<ForagingNodeState>) => void;
   dispose: () => void;
 };
 
 const DOE_MODEL_URL = '/assets/models/deer/quaternius-deer.glb';
 const STAG_MODEL_URL = '/assets/models/deer/quaternius-stag.glb';
-const DEER_PER_GAME_SITE = 5;
+const DEER_PER_GAME_SITE = GAME_PATCH_MAX_YIELD;
 const HERD_SPAWN_RADIUS = 12;
 const DOE_TARGET_HEIGHT = 1.7;
 const STAG_TARGET_HEIGHT = 2;
@@ -86,6 +91,7 @@ export async function createDeerWildlifeVisuals(
       doeCount: 0,
       stagCount: 0,
       update: () => undefined,
+      sync: () => undefined,
       dispose: () => undefined,
     };
   }
@@ -104,7 +110,9 @@ export async function createDeerWildlifeVisuals(
   let doeCount = 0;
   let stagCount = 0;
 
-  for (const site of gameSites) {
+  for (let siteIndex = 0; siteIndex < gameSites.length; siteIndex++) {
+    const site = gameSites[siteIndex];
+    const nodeId = `foraging-game-${siteIndex}`;
     const spawnPoints = createHerdSpawnPoints(site, rng, isBlockedAt);
     const distribution = createHerdSexDistribution(spawnPoints.length, rng);
     for (let index = 0; index < spawnPoints.length; index++) {
@@ -154,7 +162,15 @@ export async function createDeerWildlifeVisuals(
       firstAction.time = rng() * firstAction.getClip().duration;
       root.position.set(spawn.x, terrain.getHeightAt(spawn.x, spawn.z), spawn.z);
       root.rotation.y = heading;
-      deer.push({ root, mixer, actions, activeMode: initialMode, motion });
+      deer.push({
+        nodeId,
+        actorIndex: index,
+        root,
+        mixer,
+        actions,
+        activeMode: initialMode,
+        motion,
+      });
       if (sex === 'stag') stagCount++;
       else doeCount++;
     }
@@ -171,6 +187,7 @@ export async function createDeerWildlifeVisuals(
     if (!shouldShow) return;
 
     for (const visual of deer) {
+      if (!visual.root.visible) continue;
       updateDeerMotion(visual.motion, dtSeconds, {
         observer: firstPersonObserver,
         random: rng,
@@ -188,12 +205,43 @@ export async function createDeerWildlifeVisuals(
     }
   };
 
+  const sync = (nodes: Iterable<ForagingNodeState>): void => {
+    const byId = new Map(Array.from(nodes, (node) => [node.nodeId, node] as const));
+    for (const visual of deer) {
+      const node = byId.get(visual.nodeId);
+      const visiblePopulation = node && node.remaining > 0
+        ? Math.max(1, Math.floor(node.remaining + 1e-6))
+        : 0;
+      visual.root.visible = visual.actorIndex < visiblePopulation;
+      if (!node) continue;
+      const dx = node.x - visual.motion.homeX;
+      const dz = node.z - visual.motion.homeZ;
+      if (Math.hypot(dx, dz) <= 0.01) continue;
+      visual.motion.x += dx;
+      visual.motion.z += dz;
+      visual.motion.homeX = node.x;
+      visual.motion.homeZ = node.z;
+      visual.motion.targetX += dx;
+      visual.motion.targetZ += dz;
+    }
+    group.userData.gameResourceCenters = gameSites.map((site, index) => {
+      const nodeId = `foraging-game-${index}`;
+      const node = byId.get(nodeId);
+      return {
+        nodeId,
+        x: node?.x ?? site.x,
+        z: node?.z ?? site.z,
+      };
+    });
+  };
+
   return {
     group,
     deerCount: deer.length,
     doeCount,
     stagCount,
     update,
+    sync,
     dispose: () => {
       for (const visual of deer) {
         visual.mixer.stopAllAction();

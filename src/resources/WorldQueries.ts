@@ -46,6 +46,26 @@ import { isPointInPolygon2 } from '../utils/polygonGeometry.ts';
 
 const RIVER_INSPECT_MAX_SHORE = 8;
 const NEAREST_ROAD_MAX_DISTANCE = 24;
+type ForagingKind = Extract<ResourceNodeState['kind'], 'game' | 'berries' | 'mushrooms' | 'fish'>;
+
+function findNearestForagingTarget(
+  state: GameState,
+  registry: WorldLayoutRegistry,
+  x: number,
+  z: number,
+): Extract<InspectableTarget, { kind: 'foraging' }> | null {
+  let nearest: Extract<InspectableTarget, { kind: 'foraging' }> | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const node of state.foragingNodes.values()) {
+    const definition = registry.getDefinition(node.nodeId);
+    if (!definition || definition.kind === 'quarry') continue;
+    const distance = Math.hypot(node.x - x, node.z - z);
+    if (distance > definition.pickRadius || distance >= nearestDistance) continue;
+    nearestDistance = distance;
+    nearest = { kind: 'foraging', definition, state: node };
+  }
+  return nearest;
+}
 
 function findNearestResidenceTarget(
   state: GameState,
@@ -228,29 +248,8 @@ export class WorldQueries {
       }
     }
 
-    const gameDefinition = this.registry.findNearestForagingNode(x, z, 'game');
-    if (gameDefinition) {
-      const nodeState = state.foragingNodes.get(gameDefinition.id);
-      if (nodeState && nodeState.remaining > 0) {
-        return { kind: 'foraging', definition: gameDefinition, state: nodeState };
-      }
-    }
-
-    const berryDefinition = this.registry.findNearestForagingNode(x, z, 'berries');
-    if (berryDefinition) {
-      const nodeState = state.foragingNodes.get(berryDefinition.id);
-      if (nodeState && nodeState.remaining > 0) {
-        return { kind: 'foraging', definition: berryDefinition, state: nodeState };
-      }
-    }
-
-    const fishDefinition = this.registry.findNearestForagingNode(x, z, 'fish');
-    if (fishDefinition) {
-      const nodeState = state.foragingNodes.get(fishDefinition.id);
-      if (nodeState && nodeState.remaining > 0) {
-        return { kind: 'foraging', definition: fishDefinition, state: nodeState };
-      }
-    }
+    const foragingTarget = findNearestForagingTarget(state, this.registry, x, z);
+    if (foragingTarget) return foragingTarget;
 
     const river = this.getRiverAccessInfo(x, z);
     if (river.onWater || river.shoreDistance <= RIVER_INSPECT_MAX_SHORE) {
@@ -676,7 +675,12 @@ export class WorldQueries {
     const definition = this.registry.getDefinition(nodeId);
     if (
       !definition
-      || (definition.kind !== 'game' && definition.kind !== 'berries' && definition.kind !== 'fish')
+      || (
+        definition.kind !== 'game'
+        && definition.kind !== 'berries'
+        && definition.kind !== 'mushrooms'
+        && definition.kind !== 'fish'
+      )
     ) return null;
 
     const state = this.getGameState().foragingNodes.get(nodeId);
@@ -720,14 +724,36 @@ export class WorldQueries {
     x: number,
     z: number,
     radius: number,
-    nodeKind: 'game' | 'berries' | 'fish',
+    nodeKind: ForagingKind | readonly ForagingKind[],
+    includeDepleted = false,
   ): ResourceNodeState | null {
-    return findNearestResourceNodeWithRemaining(
-      this.getGameState().foragingNodes.values(),
-      x,
-      z,
-      radius,
-      nodeKind,
-    );
+    const kinds = Array.isArray(nodeKind) ? nodeKind : [nodeKind];
+    let nearest: ResourceNodeState | null = null;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    if (includeDepleted) {
+      for (const candidate of this.getGameState().foragingNodes.values()) {
+        if (!kinds.includes(candidate.kind)) continue;
+        const distance = Math.hypot(candidate.x - x, candidate.z - z);
+        if (distance > radius || distance >= nearestDistance) continue;
+        nearest = candidate;
+        nearestDistance = distance;
+      }
+      return nearest;
+    }
+    for (const kind of kinds) {
+      const candidate = findNearestResourceNodeWithRemaining(
+        this.getGameState().foragingNodes.values(),
+        x,
+        z,
+        radius,
+        kind,
+      );
+      if (!candidate) continue;
+      const distance = Math.hypot(candidate.x - x, candidate.z - z);
+      if (distance >= nearestDistance) continue;
+      nearest = candidate;
+      nearestDistance = distance;
+    }
+    return nearest;
   }
 }

@@ -1,3 +1,10 @@
+import { GAME_MIN_BREEDING_POPULATION } from '../../generated/gameBalance.ts';
+import {
+  foragingSeason,
+  isForagingHarvestAvailable,
+  isForagingRegrowthSeason,
+} from '../../foraging/foragingSeason.ts';
+import { gameClock } from '../../world/gameCalendar.ts';
 import { formatResourceAmount } from '../yields.ts';
 import type { InspectableTarget } from '../types.ts';
 import type { InspectorRenderContext, InspectorView } from './renderInspectableTarget.ts';
@@ -5,29 +12,74 @@ import { hiddenDemolish, hiddenLabor } from './renderInspectableTarget.ts';
 
 export function renderForagingInspector(
   target: Extract<InspectableTarget, { kind: 'foraging' }>,
-  _context: InspectorRenderContext,
+  context: InspectorRenderContext,
 ): InspectorView {
   const { definition, state } = target;
-  const isFish = definition.kind === 'fish';
-  const depleted = state.remaining <= 0;
+  const clock = gameClock(context.gameState.tick);
+  const season = foragingSeason(clock.month);
+  const available = isForagingHarvestAvailable(state.kind, clock.month);
+  const regrowing = isForagingRegrowthSeason(state.kind, clock.month)
+    && state.remaining < state.maxYield;
+  const depleted = state.remaining <= 1e-6;
+  const belowGameBreedingFloor = state.kind === 'game'
+    && state.remaining > 0
+    && state.remaining < GAME_MIN_BREEDING_POPULATION;
 
+  let statusText: string;
+  let statusState: InspectorView['statusState'] = 'active';
+  if (state.kind === 'fish' && depleted) {
+    statusText = 'Extinct — no fish remain to reproduce';
+    statusState = 'warning';
+  } else if (state.kind === 'game' && depleted) {
+    statusText = 'Extinct — the habitat remains empty';
+    statusState = 'warning';
+  } else if (belowGameBreedingFloor) {
+    statusText = `${formatStock(state.remaining, state.maxYield)} — below the two-animal breeding floor`;
+    statusState = 'warning';
+  } else if (!available) {
+    statusText = state.kind === 'fish'
+      ? `${formatStock(state.remaining, state.maxYield)} — frozen for winter`
+      : `${formatStock(state.remaining, state.maxYield)} — dormant for winter`;
+    statusState = 'idle';
+  } else if (depleted) {
+    statusText = `Empty — regrows here during spring and summer`;
+    statusState = 'idle';
+  } else if (regrowing) {
+    statusText = `${formatStock(state.remaining, state.maxYield)} — population recovering`;
+  } else {
+    statusText = formatStock(state.remaining, state.maxYield);
+  }
+
+  const lifecycle = lifecycleDescription(state.kind);
   return {
-    eyebrow: isFish ? 'Water resource' : 'Wild harvest',
+    eyebrow: state.kind === 'fish' ? 'Water population' : 'Wild population',
     title: definition.label,
-    statusText: isFish
-      ? `${state.isRich ? 'Rich' : 'Small'} inexhaustible shoal`
-      : depleted
-      ? 'Depleted — will return once the land recovers'
-      : `${Math.round(state.remaining)} / ${Math.round(state.maxYield)} ${definition.resource} remaining`,
-    statusState: depleted && !isFish ? 'idle' : 'active',
+    statusText,
+    statusState,
     detailsHtml: `
-      <li><span>Resource</span><span>${isFish ? 'Fresh fish (becomes food)' : formatResourceAmount(definition.resource, state.remaining)}</span></li>
-      ${isFish ? `<li><span>Reserve</span><span>Inexhaustible</span></li>
-      <li><span>Richness</span><span>${state.isRich ? 'Rich shoal (1.75x catch)' : 'Small shoal'}</span></li>` : ''}
+      <li><span>Resource</span><span>${formatResourceAmount(definition.resource, state.remaining)}</span></li>
+      <li><span>Capacity</span><span>${Math.round(state.maxYield)}</span></li>
+      <li><span>Season</span><span>${capitalize(season)}${available ? '' : ' — unavailable'}</span></li>
+      <li><span>Recovery</span><span>${lifecycle}</span></li>
+      ${state.kind === 'fish' ? `<li><span>Shoal</span><span>${state.isRich ? 'Rich population (1.75× catch)' : 'Small population'}</span></li>` : ''}
       <li><span>Harvest radius</span><span>${definition.pickRadius} m</span></li>
-      <li><span>Location</span><span>${Math.round(definition.x)}, ${Math.round(definition.z)}</span></li>
+      <li><span>Location</span><span>${Math.round(state.x)}, ${Math.round(state.z)}</span></li>
     `,
     demolish: hiddenDemolish(),
     labor: hiddenLabor(),
   };
+}
+
+function formatStock(remaining: number, maximum: number): string {
+  return `${Math.max(0, remaining).toFixed(remaining < 10 ? 1 : 0)} / ${Math.round(maximum)}`;
+}
+
+function lifecycleDescription(kind: 'game' | 'berries' | 'mushrooms' | 'fish'): string {
+  if (kind === 'fish') return 'Spring reproduction from surviving fish; zero is permanent';
+  if (kind === 'game') return 'Herd-size reproduction; at least two animals required';
+  return 'Regrows in place during spring and summer';
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

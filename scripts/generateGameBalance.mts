@@ -228,14 +228,19 @@ export type GameBalance = {
     lodgeFirewoodPerCycle: number;
     lodgeFirewoodPerDelivery: number;
     stonePerHarvest: number;
+    gameAnimalsPerHarvest: number;
     gamePerHarvest: number;
     berriesPerHarvest: number;
+    mushroomsPerHarvest: number;
     fishPerHarvest: number;
     richFishYieldMultiplier: number;
     foodPerDelivery: number;
-    gameRespawnSec: number;
-    berriesRespawnSec: number;
-    berriesRespawnRadius: number;
+    berriesRegrowPerDay: number;
+    mushroomsRegrowPerDay: number;
+    fishReproductionRatePerDay: number;
+    gameReproductionRatePerDay: number;
+    gameMinBreedingPopulation: number;
+    gameHabitatDisruptionRadius: number;
     reforesterRegrowPerSec: number;
     wellBaseRefillPerSec: number;
     wellSurgeChancePerTick: number;
@@ -482,14 +487,19 @@ function generateRust(): string {
     `pub const LODGE_FIREWOOD_PER_CYCLE: f64 = ${rustF64(b.production.lodgeFirewoodPerCycle)};`,
     `pub const LODGE_FIREWOOD_PER_DELIVERY: f64 = ${rustF64(b.production.lodgeFirewoodPerDelivery)};`,
     `pub const STONE_PER_HARVEST: f64 = ${rustF64(b.production.stonePerHarvest)};`,
+    `pub const GAME_ANIMALS_PER_HARVEST: f64 = ${rustF64(b.production.gameAnimalsPerHarvest)};`,
     `pub const GAME_PER_HARVEST: f64 = ${rustF64(b.production.gamePerHarvest)};`,
     `pub const BERRIES_PER_HARVEST: f64 = ${rustF64(b.production.berriesPerHarvest)};`,
+    `pub const MUSHROOMS_PER_HARVEST: f64 = ${rustF64(b.production.mushroomsPerHarvest)};`,
     `pub const FISH_PER_HARVEST: f64 = ${rustF64(b.production.fishPerHarvest)};`,
     `pub const RICH_FISH_YIELD_MULTIPLIER: f64 = ${rustF64(b.production.richFishYieldMultiplier)};`,
     `pub const FOOD_PER_DELIVERY: f64 = ${rustF64(b.production.foodPerDelivery)};`,
-    `pub const GAME_RESPAWN_SEC: f64 = ${rustF64(b.production.gameRespawnSec)};`,
-    `pub const BERRIES_RESPAWN_SEC: f64 = ${rustF64(b.production.berriesRespawnSec)};`,
-    `pub const BERRIES_RESPAWN_RADIUS: f64 = ${rustF64(b.production.berriesRespawnRadius)};`,
+    `pub const BERRIES_REGROW_PER_DAY: f64 = ${rustF64(b.production.berriesRegrowPerDay)};`,
+    `pub const MUSHROOMS_REGROW_PER_DAY: f64 = ${rustF64(b.production.mushroomsRegrowPerDay)};`,
+    `pub const FISH_REPRODUCTION_RATE_PER_DAY: f64 = ${rustF64(b.production.fishReproductionRatePerDay)};`,
+    `pub const GAME_REPRODUCTION_RATE_PER_DAY: f64 = ${rustF64(b.production.gameReproductionRatePerDay)};`,
+    `pub const GAME_MIN_BREEDING_POPULATION: f64 = ${rustF64(b.production.gameMinBreedingPopulation)};`,
+    `pub const GAME_HABITAT_DISRUPTION_RADIUS: f64 = ${rustF64(b.production.gameHabitatDisruptionRadius)};`,
     `pub const REFORESTER_REGROW_PER_SEC: f64 = ${rustF64(b.production.reforesterRegrowPerSec)};`,
     `pub const WELL_BASE_REFILL_PER_SEC: f64 = ${rustF64(b.production.wellBaseRefillPerSec)};`,
     `pub const WELL_SURGE_CHANCE_PER_TICK: f64 = ${rustF64(b.production.wellSurgeChancePerTick)};`,
@@ -913,11 +923,19 @@ function generateTypeScript(): string {
     `export const LODGE_FIREWOOD_PER_CYCLE = ${b.production.lodgeFirewoodPerCycle};`,
     `export const LODGE_FIREWOOD_PER_DELIVERY = ${b.production.lodgeFirewoodPerDelivery};`,
     `export const STONE_PER_HARVEST = ${b.production.stonePerHarvest};`,
+    `export const GAME_ANIMALS_PER_HARVEST = ${b.production.gameAnimalsPerHarvest};`,
     `export const GAME_PER_HARVEST = ${b.production.gamePerHarvest};`,
     `export const BERRIES_PER_HARVEST = ${b.production.berriesPerHarvest};`,
+    `export const MUSHROOMS_PER_HARVEST = ${b.production.mushroomsPerHarvest};`,
     `export const FISH_PER_HARVEST = ${b.production.fishPerHarvest};`,
     `export const RICH_FISH_YIELD_MULTIPLIER = ${b.production.richFishYieldMultiplier};`,
     `export const FOOD_PER_DELIVERY = ${b.production.foodPerDelivery};`,
+    `export const BERRIES_REGROW_PER_DAY = ${b.production.berriesRegrowPerDay};`,
+    `export const MUSHROOMS_REGROW_PER_DAY = ${b.production.mushroomsRegrowPerDay};`,
+    `export const FISH_REPRODUCTION_RATE_PER_DAY = ${b.production.fishReproductionRatePerDay};`,
+    `export const GAME_REPRODUCTION_RATE_PER_DAY = ${b.production.gameReproductionRatePerDay};`,
+    `export const GAME_MIN_BREEDING_POPULATION = ${b.production.gameMinBreedingPopulation};`,
+    `export const GAME_HABITAT_DISRUPTION_RADIUS = ${b.production.gameHabitatDisruptionRadius};`,
     `export const WELL_BASE_REFILL_PER_SEC = ${b.production.wellBaseRefillPerSec};`,
     `export const WELL_SURGE_CHANCE_PER_TICK = ${b.production.wellSurgeChancePerTick};`,
     `export const WELL_SURGE_AMOUNT_MIN = ${b.production.wellSurgeAmountMin};`,

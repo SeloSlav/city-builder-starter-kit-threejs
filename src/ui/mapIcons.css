@@ -85,8 +85,17 @@
   border-color: rgba(176, 92, 118, 0.58);
 }
 
+.foraging-map-icon--mushrooms {
+  border-color: rgba(183, 143, 92, 0.68);
+}
+
 .foraging-map-icon--fish {
   border-color: rgba(91, 153, 176, 0.72);
+}
+
+.foraging-map-icon--depleted {
+  opacity: 0.52;
+  filter: saturate(0.35);
 }
 
 .foraging-map-icon:hover,
@@ -103,6 +112,11 @@
 }
 
 .foraging-map-icon-glyph--berries {
+  width: 23px;
+  height: 23px;
+}
+
+.foraging-map-icon-glyph--mushrooms {
   width: 23px;
   height: 23px;
 }

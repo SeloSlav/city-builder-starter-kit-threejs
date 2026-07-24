@@ -6,6 +6,7 @@ import {
   BERRY_PATCH_MAX_YIELD,
   FISH_SHOAL_MAX_YIELD,
   GAME_PATCH_MAX_YIELD,
+  MUSHROOM_PATCH_MAX_YIELD,
   RICH_FISH_SHOAL_MAX_YIELD,
 } from '../foraging/foragingYields.ts';
 import { quarryMaxYield, quarryPickRadius } from './yields.ts';
@@ -51,11 +52,15 @@ export class WorldLayoutRegistry {
     }
 
     let berryIndex = 0;
+    let mushroomIndex = 0;
     let fishIndex = 0;
     for (const site of layout.foragingLayout.sites) {
       if (site.kind === 'berries') {
         definitions.push(foragingDefinition(site, berryIndex));
         berryIndex++;
+      } else if (site.kind === 'mushrooms') {
+        definitions.push(foragingDefinition(site, mushroomIndex));
+        mushroomIndex++;
       } else if (site.kind === 'fish') {
         definitions.push(foragingDefinition(site, fishIndex));
         fishIndex++;
@@ -78,7 +83,7 @@ export class WorldLayoutRegistry {
   findNearestForagingNode(
     x: number,
     z: number,
-    nodeKind: 'game' | 'berries' | 'fish',
+    nodeKind: 'game' | 'berries' | 'mushrooms' | 'fish',
   ): ResourceNodeDefinition | null {
     let best: ResourceNodeDefinition | null = null;
     let bestScore = Infinity;
@@ -160,21 +165,32 @@ export function buildingKindLabel(kind: BuildingKind): string {
 
 function foragingDefinition(site: ForagingSite, berryIndex = 0): ResourceNodeDefinition {
   const isGame = site.kind === 'game';
+  const isMushroom = site.kind === 'mushrooms';
   const isFish = site.kind === 'fish';
   const isRichFish = isFish && site.isRich === true;
   return {
     id: isGame
       ? 'foraging-game-0'
+      : isMushroom
+        ? `foraging-mushrooms-${berryIndex}`
       : isFish
         ? `foraging-fish-${isRichFish ? 'rich' : 'small'}-${berryIndex}`
         : `foraging-berries-${berryIndex}`,
     kind: site.kind,
-    resource: isGame ? 'game' : isFish ? 'fish' : 'berries',
+    resource: isGame ? 'game' : isMushroom ? 'mushrooms' : isFish ? 'fish' : 'berries',
     x: site.x,
     z: site.z,
-    label: isGame ? 'Game trail' : isFish ? (isRichFish ? 'Rich fishing shoal' : 'Fishing shoal') : 'Berry patch',
+    label: isGame
+      ? 'Game habitat'
+      : isMushroom
+        ? 'Deep-forest mushroom bed'
+        : isFish
+          ? (isRichFish ? 'Rich fishing shoal' : 'Fishing shoal')
+          : 'Berry patch',
     maxYield: isGame
       ? GAME_PATCH_MAX_YIELD
+      : isMushroom
+        ? MUSHROOM_PATCH_MAX_YIELD
       : isRichFish
         ? RICH_FISH_SHOAL_MAX_YIELD
         : isFish

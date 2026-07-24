@@ -103,6 +103,19 @@ pub fn step_granary(
         &["woodcutters_lodge", "village_storehouse"],
         GRANARY_FIREWOOD_PER_CYCLE * 3.0,
     );
+    // Once its bakery inputs are covered, the granary also centralizes fresh
+    // wild food. Producers keep enough local stock for direct household
+    // deliveries; the granary requests only while below its storage buffer.
+    let food_buffer = building_commodity_cap(&granary.kind, CommodityKind::Food) * 0.75;
+    request_connected_commodity(
+        ctx,
+        tick,
+        clock,
+        &granary,
+        CommodityKind::Food,
+        &["hunters_hall", "foragers_shed", "fishing_camp", "swineherd"],
+        food_buffer,
+    );
     granary = step_processor(
         ctx,
         clock,

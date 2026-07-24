@@ -31,6 +31,7 @@ const MARKER_KIND_CLASS: Record<WorldMapMarkerKind, string> = {
   quarry: 'terrain-minimap__marker--quarry',
   game: 'terrain-minimap__marker--game',
   berries: 'terrain-minimap__marker--berries',
+  mushrooms: 'terrain-minimap__marker--mushrooms',
   fish: 'terrain-minimap__marker--fish',
   building: 'terrain-minimap__marker--building',
 };
@@ -178,7 +179,12 @@ export class TerrainMinimapOverlay {
   private placeMarkerEntry(entry: MinimapMarkerEntry): void {
     entry.element.hidden = entry.hidden;
     if (entry.hidden) return;
-    const point = worldToMapPercent(entry.marker.x, entry.marker.z, this.bounds);
+    const node = this.options.getGameState().foragingNodes.get(entry.marker.id);
+    const point = worldToMapPercent(
+      node?.x ?? entry.marker.x,
+      node?.z ?? entry.marker.z,
+      this.bounds,
+    );
     entry.element.style.left = `${point.x}%`;
     entry.element.style.top = `${point.y}%`;
   }

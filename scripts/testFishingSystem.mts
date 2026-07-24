@@ -6,9 +6,14 @@ import { validateBuildingPlacement } from '../src/buildings/BuildingPlacementVal
 import {
   BUILDING_DEFINITIONS,
   BUILDING_STORAGE_CAPS,
+  FISH_REPRODUCTION_RATE_PER_DAY,
   FISH_PER_HARVEST,
   RICH_FISH_YIELD_MULTIPLIER,
 } from '../src/generated/gameBalance.ts';
+import {
+  isForagingHarvestAvailable,
+  isForagingRegrowthSeason,
+} from '../src/foraging/foragingSeason.ts';
 import { claimResidencesForFoodSuppliers } from '../src/logistics/roadLogistics.ts';
 import { FISH_ICON_SVG } from '../src/map/resourceMapIconGlyphs.ts';
 import { createWorldLayout } from '../src/resources/WorldLayout.ts';
@@ -45,6 +50,11 @@ assert.equal(BUILDING_DEFINITIONS.fishing_camp.workRadius, 64);
 assert.equal(BUILDING_STORAGE_CAPS.fishing_camp.food, 120);
 assert.ok(FISH_PER_HARVEST > 0);
 assert.ok(RICH_FISH_YIELD_MULTIPLIER > 1);
+assert.ok(FISH_REPRODUCTION_RATE_PER_DAY > 0);
+assert.equal(isForagingHarvestAvailable('fish', 1), false);
+assert.equal(isForagingHarvestAvailable('fish', 4), true);
+assert.equal(isForagingRegrowthSeason('fish', 4), true);
+assert.equal(isForagingRegrowthSeason('fish', 7), false);
 
 for (const mapSize of ['small', 'medium', 'large'] as const) {
   for (const hydrology of [0, 50, 100]) {
@@ -157,8 +167,24 @@ const serverFoodSupplier = readFileSync(
 );
 assert.match(
   serverFoodSupplier,
-  /step_food_supplier\(ctx,\s*tick,\s*clock,\s*building,\s*"fish",\s*FISH_PER_HARVEST,\s*false\)/s,
-  'the authoritative fishing step must use the non-depleting harvest branch',
+  /&\["fish"\],\s*FISH_PER_HARVEST,\s*1\.0/s,
+  'the authoritative fishing step must use the finite fish-population branch',
+);
+assert.match(
+  serverFoodSupplier,
+  /remaining:\s*\(node\.remaining\s*-\s*extracted\)\.max\(0\.0\)/,
+  'each catch must reduce the authoritative shoal population',
+);
+
+const foragingPolicy = readFileSync(
+  `${projectRoot}server/src/foraging_policy.rs`,
+  'utf8',
+);
+assert.match(foragingPolicy, /"fish"\s+if\s+is_spring\(month\)\s+&&\s+remaining\s*>\s*0\.0/);
+assert.match(
+  foragingPolicy,
+  /population_growth_per_second\("fish",\s*0\.0,\s*120\.0,\s*4\),\s*0\.0/,
+  'an extinct fish population must not reproduce',
 );
 
 console.log('fishing system tests passed');

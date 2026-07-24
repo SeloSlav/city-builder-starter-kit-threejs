@@ -1,104 +1,117 @@
 use spacetimedb::ReducerContext;
 
-use crate::constants::{
-    BERRIES_RESPAWN_RADIUS, BERRIES_RESPAWN_SEC, GAME_RESPAWN_SEC, TICK_DT,
-};
+use crate::balance_generated::{GAME_HABITAT_DISRUPTION_RADIUS, TICK_DT};
+use crate::building_defs::building_def;
 use crate::db::*;
-use crate::tables::ForagingNode;
+use crate::foraging_policy::population_growth_per_second;
+use crate::simulation::game_calendar::GameClock;
+use crate::tables::{Building, ForagingNode};
 use crate::world_gen;
 
-pub fn step_foraging_respawn(ctx: &ReducerContext) {
-    for node in ctx.db.foraging_node().iter() {
-        if node.remaining > 0.0 {
-            if node.respawn_cooldown > 0.0 {
-                ctx.db.foraging_node().node_id().update(ForagingNode {
-                    respawn_cooldown: 0.0,
-                    ..node
-                });
-            }
+/// Advances persistent wild-resource populations. Nodes are never deleted or
+/// rerolled here: seasonal plants recover in place, fish and game reproduce
+/// from survivors, and only a disturbed game habitat may migrate.
+pub fn step_foraging_lifecycle(ctx: &ReducerContext, clock: &GameClock) {
+    let nodes: Vec<ForagingNode> = ctx.db.foraging_node().iter().collect();
+    for node in nodes {
+        let growth = population_growth_per_second(
+            &node.node_kind,
+            node.remaining,
+            node.max_yield,
+            clock.month,
+        ) * TICK_DT;
+        let remaining = (node.remaining + growth).min(node.max_yield);
+        if (remaining - node.remaining).abs() <= 1e-12 && node.respawn_cooldown <= 0.0 {
             continue;
         }
-
-        let cooldown = (node.respawn_cooldown - TICK_DT).max(0.0);
-        if cooldown > 0.0 {
-            ctx.db.foraging_node().node_id().update(ForagingNode {
-                respawn_cooldown: cooldown,
-                ..node
-            });
-            continue;
-        }
-
-        let respawn_target = match node.node_kind.as_str() {
-            "game" => respawn_game_location(ctx, &node),
-            "berries" => Some(respawn_berries_location(ctx, &node)),
-            _ => None,
-        };
-
-        let Some((x, z)) = respawn_target else {
-            let retry_after = match node.node_kind.as_str() {
-                "game" => GAME_RESPAWN_SEC,
-                "berries" => BERRIES_RESPAWN_SEC,
-                _ => GAME_RESPAWN_SEC,
-            };
-            ctx.db.foraging_node().node_id().update(ForagingNode {
-                respawn_cooldown: retry_after,
-                ..node
-            });
-            continue;
-        };
-
         ctx.db.foraging_node().node_id().update(ForagingNode {
-            x,
-            z,
-            remaining: node.max_yield,
+            remaining,
+            // Kept in the schema for old databases; persistent nodes no longer
+            // use cooldown-based deletion or relocation.
             respawn_cooldown: 0.0,
             ..node
         });
     }
+
+    migrate_disrupted_game_habitats(ctx, clock.sim_tick);
 }
 
-fn respawn_game_location(ctx: &ReducerContext, node: &ForagingNode) -> Option<(f64, f64)> {
+fn migrate_disrupted_game_habitats(ctx: &ReducerContext, sim_tick: u64) {
+    let buildings: Vec<Building> = ctx.db.building().iter().collect();
+    if buildings.is_empty() {
+        return;
+    }
+    let resource_nodes: Vec<ForagingNode> = ctx.db.foraging_node().iter().collect();
+
+    for node in resource_nodes
+        .iter()
+        .filter(|node| node.node_kind == "game" && node.remaining > 0.0)
+    {
+        if !habitat_is_disrupted(node.x, node.z, &buildings) {
+            continue;
+        }
+        let Some((x, z)) = choose_migration_target(
+            node,
+            &resource_nodes,
+            &buildings,
+            sim_tick,
+        ) else {
+            continue;
+        };
+        let Some(current) = ctx.db.foraging_node().node_id().find(&node.node_id) else {
+            continue;
+        };
+        ctx.db.foraging_node().node_id().update(ForagingNode {
+            x,
+            z,
+            anchor_x: x,
+            anchor_z: z,
+            respawn_cooldown: 0.0,
+            ..current
+        });
+    }
+}
+
+fn habitat_is_disrupted(x: f64, z: f64, buildings: &[Building]) -> bool {
+    buildings.iter().any(|building| {
+        if building.kind == "hunters_hall" {
+            return false;
+        }
+        let footprint = building_def(&building.kind)
+            .map(|definition| definition.pick_radius)
+            .unwrap_or(0.0);
+        let radius = GAME_HABITAT_DISRUPTION_RADIUS + footprint;
+        (building.x - x) * (building.x - x) + (building.z - z) * (building.z - z)
+            <= radius * radius
+    })
+}
+
+fn choose_migration_target(
+    node: &ForagingNode,
+    resource_nodes: &[ForagingNode],
+    buildings: &[Building],
+    sim_tick: u64,
+) -> Option<(f64, f64)> {
     let candidates = world_gen::game_respawn_candidates();
     if candidates.is_empty() {
         return None;
     }
-    let tick = ctx
-        .db
-        .world_config()
-        .id()
-        .find(&0)
-        .map(|config| config.sim_tick)
-        .unwrap_or(0);
-    let index = (tick as usize + node.node_id.len()) % candidates.len();
-    let point = &candidates[index];
-    Some((point.x, point.z))
-}
-
-fn respawn_berries_location(ctx: &ReducerContext, node: &ForagingNode) -> (f64, f64) {
-    let tick = ctx
-        .db
-        .world_config()
-        .id()
-        .find(&0)
-        .map(|config| config.sim_tick)
-        .unwrap_or(0);
-    let angle = ((tick % 360) as f64).to_radians() + node.anchor_x * 0.01;
-    let radius = BERRIES_RESPAWN_RADIUS * (0.35 + ((tick % 17) as f64) / 34.0);
-    (
-        node.anchor_x + angle.cos() * radius,
-        node.anchor_z + angle.sin() * radius,
-    )
-}
-
-pub fn mark_foraging_depleted(ctx: &ReducerContext, node: ForagingNode) {
-    let cooldown = match node.node_kind.as_str() {
-        "game" => GAME_RESPAWN_SEC,
-        "berries" => BERRIES_RESPAWN_SEC,
-        _ => GAME_RESPAWN_SEC,
-    };
-    ctx.db.foraging_node().node_id().update(ForagingNode {
-        remaining: 0.0,
-        respawn_cooldown: cooldown,
-        ..node
-    });
+    let start = (sim_tick as usize + node.node_id.len()) % candidates.len();
+    for offset in 0..candidates.len() {
+        let point = &candidates[(start + offset) % candidates.len()];
+        if habitat_is_disrupted(point.x, point.z, buildings) {
+            continue;
+        }
+        let overlaps_other_resource = resource_nodes.iter().any(|other| {
+            other.node_id != node.node_id
+                && (other.x - point.x) * (other.x - point.x)
+                    + (other.z - point.z) * (other.z - point.z)
+                    < 90.0 * 90.0
+        });
+        if overlaps_other_resource {
+            continue;
+        }
+        return Some((point.x, point.z));
+    }
+    None
 }

@@ -24,18 +24,21 @@ import {
   residenceFoodRunwayDays,
 } from '../../logistics/foodLogistics.ts';
 import { formatCooldown } from './woodcuttersLodgeStatus.ts';
+import { gameClock } from '../../world/gameCalendar.ts';
+import { isForagingHarvestAvailable } from '../../foraging/foragingSeason.ts';
 
 type HarvestBuildingKind = Extract<BuildingKind, 'foragers_shed' | 'hunters_hall' | 'fishing_camp'>;
+type HarvestForagingKind = 'berries' | 'mushrooms' | 'game' | 'fish';
 
 const HARVEST_BUILDING_COPY: Record<
   HarvestBuildingKind,
-  { foragingKind: 'berries' | 'game' | 'fish'; idleLabel: string; activeUnit: string; patchLabel: string; inexhaustible?: boolean }
+  { foragingKind: HarvestForagingKind | readonly HarvestForagingKind[]; idleLabel: string; activeUnit: string; patchLabel: string }
 > = {
   foragers_shed: {
-    foragingKind: 'berries',
-    idleLabel: 'Idle — assign labor to gather berries',
-    activeUnit: 'berries',
-    patchLabel: 'patch',
+    foragingKind: ['berries', 'mushrooms'],
+    idleLabel: 'Idle — assign labor to gather wild food',
+    activeUnit: 'berries or mushrooms',
+    patchLabel: 'wild patch',
   },
   hunters_hall: {
     foragingKind: 'game',
@@ -48,7 +51,6 @@ const HARVEST_BUILDING_COPY: Record<
     idleLabel: 'Idle - assign labor to fish the shoal',
     activeUnit: 'fish',
     patchLabel: 'shoal',
-    inexhaustible: true,
   },
 };
 
@@ -75,7 +77,12 @@ export function renderHarvestBuildingInspector(
     building.z,
     building.workRadius,
     copy.foragingKind,
+    true,
   );
+  const month = gameClock(context.gameState.tick).month;
+  const seasonAvailable = nearestNode
+    ? isForagingHarvestAvailable(nearestNode.kind as HarvestForagingKind, month)
+    : true;
   const crew = foodLaborSplit(building.assignedLabor);
   const claimedResidences = context.worldQueries.getClaimedResidencesForFoodSupplier(building);
   const nextDeliveryTarget = context.worldQueries.getNextFoodDeliveryTargetForSupplier(building);
@@ -89,7 +96,10 @@ export function renderHarvestBuildingInspector(
   const foodPerTrip = foodPerDelivery(crew.delivering);
   const activeTrip = context.worldQueries.getActiveDeliveryTrip(building);
   const tripRemaining = context.worldQueries.getActiveTripRemainingSeconds(building);
-  const harvesting = building.assignedLabor > 0 && nearestNode != null;
+  const harvesting = building.assignedLabor > 0
+    && nearestNode != null
+    && nearestNode.remaining > 0
+    && seasonAvailable;
   const canDeliver = crew.delivering > 0 && onRoad && building.food > 0 && nextDeliveryTarget != null && !activeTrip;
   const cycleSeconds = laborScaledInterval(definition.harvestInterval, building.assignedLabor);
 
@@ -107,15 +117,30 @@ export function renderHarvestBuildingInspector(
   } else if (canDeliver) {
     statusText = `Delivering food — ${claimedResidences.length} road-linked home${claimedResidences.length === 1 ? '' : 's'}`;
     statusState = 'active';
-  } else if (harvesting && copy.inexhaustible) {
-    statusText = `Working - fishing an ${nearestNode.isRich ? 'inexhaustible rich' : 'inexhaustible'} ${copy.patchLabel}`;
-    statusState = 'active';
-  } else if (harvesting) {
-    statusText = `Working — ${Math.round(nearestNode.remaining)} ${copy.activeUnit} left at ${copy.patchLabel}`;
-    statusState = 'active';
-  } else if (nearestNode && copy.inexhaustible) {
-    statusText = `Idle - ${nearestNode.isRich ? 'rich ' : ''}inexhaustible ${copy.patchLabel} in range`;
+  } else if (nearestNode && !seasonAvailable) {
+    statusText = nearestNode.kind === 'fish'
+      ? 'Idle — the shoal is frozen until spring'
+      : 'Idle — seasonal forage is dormant for winter';
     statusState = 'idle';
+  } else if (nearestNode && nearestNode.remaining <= 0) {
+    statusText = nearestNode.kind === 'fish'
+      ? 'Idle — the shoal is extinct'
+      : nearestNode.kind === 'game'
+        ? 'Idle — the game habitat is extinct'
+        : 'Idle — the patch is empty and waiting for spring or summer regrowth';
+    statusState = nearestNode.kind === 'fish' || nearestNode.kind === 'game'
+      ? 'warning'
+      : 'idle';
+  } else if (
+    nearestNode?.kind === 'game'
+    && nearestNode.remaining < 2
+  ) {
+    statusText = `Warning — ${nearestNode.remaining.toFixed(1)} animal left, below the breeding floor`;
+    statusState = 'warning';
+  } else if (harvesting) {
+    const resourceLabel = nearestNode.kind === 'mushrooms' ? 'mushrooms' : copy.activeUnit;
+    statusText = `Working — ${Math.round(nearestNode.remaining)} ${resourceLabel} left at ${copy.patchLabel}`;
+    statusState = 'active';
   } else if (nearestNode) {
     statusText = `Idle — ${Math.round(nearestNode.remaining)} ${copy.activeUnit} in range`;
     statusState = 'idle';

@@ -8,7 +8,9 @@ export function syncForagingNodes(rows: Iterable<ForagingNode>): Map<string, For
       ? 'game'
       : row.nodeKind === 'fish'
         ? 'fish'
-        : 'berries';
+        : row.nodeKind === 'mushrooms'
+          ? 'mushrooms'
+          : 'berries';
     foragingNodes.set(row.nodeId, {
       nodeId: row.nodeId,
       kind,

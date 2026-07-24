@@ -9,6 +9,7 @@ import type { LivestockVisuals } from '../farming/LivestockVisuals.ts';
 import type { GameState } from '../resources/types.ts';
 import type { TreeRegistry } from '../resources/TreeRegistry.ts';
 import type { CrowdViewState } from '../settlement/crowdView.ts';
+import { gameClock } from '../world/gameCalendar.ts';
 
 export type SettlementWorldSyncTargets = {
   residenceMarkers: ResidenceMarkers | null;
@@ -71,13 +72,22 @@ export function syncSettlementWorld(
     || !mapEntriesMatch(
       state.quarries,
       previous.quarries,
-      (current, prior) => current.remaining === prior.remaining,
+      (current, prior) =>
+        current.remaining === prior.remaining
+        && current.x === prior.x
+        && current.z === prior.z,
     )
     || !mapEntriesMatch(
       state.foragingNodes,
       previous.foragingNodes,
-      (current, prior) => current.remaining === prior.remaining,
+      (current, prior) =>
+        current.remaining === prior.remaining
+        && current.x === prior.x
+        && current.z === prior.z
+        && current.kind === prior.kind,
     );
+  const workerForagingMonthChanged = !previous
+    || gameClock(state.tick).month !== gameClock(previous.tick).month;
   const workerTreePhasesChanged = !previous || !mapEntriesMatch(
     state.trees,
     previous.trees,
@@ -106,6 +116,7 @@ export function syncSettlementWorld(
     residencesChanged
     || workerBuildingsChanged
     || workerResourcesChanged
+    || workerForagingMonthChanged
     || workerTreePhasesChanged
     || workerFieldsChanged
     || workerPasturesChanged
@@ -120,6 +131,7 @@ export function syncSettlementWorld(
       farmFields: state.farmFields.values(),
       pastures: state.pastures.values(),
       roadNetwork: targets.getRoadNetwork(),
+      foragingMonth: gameClock(state.tick).month,
     });
   }
   if (farmFieldsChanged) {

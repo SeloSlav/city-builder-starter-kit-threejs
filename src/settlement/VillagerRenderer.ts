@@ -178,6 +178,7 @@ export class VillagerRenderer {
     farmFields: Iterable<FarmFieldState>;
     pastures: Iterable<PastureState>;
     roadNetwork: RoadNetwork | null;
+    foragingMonth?: number;
   }): void {
     const previousResidences = this.residences;
     const previousBuildings = this.buildings;
@@ -291,6 +292,7 @@ export class VillagerRenderer {
       treeRegistry: options.treeRegistry,
       farmFields,
       pastures,
+      foragingMonth: options.foragingMonth,
     };
     const workerBuildingIds = new Set(roster.assignments.map((assignment) => assignment.buildingId));
     this.workerTargets = new Map();

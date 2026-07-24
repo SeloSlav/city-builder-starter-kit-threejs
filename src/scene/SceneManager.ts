@@ -10,7 +10,7 @@ import { RiverField } from '../rivers/RiverField.ts';
 import { setActiveRiverLayout, setActiveQuarryLayout, getActivePlacedBuildingLayout } from '../terrain/TerrainHeight.ts';
 import { createQuarrySystem, type QuarrySystem } from '../quarries/QuarrySystem.ts';
 import { createWorldLayout, type WorldLayout } from '../resources/WorldLayout.ts';
-import type { ResourceNodeState } from '../resources/types.ts';
+import type { ForagingNodeState, ResourceNodeState } from '../resources/types.ts';
 import type { WorldGenerationSettings } from '../world/worldGenerationSettings.ts';
 import { resolveWorldDimensions } from '../world/worldGenerationSettings.ts';
 import { forestDensityScale } from '../world/worldGenerationSettings.ts';
@@ -45,6 +45,11 @@ import {
 import type { LoadingPhase } from '../ui/loadingProgress.ts';
 import { createBerryPatchVisuals, type BerryPatchVisuals } from '../foraging/BerryPatchVisuals.ts';
 import { createDeerWildlifeVisuals, type DeerWildlifeVisuals } from '../foraging/DeerWildlifeVisuals.ts';
+import {
+  createMushroomPatchVisuals,
+  type MushroomPatchVisuals,
+} from '../foraging/MushroomPatchVisuals.ts';
+import { gameClock } from '../world/gameCalendar.ts';
 import {
   disposeBuildingMaterialLibrary,
   initializeBuildingMaterialLibrary,
@@ -87,7 +92,10 @@ export class SceneManager {
   private forestManager: ForestManager | null = null;
   private grassField: GrassBladeField | null = null;
   private berryPatchVisuals: BerryPatchVisuals | null = null;
+  private mushroomPatchVisuals: MushroomPatchVisuals | null = null;
   private deerWildlifeVisuals: DeerWildlifeVisuals | null = null;
+  private latestForagingNodes: ForagingNodeState[] = [];
+  private latestForagingMonth = 1;
   private vegetationBuilt = false;
   private vegetationBuildActive = false;
   private roadNetworkRef: RoadNetwork | null = null;
@@ -331,8 +339,16 @@ export class SceneManager {
       isForagingSiteBlocked,
     );
     this.scene.add(this.berryPatchVisuals.group);
+    this.mushroomPatchVisuals = createMushroomPatchVisuals(
+      this.terrain,
+      this.worldLayout.foragingLayout.sites,
+      this.worldLayout.foragingLayout.seed,
+      isForagingSiteBlocked,
+    );
+    this.scene.add(this.mushroomPatchVisuals.group);
     this.deerWildlifeVisuals = await deerVisualsPromise;
     if (this.deerWildlifeVisuals) this.scene.add(this.deerWildlifeVisuals.group);
+    this.applyForagingVisualState();
     if (GRASS_BLADES_ENABLED) {
       this.grassField = await createGrassBladeField(this.terrain, {
         isBlockedAt: (x, z) =>
@@ -460,6 +476,7 @@ export class SceneManager {
       firstPersonActive ? this.firstPersonDeerObserver : null,
       cameraDistance,
     );
+    this.mushroomPatchVisuals?.updateCameraState(cameraDistance, firstPersonActive);
     this.renderFrame++;
     if (this.shouldRefreshShadowMap(cameraDistance)) {
       const viewBounds = computeViewShadowBounds(this.camera, this.cameraTarget, cameraDistance);
@@ -524,6 +541,18 @@ export class SceneManager {
 
   getForestManager(): ForestManager | null {
     return this.forestManager;
+  }
+
+  syncForagingNodes(nodes: Iterable<ForagingNodeState>, simTick: number): void {
+    this.latestForagingNodes = [...nodes];
+    this.latestForagingMonth = gameClock(simTick).month;
+    this.applyForagingVisualState();
+  }
+
+  private applyForagingVisualState(): void {
+    this.berryPatchVisuals?.sync(this.latestForagingNodes, this.latestForagingMonth);
+    this.mushroomPatchVisuals?.sync(this.latestForagingNodes, this.latestForagingMonth);
+    this.deerWildlifeVisuals?.sync(this.latestForagingNodes);
   }
 
   getFirstPersonCollisionRoots(): readonly THREE.Object3D[] {
@@ -693,6 +722,11 @@ export class SceneManager {
       this.berryPatchVisuals.dispose();
       disposeObject3D(this.berryPatchVisuals.group);
       this.berryPatchVisuals = null;
+    }
+    if (this.mushroomPatchVisuals) {
+      this.mushroomPatchVisuals.dispose();
+      disposeObject3D(this.mushroomPatchVisuals.group);
+      this.mushroomPatchVisuals = null;
     }
     if (this.deerWildlifeVisuals) {
       this.scene.remove(this.deerWildlifeVisuals.group);

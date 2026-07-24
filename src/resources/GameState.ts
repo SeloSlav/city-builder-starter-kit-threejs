@@ -16,20 +16,28 @@ export function createInitialGameState(registry: WorldLayoutRegistry, seed: numb
   const quarries = new Map<string, ResourceNodeState>();
   const foragingNodes = new Map<string, ForagingNodeState>();
   for (const definition of registry.definitionList) {
-    const nodeState = {
-      nodeId: definition.id,
-      kind: definition.kind,
-      resource: definition.resource,
-      remaining: definition.maxYield,
-      maxYield: definition.maxYield,
-      x: definition.x,
-      z: definition.z,
-      isRich: definition.isRich ?? false,
-    };
     if (definition.kind === 'quarry') {
-      quarries.set(definition.id, nodeState);
+      quarries.set(definition.id, {
+        nodeId: definition.id,
+        kind: definition.kind,
+        resource: definition.resource,
+        remaining: definition.maxYield,
+        maxYield: definition.maxYield,
+        x: definition.x,
+        z: definition.z,
+        isRich: definition.isRich ?? false,
+      });
     } else {
-      foragingNodes.set(definition.id, nodeState);
+      foragingNodes.set(definition.id, {
+        nodeId: definition.id,
+        kind: definition.kind,
+        resource: definition.resource,
+        remaining: definition.maxYield,
+        maxYield: definition.maxYield,
+        x: definition.x,
+        z: definition.z,
+        isRich: definition.isRich ?? false,
+      });
     }
   }
 

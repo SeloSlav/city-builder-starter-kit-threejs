@@ -18,6 +18,8 @@ import {
   seedThreeGroundCoverWindVector,
 } from '../vegetation/seedthree/seedThreeGroundCover.ts';
 import type { ForagingSite } from './ForagingLayout.ts';
+import type { ForagingNodeState } from '../resources/types.ts';
+import { isForagingHarvestAvailable } from './foragingSeason.ts';
 
 type BerryClumpPlacement = {
   nodeId: string;
@@ -30,6 +32,7 @@ type BerryClumpPlacement = {
 export type BerryPatchVisuals = {
   group: THREE.Group;
   placements: ReadonlyArray<BerryClumpPlacement>;
+  sync: (nodes: Iterable<ForagingNodeState>, month: number) => void;
   dispose: () => void;
 };
 
@@ -98,6 +101,7 @@ export async function createBerryPatchVisuals(
   const scale = new THREE.Vector3();
   const tint = new THREE.Color();
   const wind = new THREE.Vector3();
+  const berryMatrices: THREE.Matrix4[] = [];
 
   placements.forEach((placement, index) => {
     const y = terrain.getHeightAt(placement.x, placement.z) + 0.07;
@@ -116,6 +120,7 @@ export async function createBerryPatchVisuals(
     matrix.compose(position, quaternion, scale);
     mesh.setMatrixAt(index, matrix);
     berries.setMatrixAt(index, matrix);
+    berryMatrices.push(matrix.clone());
 
     const tintR = THREE.MathUtils.lerp(0.58, 0.76, rng());
     const tintG = THREE.MathUtils.lerp(0.64, 0.84, rng());
@@ -148,9 +153,27 @@ export async function createBerryPatchVisuals(
   }));
   group.add(mesh, berries);
 
+  const hiddenMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+  const sync = (nodes: Iterable<ForagingNodeState>, month: number): void => {
+    const byId = new Map(
+      Array.from(nodes, (node) => [node.nodeId, node] as const),
+    );
+    const seasonAvailable = isForagingHarvestAvailable('berries', month);
+    placements.forEach((placement, index) => {
+      const node = byId.get(placement.nodeId);
+      const stockRatio = node && node.maxYield > 0
+        ? THREE.MathUtils.clamp(node.remaining / node.maxYield, 0, 1)
+        : 0;
+      const visible = seasonAvailable && hash01(index * 7.31 + 21.7) < stockRatio;
+      berries.setMatrixAt(index, visible ? berryMatrices[index] : hiddenMatrix);
+    });
+    berries.instanceMatrix.needsUpdate = true;
+  };
+
   return {
     group,
     placements,
+    sync,
     dispose: () => {
       geometry.dispose();
       material.dispose();

@@ -52,12 +52,11 @@ pub fn bootstrap_foraging(
         }
         if let Some(existing) = ctx.db.foraging_node().node_id().find(&node.node_id) {
             ctx.db.foraging_node().node_id().update(ForagingNode {
-                x: node.x,
-                z: node.z,
+                // A persistent habitat may have migrated. Reconnecting clients
+                // must not snap it back to its generated starting position.
                 max_yield: node.max_yield,
                 remaining: existing.remaining.min(node.max_yield),
-                anchor_x: node.anchor_x,
-                anchor_z: node.anchor_z,
+                node_kind: node.node_kind,
                 ..existing
             });
         } else {

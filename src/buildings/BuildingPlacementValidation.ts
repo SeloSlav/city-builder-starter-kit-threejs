@@ -124,7 +124,16 @@ export function validateBuildingPlacement(
     return { ok: false, reason: 'no_game_in_range' };
   }
 
-  if (kind === 'foragers_shed' && !hasForagingInRadius(x, z, getBuildingDefinition(kind).workRadius, 'berries', context.foragingNodes)) {
+  if (
+    kind === 'foragers_shed'
+    && !hasAnyForagingInRadius(
+      x,
+      z,
+      getBuildingDefinition(kind).workRadius,
+      ['berries', 'mushrooms'],
+      context.foragingNodes,
+    )
+  ) {
     return { ok: false, reason: 'no_berries_in_range' };
   }
 
@@ -297,16 +306,29 @@ function hasForagingInRadius(
   x: number,
   z: number,
   radius: number,
-  nodeKind: 'game' | 'berries' | 'fish',
+  nodeKind: 'game' | 'berries' | 'mushrooms' | 'fish',
   nodes: Iterable<ForagingNodeState>,
+  includeDepleted = false,
 ): boolean {
   for (const node of nodes) {
-    if (node.kind !== nodeKind || node.remaining <= 0) continue;
+    if (node.kind !== nodeKind || (!includeDepleted && node.remaining <= 0)) continue;
     if (Math.hypot(node.x - x, node.z - z) <= radius) {
       return true;
     }
   }
   return false;
+}
+
+function hasAnyForagingInRadius(
+  x: number,
+  z: number,
+  radius: number,
+  nodeKinds: ReadonlyArray<'game' | 'berries' | 'mushrooms' | 'fish'>,
+  nodes: Iterable<ForagingNodeState>,
+): boolean {
+  return nodeKinds.some((nodeKind) =>
+    hasForagingInRadius(x, z, radius, nodeKind, nodes, true)
+  );
 }
 
 function buildingFootprintOverlapsRoadSurface(

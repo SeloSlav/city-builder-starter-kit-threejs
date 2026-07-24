@@ -36,6 +36,7 @@ const tests = [
   'test:quarry-balance',
   'test:rich-stone',
   'test:fishing',
+  'test:foraging-ecology',
 ] as const;
 
 let failed = 0;

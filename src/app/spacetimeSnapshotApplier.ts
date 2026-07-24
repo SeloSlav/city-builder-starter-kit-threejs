@@ -43,6 +43,9 @@ export class SpacetimeSnapshotApplier {
     const burgageZonesChanged = !previous || state.burgageZones !== previous.burgageZones;
     const farmFieldsChanged = !previous || state.farmFields !== previous.farmFields;
     const quarriesChanged = !previous || state.quarries !== previous.quarries;
+    const foragingChanged = !previous
+      || state.foragingNodes !== previous.foragingNodes
+      || state.tick !== previous.tick;
     const residenceCollidersChanged = !previous || !mapEntriesMatch(
       state.residences,
       previous.residences,
@@ -79,6 +82,9 @@ export class SpacetimeSnapshotApplier {
     const quarryCollidersChanged = quarriesChanged
       ? (deps.sceneManager?.syncQuarryNodes(state.quarries.values()) ?? false)
       : false;
+    if (foragingChanged) {
+      deps.sceneManager?.syncForagingNodes(state.foragingNodes.values(), state.tick);
+    }
     const treesChanged = !previous || !mapEntriesShareValues(state.trees, previous.trees);
     if (treesChanged) {
       const changedTreeIds: string[] = [];

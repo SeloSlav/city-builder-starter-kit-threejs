@@ -5,7 +5,7 @@
       "nodeKind": "game",
       "x": 217.35330707281827,
       "z": -345.85891523715105,
-      "maxYield": 200,
+      "maxYield": 12,
       "anchorX": 217.35330707281827,
       "anchorZ": -345.85891523715105
     },
@@ -26,6 +26,24 @@
       "maxYield": 60,
       "anchorX": 327.1112253328785,
       "anchorZ": 111.66617432907223
+    },
+    {
+      "nodeId": "foraging-mushrooms-0",
+      "nodeKind": "mushrooms",
+      "x": -302.96968699395654,
+      "z": -316.3476636510342,
+      "maxYield": 42,
+      "anchorX": -302.96968699395654,
+      "anchorZ": -316.3476636510342
+    },
+    {
+      "nodeId": "foraging-mushrooms-1",
+      "nodeKind": "mushrooms",
+      "x": -71.30329248979687,
+      "z": 233.68659560326486,
+      "maxYield": 42,
+      "anchorX": -71.30329248979687,
+      "anchorZ": 233.68659560326486
     },
     {
       "nodeId": "foraging-fish-small-0",

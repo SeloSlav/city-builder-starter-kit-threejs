@@ -49,6 +49,7 @@
     "test:quarry-balance": "node --experimental-strip-types scripts/testQuarryBalance.mts",
     "test:rich-stone": "node --experimental-strip-types scripts/testRichStoneSystem.mts",
     "test:fishing": "node --experimental-strip-types scripts/testFishingSystem.mts",
+    "test:foraging-ecology": "node --experimental-strip-types scripts/testForagingEcology.mts",
     "test": "npm run test:ci",
     "test:ci": "npx tsx scripts/run-all-tests.mts",
     "deploy:local": "powershell -ExecutionPolicy Bypass -File ./server/deploy-local.ps1",

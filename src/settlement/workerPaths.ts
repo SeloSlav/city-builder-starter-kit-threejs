@@ -14,6 +14,7 @@ import { roadPathRoute } from '../logistics/roadLogistics.ts';
 import type { RoadNetwork } from '../roads/RoadNetwork.ts';
 import { polylineLengthXZ, type PointXZ } from '../utils/pathGeometry.ts';
 import { hashStringSeed, mulberry32 } from '../utils/random.ts';
+import { isForagingHarvestAvailable } from '../foraging/foragingSeason.ts';
 
 export const PRODUCTION_WORKPLACE_KINDS = [
   'lumber_mill',
@@ -59,6 +60,7 @@ export type WorkerTargetKind =
   | 'quarry'
   | 'game'
   | 'berries'
+  | 'mushrooms'
   | 'fish'
   | 'field'
   | 'pasture'
@@ -87,6 +89,7 @@ export type WorkerTargetInputs = {
   } | null;
   farmFields: Iterable<FarmFieldState>;
   pastures: Iterable<PastureState>;
+  foragingMonth?: number;
 };
 
 export function isProductionWorkplaceKind(kind: BuildingKind): boolean {
@@ -218,19 +221,40 @@ export function collectWorkerTargets(
   }
   if (definition.requiresGame) {
     for (const node of inputs.foragingNodes) {
-      if (node.kind !== 'game' || node.remaining <= 0) continue;
+      if (
+        node.kind !== 'game'
+        || node.remaining <= 0
+        || (
+          inputs.foragingMonth !== undefined
+          && !isForagingHarvestAvailable(node.kind, inputs.foragingMonth)
+        )
+      ) continue;
       pushNodeInsideExtent(building, radius, node, 'game', targets);
     }
   }
   if (definition.requiresBerries) {
     for (const node of inputs.foragingNodes) {
-      if (node.kind !== 'berries' || node.remaining <= 0) continue;
-      pushNodeInsideExtent(building, radius, node, 'berries', targets);
+      if (
+        (node.kind !== 'berries' && node.kind !== 'mushrooms')
+        || node.remaining <= 0
+        || (
+          inputs.foragingMonth !== undefined
+          && !isForagingHarvestAvailable(node.kind, inputs.foragingMonth)
+        )
+      ) continue;
+      pushNodeInsideExtent(building, radius, node, node.kind, targets);
     }
   }
   if (definition.requiresFish) {
     for (const node of inputs.foragingNodes) {
-      if (node.kind !== 'fish' || node.remaining <= 0) continue;
+      if (
+        node.kind !== 'fish'
+        || node.remaining <= 0
+        || (
+          inputs.foragingMonth !== undefined
+          && !isForagingHarvestAvailable(node.kind, inputs.foragingMonth)
+        )
+      ) continue;
       pushNodeInsideExtent(building, radius, node, 'fish', targets);
     }
   }
@@ -381,7 +405,7 @@ function pushNodeInsideExtent(
   building: BuildingState,
   radius: number,
   node: ResourceNodeState,
-  kind: Extract<WorkerTargetKind, 'quarry' | 'game' | 'berries' | 'fish'>,
+  kind: Extract<WorkerTargetKind, 'quarry' | 'game' | 'berries' | 'mushrooms' | 'fish'>,
   targets: WorkerTarget[],
 ): void {
   if (radius <= 0 || distanceSq(building, node) > radius * radius) return;

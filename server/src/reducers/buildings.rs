@@ -162,10 +162,11 @@ fn has_foraging_in_radius(
     z: f64,
     radius: f64,
     node_kind: &str,
+    include_depleted: bool,
 ) -> bool {
     let radius_sq = radius * radius;
     for node in ctx.db.foraging_node().iter() {
-        if node.node_kind != node_kind || node.remaining <= 0.0 {
+        if node.node_kind != node_kind || (!include_depleted && node.remaining <= 0.0) {
             continue;
         }
         let dx = node.x - x;
@@ -318,15 +319,18 @@ pub fn place_building(ctx: &ReducerContext, kind: String, x: f64, z: f64) -> Res
         return Err("Large Quarries must be placed directly over a rich stone deposit.".to_string());
     }
 
-    if def.requires_game && !has_foraging_in_radius(ctx, x, z, def.work_radius, "game") {
+    if def.requires_game && !has_foraging_in_radius(ctx, x, z, def.work_radius, "game", false) {
         return Err("No game within work range.".to_string());
     }
 
-    if def.requires_berries && !has_foraging_in_radius(ctx, x, z, def.work_radius, "berries") {
-        return Err("No berries within work range.".to_string());
+    if def.requires_berries
+        && !has_foraging_in_radius(ctx, x, z, def.work_radius, "berries", true)
+        && !has_foraging_in_radius(ctx, x, z, def.work_radius, "mushrooms", true)
+    {
+        return Err("No berries or mushrooms within work range.".to_string());
     }
 
-    if def.requires_fish && !has_foraging_in_radius(ctx, x, z, def.work_radius, "fish") {
+    if def.requires_fish && !has_foraging_in_radius(ctx, x, z, def.work_radius, "fish", false) {
         return Err("No fish shoal within work range.".to_string());
     }
 

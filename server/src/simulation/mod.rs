@@ -41,7 +41,7 @@ pub use road_logistics::road_path_distance;
 pub use household_market_orders::step_household_market_orders;
 pub use marketplace_caravan::{step_marketplace_caravans, try_dispatch_marketplace_caravan, MarketCaravanDispatch};
 pub use food_supplier::{step_fishing_camp, step_foragers_shed, step_hunters_hall};
-pub use foraging_respawn::step_foraging_respawn;
+pub use foraging_respawn::step_foraging_lifecycle;
 pub use lumber_mill::step_lumber_mill;
 pub use reforester::step_reforester;
 pub use chapel::step_chapels;

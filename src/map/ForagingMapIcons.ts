@@ -8,7 +8,12 @@ import {
   createMapIconRoot,
   placeProjectedMapButton,
 } from './mapIconProjection.ts';
-import { BERRY_ICON_SVG, FISH_ICON_SVG, GAME_ICON_SVG } from './resourceMapIconGlyphs.ts';
+import {
+  BERRY_ICON_SVG,
+  FISH_ICON_SVG,
+  GAME_ICON_SVG,
+  MUSHROOM_ICON_SVG,
+} from './resourceMapIconGlyphs.ts';
 
 type ForagingMapIconsOptions = {
   uiRoot: HTMLElement;
@@ -68,7 +73,15 @@ export class ForagingMapIcons {
         continue;
       }
 
-      placeProjectedMapButton(button, marker.x, marker.z, worldPoint, frame);
+      const node = nodes.get(marker.id);
+      button.classList.toggle('foraging-map-icon--depleted', (node?.remaining ?? 0) <= 0);
+      placeProjectedMapButton(
+        button,
+        node?.x ?? marker.x,
+        node?.z ?? marker.z,
+        worldPoint,
+        frame,
+      );
     }
   }
 
@@ -91,6 +104,9 @@ export class ForagingMapIcons {
     } else if (marker.kind === 'berries') {
       button.classList.add('foraging-map-icon--berries');
       button.innerHTML = BERRY_ICON_SVG;
+    } else if (marker.kind === 'mushrooms') {
+      button.classList.add('foraging-map-icon--mushrooms');
+      button.innerHTML = MUSHROOM_ICON_SVG;
     } else {
       button.classList.add('foraging-map-icon--fish');
       button.innerHTML = FISH_ICON_SVG;

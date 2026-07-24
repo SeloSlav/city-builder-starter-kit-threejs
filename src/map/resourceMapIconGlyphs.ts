@@ -5,6 +5,7 @@
  * - Deer head by Caro Asercion
  * - Berry bush by Delapouite
  * - Fish silhouette drawn in-project
+ * - Mushroom silhouette drawn in-project
  *
  * The original black square backgrounds were removed, the quarry and berry
  * artwork was redrawn as low-detail silhouettes, and every glyph now inherits
@@ -33,6 +34,16 @@ export const BERRY_ICON_SVG = `
     <circle cx="14.1" cy="11.1" r="2.5" fill="currentColor"/>
     <circle cx="10.8" cy="16.6" r="2.55" fill="currentColor"/>
     <circle cx="16.5" cy="16.2" r="2.35" fill="currentColor"/>
+  </svg>
+`.trim();
+
+export const MUSHROOM_ICON_SVG = `
+  <svg class="map-resource-icon-glyph foraging-map-icon-glyph foraging-map-icon-glyph--mushrooms" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="currentColor" d="M3.2 11.1C3.8 6.3 7.2 3.6 12 3.6s8.2 2.7 8.8 7.5c-2.6-.8-5.6-1.2-8.8-1.2s-6.2.4-8.8 1.2Z"/>
+    <path fill="currentColor" d="M9.7 10.2h4.6c-.5 2.1-.4 4.1.3 6.2.5 1.6-.3 3.6-2.6 3.6s-3.1-2-2.6-3.6c.7-2.1.8-4.1.3-6.2Z"/>
+    <circle cx="8" cy="7.6" r="1" fill="var(--panel, #171915)"/>
+    <circle cx="13.4" cy="6.3" r=".85" fill="var(--panel, #171915)"/>
+    <circle cx="16.4" cy="8.5" r=".7" fill="var(--panel, #171915)"/>
   </svg>
 `.trim();
 

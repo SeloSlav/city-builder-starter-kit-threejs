@@ -206,7 +206,7 @@ export function samplePointInHillEdgeBand(
 }
 
 export function hasMinimumDistance(
-  points: Array<{ x: number; z: number }>,
+  points: ReadonlyArray<{ x: number; z: number }>,
   x: number,
   z: number,
   minDistance: number,

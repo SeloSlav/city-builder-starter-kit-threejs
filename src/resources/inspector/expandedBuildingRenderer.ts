@@ -24,7 +24,7 @@ import {
 const PROCESS: Record<string, string> = {
   threshing_barn: 'Farmstead crew works nearby drawn fields',
   watermill: 'Grain + river power → flour',
-  granary: 'Flour + well water + firewood → staple food',
+  granary: 'Bakes staple food and stores road-hauled wild food',
   brewery: 'Grain + water → ale',
   smokehouse: 'Fresh food + firewood → preserved food',
   apiary: 'Forest forage → honey + food',

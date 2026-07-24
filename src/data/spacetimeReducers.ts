@@ -339,7 +339,12 @@ export async function bootstrapWorld(
       anchorZ: node.anchorZ,
     }))
     : registry.definitionList
-      .filter((definition) => definition.kind === 'game' || definition.kind === 'berries')
+      .filter((definition) =>
+        definition.kind === 'game'
+        || definition.kind === 'berries'
+        || definition.kind === 'mushrooms'
+        || definition.kind === 'fish'
+      )
       .map((definition) => ({
         nodeId: definition.id,
         nodeKind: definition.kind,
